@@ -5,24 +5,26 @@
 
 :8080 {
     @unexpected not host {$POSTFORGE_GATEWAY_HOST}
-    respond @unexpected 421
+    route {
+        respond @unexpected 421
 
-    @portal path /authelia /authelia/*
-    handle @portal {
-        reverse_proxy postforge-auth:9091 {
-            header_up X-Forwarded-Proto https
+        @portal path /authelia /authelia/*
+        handle @portal {
+            reverse_proxy postforge-auth:9091 {
+                header_up X-Forwarded-Proto https
+            }
         }
-    }
 
-    handle {
-        forward_auth postforge-auth:9091 {
-            uri /api/authz/forward-auth
-            header_up X-Forwarded-Proto https
-        }
-        reverse_proxy postiz:5000 {
-            header_up X-Forwarded-Proto https
-            header_up -Proxy-Authorization
-            header_up Cookie "(^|;[[:space:]]*)postforge_gateway=[^;]*" "${1}postforge_gateway=_"
+        handle {
+            forward_auth postforge-auth:9091 {
+                uri /api/authz/forward-auth
+                header_up X-Forwarded-Proto https
+            }
+            reverse_proxy postiz:5000 {
+                header_up X-Forwarded-Proto https
+                header_up -Proxy-Authorization
+                header_up Cookie "(^|;[[:space:]]*)postforge_gateway=[^;]*" "${1}postforge_gateway=_"
+            }
         }
     }
 }
