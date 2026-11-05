@@ -45,7 +45,7 @@ silently publish content.
 
 - **Approval-safe drafting:** media and one-sentence instructions become
   reviewable Postiz drafts.
-- **WhatsApp self-chat intake:** text, media (up to 32 MiB by default), and optional voice notes become
+- **WhatsApp self-chat intake:** text, photos, videos up to 256 MiB, and optional voice notes become
   plans; approval/rejection commands are explicit and bilingual.
 - **Durable scheduling:** Temporal preserves scheduled work across a controlled
   stop/start; late delivery is visible rather than silently discarded.
@@ -86,7 +86,7 @@ Start with [SETUP.md](SETUP.md) and copy `.env.example` to a private `.env` (mod
 | 7. Local captions | Installed Ollama and `LOCAL_LLM_MODEL` | No cloud API key is needed for local captions. Gemini is optional and disabled unless explicitly enabled. |
 | Backup and migration | A passphrase of at least 12 characters | Encrypts the exported credentials; it is separate from all service passwords. |
 
-**Large WhatsApp files:** intake checks the protobuf file size before asking Evolution to download/base64-encode media. The default is 32 MiB (`WA_MAX_MEDIA_MB`, effective range 1–64 MiB). Unknown sizes are rejected. Send larger videos through the Mac window, which avoids the Evolution base64 memory overhead.
+**Large WhatsApp files:** PostForge streams videos above the regular intake limit to disk, up to 256 MiB, and verifies the file size and SHA-256 before using them. The regular intake limit is 32 MiB by default (`WA_MAX_MEDIA_MB`, effective range 1–64 MiB). Use New Post for bigger files or media with missing download metadata.
 
 The host scripts obtain the Postiz organization's API key from the local database; this setup does not require a separate `POSTIZ_API_KEY` environment variable. Never reuse the Evolution global key as a Postiz password.
 

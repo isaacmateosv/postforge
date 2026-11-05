@@ -314,6 +314,8 @@ def run(env, p, dry_run):
     try:
         ready = [pmlib.normalize_media(os.path.expanduser(path), tmp) for path in p["media"]]
         kinds = [kind for kind, _ in ready]
+        short = kinds == ["video"] and pmlib.is_short(ready[0][1])
+        shorts_requested = re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
         usable = []
         for network, channel, _ in targets:
             if not kinds:
@@ -324,13 +326,16 @@ def run(env, p, dry_run):
                                if channel and channel.get("identifier") in NEEDS_MEDIA else None)
             else:
                 problem = media_problem(network, kinds)
+                if not problem and network == "youtube" and shorts_requested and not short:
+                    problem = ("YouTube Shorts require a vertical or square video of at most 3 minutes"
+                               if p["lang"] != "Spanish" else
+                               "YouTube Shorts requiere un video vertical o cuadrado de hasta 3 minutos")
             if problem:
                 result["warnings"].append(problem + ": skipped")
             else:
                 usable.append((network, channel, placement(p["command"], network)))
         if not usable:
             raise PMError("Nothing to draft: " + "; ".join(result["warnings"]))
-        short = bool(kinds) and kinds == ["video"] and pmlib.is_short(ready[0][1])
 
         if p["exact"]:
             caption, source = p["exact"], "your text"

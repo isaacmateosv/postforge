@@ -455,4 +455,4 @@ cd ~/postforge
 Copy the resulting package, the export, and `.env` privately to the new Mac. Never
 upload `.env`, `data/`, `logs/`, `run/`, or `exports/` to a public service.
 
-WhatsApp intake defaults to **32 MiB per file** (`WA_MAX_MEDIA_MB`, effective range 1–64). Large or unknown-size files should use the native New Post window; this prevents Evolution base64 downloads from exceeding its memory budget.
+WhatsApp’s regular intake defaults to **32 MiB per file** (`WA_MAX_MEDIA_MB`, effective range 1–64). PostForge streams larger videos up to **256 MiB** to disk and verifies their size and SHA-256 before planning. Use New Post for bigger files or media with missing download metadata.
