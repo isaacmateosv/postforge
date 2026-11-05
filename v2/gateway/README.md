@@ -53,6 +53,18 @@ can do inside the workspace. They are separate settings.
   switch before applying an invitation, so an invite alone cannot create a new
   email/password account while registration is disabled.
 
+Without a mail provider, the pinned Postiz build can return an invitation
+link without emailing it. Copy the link and hand it to the intended person
+privately, such as through your own email or a direct message. The link expires
+in two days. Local accounts created with no Postiz email provider are activated
+at creation. The gateway password and authenticator QR code are separate from
+the invitation.
+
+Use the tray's **Gateway Access** editor for gateway authorization. Keep
+workspace roles and invitations in Postiz. If a future onboarding screen
+offers temporary signup, put it behind an explicit owner action, show the
+expiry, and restore disabled registration automatically.
+
 For a person who leaves, revoke gateway access and remove their Postiz workspace
 membership separately. Postiz invitation delivery is independent of how the
 gateway provisions authenticators.
