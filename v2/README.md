@@ -38,7 +38,16 @@ A purchased domain does not change this sequence. Use a DNS name like
 `postiz.example.org`, configure HTTPS and the gate there, and update the
 Postiz URLs and provider OAuth callback registrations together. Check from a
 signed-out browser that the old hostname, new hostname, `/api/`, assets, and
-uploads offer no alternate anonymous route. Then test a full OAuth round trip.
+uploads offer no alternate anonymous route. Then test a full OAuth round trip. The signed-out smoke test can check
+the expected gateway response without following redirects or handling credentials:
+
+```text
+python v2/check_gateway.py https://postiz.example.org --login https://login.example.org/sso
+```
+
+A signed-out check is one step. Complete MFA as an allowed user, verify a
+different account is denied, and test Postiz sign-in and the provider callback
+before declaring the cutover ready.
 A machine callback that cannot carry browser authentication needs its own
 narrow, verified route. Keep the rest of the API gated.
 
