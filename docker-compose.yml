@@ -1,0 +1,203 @@
+name: postforge
+
+# Docker keeps container logs until a container is removed (every `stop`); cap them for long runs.
+# Five rotated files preserve more debugging history during a noisy failure without unbounded growth.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pm-postgres
+    logging: *logging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    command: >
+      postgres -c shared_buffers=64MB
+               -c effective_cache_size=128MB
+               -c maintenance_work_mem=16MB
+               -c work_mem=4MB
+               -c max_connections=200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pm-redis
+    logging: *logging
+    restart: unless-stopped
+    volumes:
+      - ./data/redis:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    # AOF persistence is REQUIRED: Evolution API keeps every WhatsApp Signal key
+    # (pre-keys, sessions, sender keys) in Redis db 1 (hash evolution:instance:<id>);
+    # only creds live in Postgres. Without AOF every stop/start wiped them
+    # (PreKeyError storms, full session re-negotiation on each broadcast).
+    # volatile-lru: only keys with a TTL may be evicted, so the key hash is never dropped.
+    command: redis-server --maxmemory 96mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync everysec --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: pm-temporal
+    logging: *logging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Visibility (workflow search) lives in Postgres (database temporal_visibility) instead of
+    # Elasticsearch, which needed ~380 MiB and the longest boot. Postgres visibility allows 3 Text
+    # search attributes; Postiz registers 2 (postId, organizationId) at boot, so Temporal's own
+    # sample attributes are skipped to leave room (README Gotcha #20).
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=postgres
+      - ENABLE_ES=false
+      - SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true
+      - TEMPORAL_NAMESPACE=default
+    # Ready = the "default" namespace answers. Postiz waits for this: booted earlier, its backend
+    # stays at HTTP 502 and its orchestrator runs without a worker, so scheduled posts never go out.
+    healthcheck:
+      test: ["CMD-SHELL", "temporal operator namespace describe -n default --address $$(hostname -i):7233 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 36
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 384M
+    ports:
+      - "127.0.0.1:7233:7233"
+
+  postiz:
+    # Pinned (was :latest, v2.25.3 per handoff). publish-machine.sh patches compiled
+    # files inside this exact build; bump deliberately and re-verify the patch.
+    image: ghcr.io/gitroomhq/postiz-app@sha256:1e376ff2cb781022d528f171719cf174cf693a985a30cb40eefb13eae3ddda13
+    container_name: pm-postiz
+    logging: *logging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      - MAIN_URL=${FRONTEND_URL}
+      - TEMPORAL_ADDRESS=temporal:7233
+    # Runs the three apps without the pnpm/PM2 wrappers (~300 MB less) and applies the cookie
+    # patch as it boots (README Gotchas #5 and #19). tini (init) passes `docker stop` on to them.
+    command: ["sh", "/pm-patches/run.sh"]
+    init: true
+    stop_grace_period: 15s
+    volumes:
+      - ./data/postiz-uploads:/uploads
+      - ./patches/postiz:/pm-patches:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1536M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:4200:5000"
+
+  evolution-api:
+    # Pinned (was :latest, v2.3.7). broadcast-story.sh relies on this version's
+    # sendStatus batching semantics.
+    image: evoapicloud/evolution-api@sha256:966625532d9076a2381e973a271307d107e6f070450de3abeeea8bd18be07252
+    container_name: pm-evolution-api
+    logging: *logging
+    restart: unless-stopped
+    # The image's own entrypoint, preceded by the status patches (README Gotcha #14) and the manager-logo fix
+    # (its logo URLs 404 upstream), with node
+    # exec'd directly instead of through `npm run start:prod` (one idle process less). The patches
+    # always exit 0, so Evolution boots even if one can't apply. tini (init) passes `docker stop` on.
+    entrypoint: ["/bin/bash", "-c", "node /pm-patches/status-receipts.js; node /pm-patches/manager-logo.js; . ./Docker/scripts/deploy_database.sh && exec node dist/main"]
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Bound the JS heap; Baileys history buffers and Prisma also use native memory.
+      - NODE_OPTIONS=--max-old-space-size=256
+      - SERVER_PORT=8080
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=evolution
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379/1
+      # The image logs every level (DEBUG, VERBOSE, ...) in color; INFO keeps the receipt lines.
+      - LOG_LEVEL=ERROR,WARN,INFO,LOG
+      - LOG_COLOR=false
+      # The image is set to America/Sao_Paulo, which put log times 2 h ahead of the bakery's.
+      - TZ=America/Guayaquil
+    volumes:
+      - ./data/evolution-store:/evolution/store
+      # Read-only view of the media library so image/video statuses can be sent
+      # by container path (/media/...) instead of base64 JSON bodies.
+      - ./data/postiz-uploads:/media:ro
+      - ./patches/evolution:/pm-patches:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  ngrok:
+    image: ngrok/ngrok@sha256:ff3b5c3674432d14a786349908b7bdf28ee56c25662637afcbe7180d471993ef
+    container_name: pm-tunnel
+    logging: *logging
+    restart: unless-stopped
+    command:
+      - "http"
+      - "--url=${NGROK_DOMAIN}"
+      - "postiz:5000"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 64M

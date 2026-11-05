@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>PostForge</string>
+	<key>CFBundleDisplayName</key>
+	<string>PostForge</string>
+	<key>CFBundleIdentifier</key>
+	<string>local.postforge.tray</string>
+	<key>CFBundleExecutable</key>
+	<string>PostForgeTray</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleIconFile</key>
+	<string>PostForge</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<!-- Keep the menu bar tray while also allowing a normal Dock app and main window -->
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Isaac Mateo Sarzosa Valencia</string>
+	<!-- postforge://new-post and the legacy publishmachine://new-post open the New Post window -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>local.postforge.tray</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>postforge</string>
+				<string>publishmachine</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Filled in by build.sh: the project folder this app drives -->
+	<key>PMProjectDir</key>
+	<string>__PROJECT_DIR__</string>
+</dict>
+</plist>
