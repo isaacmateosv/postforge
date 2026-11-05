@@ -3174,8 +3174,8 @@ final class BackupWindow: NSObject {
         exportActions.spacing = 10
         exportActions.alignment = .centerY
         let exportBody = panelStack([
-            windowLabel(t("Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.",
-                          "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales."),
+            windowLabel(t("Saves encrypted credentials, gateway access settings if configured, and a verified Postiz export. Keep the folder private because the Postiz archive contains channel tokens.",
+                          "Guarda tus credenciales cifradas, los ajustes de acceso seguro si están configurados y un respaldo verificado de Postiz. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales."),
                         size: 12, color: .secondaryLabelColor, lines: 4),
             exportRow, exportPass, exportPass2,
             windowLabel(t("You will need this passphrase to restore. It can't be recovered if you forget it.",
@@ -3277,11 +3277,11 @@ final class BackupWindow: NSObject {
         let parts = line.dropFirst(5).split(separator: " ", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return nil }
         let translations = [
-            "Encrypting credentials": "Cifrando credenciales",
+            "Encrypting credentials and gateway settings": "Cifrando credenciales y ajustes de acceso",
             "Exporting Postiz data": "Exportando datos de Postiz",
             "Verifying backup": "Verificando el respaldo",
-            "Validating credentials": "Validando credenciales",
-            "Restoring Postiz data": "Restaurando datos de Postiz",
+            "Validating backup credentials": "Validando las credenciales del respaldo",
+            "Restoring Postiz and gateway data": "Restaurando datos de Postiz y del acceso seguro",
             "Finishing": "Finalizando",
         ]
         let label = t(parts[1], translations[parts[1]] ?? parts[1])
@@ -3348,8 +3348,8 @@ final class BackupWindow: NSObject {
             return setStatus(restoreStatus, t("Enter the backup's passphrase.", "Escribe la contraseña del respaldo."), error: true)
         }
         guard delegate.ask(t("Replace this Mac's PostForge data?", "¿Reemplazar los datos de PostForge de este Mac?"),
-                           t("Restoring replaces your current credentials, Postiz posts, channels and media with the ones in the backup. PostForge will stop while it restores.",
-                             "Restaurar reemplaza tus credenciales, publicaciones, canales y archivos actuales por los del respaldo. PostForge se detendrá mientras restaura."),
+                           t("Restoring replaces your credentials, Postiz data and any gateway settings included in the backup. PostForge will stop during the restore.",
+                             "La restauración reemplaza tus credenciales, los datos de Postiz y los ajustes de acceso seguro que estén en el respaldo. PostForge se detendrá durante el proceso."),
                            safe: t("Cancel", "Cancelar"), risky: t("Replace and Restore", "Reemplazar y restaurar")) else { return }
         restoreButton.isEnabled = false
         restoreSpinner.startAnimation(nil)
@@ -3749,7 +3749,7 @@ let uiSpanish: [String: String] = [
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
     "Create Drafts": "Crear borradores",
-    "Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
+    "Saves encrypted credentials, gateway access settings if configured, and a verified Postiz export. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas, los ajustes de acceso seguro si están configurados y un respaldo verificado de Postiz. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
     "Cut": "Cortar",
     "Default: 30 days. This sets the cleanup age for logs and unused uploaded media. Cleanup requires a separate review and apply command; changing this value deletes nothing. Scheduled posts and the database are preserved.": "Por defecto: 30 días. Define la antigüedad para limpiar registros y archivos subidos que ya no se usan. Debes revisar y ejecutar la limpieza por separado; cambiar este valor no borra nada. Se conservan la base de datos y las publicaciones programadas.",
     "Dictate": "Dictar",
@@ -3861,7 +3861,7 @@ let uiSpanish: [String: String] = [
     "Restore a backup": "Restaurar un respaldo",
     "Restored.": "Restaurado.",
     "Restore…": "Restaurar…",
-    "Restoring replaces your current credentials, Postiz posts, channels and media with the ones in the backup. PostForge will stop while it restores.": "Restaurar reemplaza tus credenciales, publicaciones, canales y archivos actuales por los del respaldo. PostForge se detendrá mientras restaura.",
+    "Restoring replaces your credentials, Postiz data and any gateway settings included in the backup. PostForge will stop during the restore.": "La restauración reemplaza tus credenciales, los datos de Postiz y los ajustes de acceso seguro que estén en el respaldo. PostForge se detendrá durante el proceso.",
     "Running": "En marcha",
     "Save": "Guardar",
     "Save to": "Guardar en",

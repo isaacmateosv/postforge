@@ -62,7 +62,7 @@ Revisa el README de v2 antes de cambiar una instalación pública.
 
 ## Respalda y recupera
 
-En **Respaldo y traslado**, exporta las credenciales cifradas y el archivo verificado de Postiz. Mantén ese archivo en privado porque contiene tokens de los canales. Restaura en el Mac de destino antes de programar contenido nuevo, verifica los envíos pendientes y vuelve a vincular WhatsApp. La migración excluye las tareas de Temporal y la sesión de WhatsApp.
+En **Respaldo y traslado**, exporta las credenciales cifradas y el archivo verificado de Postiz. Mantén ese archivo en privado porque contiene tokens de los canales. Restaura en el Mac de destino antes de programar contenido nuevo, verifica los envíos pendientes y vuelve a vincular WhatsApp. La migración excluye las tareas de Temporal y la sesión de WhatsApp. Si configuraste el acceso seguro, la misma contraseña también protege `gateway.enc`. Ese archivo contiene la lista de acceso, los hashes de las contraseñas y el registro de los autenticadores. Guárdalo junto con el respaldo. Después de restaurar, valida el acceso seguro y el túnel antes de exponer Postiz. Los usuarios vuelven a iniciar sesión con su contraseña y los códigos de su autenticador.
 
 Si Postiz queda inaccesible al cambiar el túnel, revisa en el registro si se restauró la configuración anterior. Para recuperar una conexión específica, consulta docs/reconnect en el repositorio. Usa **Abrir registro** en la barra antes de reiniciar o eliminar datos.
 
