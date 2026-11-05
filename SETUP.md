@@ -329,6 +329,11 @@ Docker images are also downloaded automatically by the first start. Keep at
 least 20 GB free before starting, and more if you choose larger models or retain
 many videos.
 
+## Set up publishing channels
+
+Use the [first-time channel setup and permissions guide](docs/reconnect/channel-setup.md)
+to create developer apps, register OAuth callbacks, and link WhatsApp through Evolution.
+
 ## Reconnect WhatsApp
 
 If WhatsApp did not reconnect automatically:

@@ -14,7 +14,7 @@ Textos locales con Ollama ────┘              │
 
 1. Instala el paquete de PostForge y los requisitos de SETUP.md, incluidos Docker Desktop, Ollama y FFmpeg.
 2. Copia .env.example a .env. Configura las credenciales de la base de datos, el secreto JWT, el dominio y token de ngrok y la clave de Evolution. Si trabajas fuera de Ecuador, configura PM_TIMEZONE.
-3. Elige acceso local o una puerta de enlace HTTPS con autenticación. Configura las credenciales y URL de retorno de OAuth para la dirección de Postiz y conecta las redes sociales.
+3. Elige acceso local o una puerta de enlace HTTPS con autenticación. Configura las credenciales y URL de retorno de OAuth para la dirección de Postiz y conecta las redes sociales. Consulta los permisos de cada conector en la [guía de configuración de canales](https://github.com/isaacmateosv/postforge/blob/main/docs/reconnect/channel-setup-es.md).
 4. Enciende PostForge. Abre **WhatsApp Manager** y escanea el código QR con el teléfono autorizado. Mantén la clave de la API en privado.
 5. Ejecuta las verificaciones de solo lectura desde la carpeta del proyecto.
 
