@@ -448,7 +448,7 @@ case "${1:-}" in
 
     # 3. Docker Desktop's VM keeps its memory until Docker Desktop quits
     echo "[3/3] Docker Desktop..."
-    if [ "${PM_QUIT_DOCKER_ON_STOP:-false}" = "true" ]; then
+    if [ "${PM_QUIT_DOCKER_ON_STOP:-false}" = "true" ] && [ "${3:-}" != "--keep-docker" ]; then
       docker desktop stop > /dev/null 2>&1 || osascript -e 'quit app "Docker"' > /dev/null 2>&1 || true
       echo "      Quit (PM_QUIT_DOCKER_ON_STOP=true)."
       docker_note="Docker Desktop quit too"

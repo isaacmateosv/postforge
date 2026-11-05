@@ -66,7 +66,8 @@ def running(name):
 def need_postgres():
     if not running("pm-postgres"):
         info("Starting Postgres only...")
-        pmlib.run(["docker", "compose", "-f", os.path.join(pmlib.ROOT, "docker-compose.yml"), "up", "-d", "postgres"])
+        pmlib.run(["docker", "compose", "--env-file", os.path.join(pmlib.ROOT, ".env"),
+                   "-f", os.path.join(pmlib.ROOT, "docker-compose.yml"), "up", "-d", "postgres"])
     for _ in range(30):
         if subprocess.run(["docker", "exec", "pm-postgres", "pg_isready", "-q"]).returncode == 0:
             return
@@ -83,12 +84,13 @@ def upload_stats(folder):
     return files, size
 
 
-def export(env):
+def export(env, target=None):
     need_postgres()
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-    os.chmod(EXPORT_DIR, 0o700)
-    target = os.path.join(EXPORT_DIR, "postiz-%s.tar" % stamp)
+    if target is None:
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        os.chmod(EXPORT_DIR, 0o700)
+        target = os.path.join(EXPORT_DIR, "postiz-%s.tar" % stamp)
     work = tempfile.mkdtemp(prefix="pm-export-")
     try:
         info("Dumping Postiz's tables...")
@@ -159,7 +161,7 @@ def compare(expected, actual):
 def restore(env, work, db):
     # --clean: the dump creates schema "public", which every new database already has (empty).
     # do_import refuses to run over existing tables unless asked to replace them.
-    args = ["pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "--clean", "--if-exists"]
+    args = ["pg_restore", "--no-owner", "--no-privileges", "--single-transaction", "--clean", "--if-exists"]
     with open(os.path.join(work, "postiz-public.dump"), "rb") as fh:
         pg(env, args, stdin=fh.read(), db=db)
 
@@ -199,20 +201,38 @@ def do_import(env, path, replace):
         raise PMError("This Postiz database already has tables. Use --replace to overwrite them.")
     if os.path.isdir(UPLOADS) and os.listdir(UPLOADS) and not replace:
         raise PMError("data/postiz-uploads/ is not empty. Use --replace to overwrite it.")
-    work, manifest = unpack(path)
+    rehearse(env, path)
+    work, _ = unpack(path)
+    staged = None
     try:
-        # Validate media paths before changing the destination database.
+        parent = os.path.dirname(UPLOADS)
+        os.makedirs(parent, exist_ok=True)
+        staged = tempfile.mkdtemp(prefix=".postiz-restore-", dir=parent)
+        incoming = os.path.join(staged, "postiz-uploads")
+        previous = os.path.join(staged, "previous-uploads")
         with tarfile.open(os.path.join(work, "uploads.tar")) as tar:
-            archive_members(tar, os.path.dirname(UPLOADS), required_prefix="postiz-uploads")
-        info("Restoring Postiz's tables...")
-        restore(env, work, None)
-        compare(manifest["rows"], row_counts(env))
-        info("Restoring media into data/postiz-uploads/...")
-        os.makedirs(os.path.dirname(UPLOADS), exist_ok=True)
-        with tarfile.open(os.path.join(work, "uploads.tar")) as tar:
-            safe_extract(tar, os.path.dirname(UPLOADS), required_prefix="postiz-uploads")
+            safe_extract(tar, staged, required_prefix="postiz-uploads")
+        os.makedirs(incoming, exist_ok=True)
+        if os.path.lexists(UPLOADS):
+            os.rename(UPLOADS, previous)
+        installed = False
+        try:
+            os.rename(incoming, UPLOADS)
+            installed = True
+            info("Restoring Postiz's tables...")
+            restore(env, work, None)
+        except BaseException:
+            if installed:
+                os.rename(UPLOADS, incoming)
+            if os.path.lexists(previous):
+                os.rename(previous, UPLOADS)
+            raise
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        if staged:
+            # If rollback itself failed, keep the old media available for recovery.
+            if sys.exc_info()[0] is None or not os.path.lexists(os.path.join(staged, "previous-uploads")):
+                shutil.rmtree(staged, ignore_errors=True)
     info("✔ Imported. Now run ./publish-machine.sh start and log in with the existing account.")
     return 0
 
@@ -226,7 +246,7 @@ def main():
     args = parser.parse_args()
     env = pmlib.load_env()
     if args.action == "export":
-        return export(env)
+        return export(env, args.file)
     if not args.file or not os.path.isfile(args.file):
         raise PMError("Give the export file, e.g. exports/postiz-YYYYMMDD-HHMM.tar")
     if args.action == "rehearse":

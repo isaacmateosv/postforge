@@ -8,6 +8,8 @@ import importlib.util
 import io
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -40,6 +42,38 @@ credentials = module("credentials", "credentials.py")
 
 
 class Operations(unittest.TestCase):
+    def test_uninstall_preserves_data_and_aborts_on_failed_docker_cleanup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / 'project'
+            home = root / 'home'
+            app = home / 'Applications' / 'PostForge.app'
+            app.mkdir(parents=True)
+            tools = root / 'bin'
+            tools.mkdir()
+            docker = tools / 'docker'
+            docker.write_text('#!/bin/bash\n[[ "$1" == info || "$TEST_COMPOSE_OK" == yes ]]\n')
+            docker.chmod(0o755)
+            scripts = project / 'scripts'
+            scripts.mkdir(parents=True)
+            uninstall = scripts / 'uninstall.sh'
+            shutil.copyfile(ROOT / 'uninstall.sh', uninstall)
+            (project / 'docker-compose.yml').touch()
+            private_files = [project / '.env', project / 'data' / 'db', project / 'exports' / 'backup']
+            for file in private_files:
+                file.parent.mkdir(exist_ok=True)
+                file.write_text('synthetic private data')
+            env = dict(os.environ, HOME=str(home), PATH=str(tools) + os.pathsep + os.environ['PATH'])
+            args = ['/bin/bash', str(uninstall), '--yes', '--keep-app-running']
+            failed = subprocess.run(args + ['--purge-data'], env=dict(env, TEST_COMPOSE_OK='no'),
+                                    capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertTrue(app.exists())
+            subprocess.run(args, env=dict(env, TEST_COMPOSE_OK='yes'), check=True, capture_output=True)
+            self.assertFalse(app.exists())
+            for file in private_files:
+                self.assertEqual(file.read_text(), 'synthetic private data')
+
     def test_backup_rejects_traversal_and_links_before_writing(self):
         for name, kind in [("../outside.txt", tarfile.REGTYPE), ("link", tarfile.SYMTYPE)]:
             with tempfile.TemporaryDirectory() as folder:

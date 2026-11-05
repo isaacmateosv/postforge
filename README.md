@@ -153,16 +153,18 @@ from release packages.
 In the PostForge app, open **Backup & Move…** (menu bar → Settings & Tools → Maintenance, the app menu, or the
 button at the bottom of the New Post window). Choose a folder, enter a passphrase of at least 12 characters, and press
 **Export Backup**. PostForge creates a private `PostForge-migration-…` folder with the encrypted credentials, the Postiz
-data and the installer, and shows its progress. Copy that folder privately to the new Mac, double-click the `.pkg`,
-open PostForge there and use **Backup & Move → Restore**. From a terminal the same flow is:
+data, and a matching installer if one is already available locally. The export verifies the Postiz archive
+in a temporary database. Copy the folder privately to the new Mac, install PostForge from the included package
+or [GitHub Releases](https://github.com/isaacmateosv/postforge/releases), then use **Backup & Move → Restore**. From a terminal the same flow is:
 
 ```bash
 ./scripts/migrate.sh export            # old Mac (asks for the passphrase in the terminal)
-./scripts/migrate.sh import ~/Desktop/PostForge-migration-YYYYMMDD-HHMM   # new Mac, after installing the .pkg
+./scripts/migrate.sh import ~/Desktop/PostForge-migration-YYYYMMDD-HHMM --skip-installer   # new Mac, after installing the .pkg
 ```
 
-The handoff never copies WhatsApp session state; link WhatsApp again by QR on the new Mac. The passphrase
-cannot be recovered: without it the backup cannot be restored.
+Link WhatsApp again by QR and verify pending posts after moving. The handoff excludes WhatsApp sessions and
+Temporal scheduler state. Keep the folder private because the Postiz archive contains channel tokens.
+The passphrase protects the credentials file and is required to restore it.
 
 ## Validation and stability
 
