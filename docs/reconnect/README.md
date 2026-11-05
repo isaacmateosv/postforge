@@ -1,5 +1,7 @@
 # Something expired? Start here
 
+Connecting a channel for the first time? See [setup and permissions](channel-setup.md).
+
 PostForge posts through accounts that were connected once. Some of those connections expire,
 and a few keys can be reset. There's one guide for each.
 

@@ -278,7 +278,6 @@ PROVIDER_DEFAULTS = {
     "tiktok": {"privacy_level": "SELF_ONLY", "duet": False, "stitch": False, "comment": True,
                "autoAddMusic": "no", "brand_content_toggle": False, "brand_organic_toggle": False,
                "content_posting_method": "UPLOAD"},
-    # Uploads from a Google project YouTube hasn't audited are locked private (DEPLOY-M1.md §6).
     "youtube": {"type": "public", "selfDeclaredMadeForKids": "no"},
 }
 

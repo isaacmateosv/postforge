@@ -4,8 +4,7 @@ Postiz renews YouTube's access by itself with Google's refresh token. It only st
 withdraws that token:
 - **While the OAuth consent screen is in Testing, Google withdraws it after 7 days.** Fix this once:
   console.cloud.google.com → APIs & Services → OAuth consent screen (Audience) → **Publish app**
-  ("In production"). It stays unverified, which is fine for your own channel; at login Google shows
-  "Google hasn't verified this app" → **Advanced** → **Go to … (unsafe)**.
+  ("In production") when appropriate. Google verification and Workspace policies can still restrict access.
 - When someone removes the app's access (myaccount.google.com → Security → Third-party connections),
   or when refresh access is unused for 6 months, a granted time limit expires, or account/organization policy invalidates access.
 
@@ -27,4 +26,4 @@ Source: [Google OAuth token expiration](https://developers.google.com/identity/p
 | "Access blocked: … has not completed the Google verification process" | The consent screen is in Testing and this Google account isn't a test user: add it under Audience → Test users, or publish the app (above) |
 | "Error 400: redirect_uri_mismatch" | The OAuth client's Authorized redirect URI must be `https://<public address>/integrations/social/youtube` ([public-address.md](public-address.md)) |
 | No channel to choose | The Google account doesn't own or manage a YouTube channel |
-| Uploads fail with a quota error | The free YouTube Data API quota (10,000 units a day; an upload costs 1,600) allows about 6 uploads a day |
+| Uploads fail with a quota error | Check the project’s Video Uploads quota in Google Cloud. See [the current upload quota](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert). |
