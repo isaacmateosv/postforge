@@ -3,8 +3,8 @@
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
 """Approval-gated WhatsApp Status queue used by the WhatsApp door."""
 import json
+import math
 import os
-import shutil
 import subprocess
 import tempfile
 import time
@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 import pmlib
 
+STATUS_PART_SECONDS = 60
 QUEUE_FILE = os.path.join(pmlib.RUN_DIR, "whatsapp-pending.json")
 
 
@@ -80,45 +81,36 @@ def _due(item):
     return datetime.now(timezone.utc) >= when.astimezone(timezone.utc)
 
 
-def _video_parts(path):
-    duration = pmlib.ffprobe(path)[0]
-    if duration <= 60:
+def video_part_count(duration):
+    return max(1, math.ceil(duration / STATUS_PART_SECONDS))
+
+
+def _video_parts(path, folder):
+    count = video_part_count(pmlib.ffprobe(path)[0])
+    if count == 1:
         return [path]
-    folder = tempfile.mkdtemp(prefix="pm-wa-parts-")
     parts = []
-    start = 0.0
-    index = 1
-    while start < duration:
-        out = os.path.join(folder, "part-%02d.mp4" % index)
-        pmlib.run(["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", path,
-                   "-t", "60", "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+    for index in range(count):
+        out = os.path.join(folder, "part-%02d.mp4" % (index + 1))
+        pmlib.run(["ffmpeg", "-y", "-v", "error", "-ss", str(index * STATUS_PART_SECONDS), "-i", path,
+                   "-t", str(STATUS_PART_SECONDS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", out])
         parts.append(out)
-        start += 60
-        index += 1
     return parts
 
 
 def _send_item(item):
     script = os.path.join(pmlib.ROOT, "scripts", "broadcast-story.sh")
     audience = pmlib.load_env().get("WA_STATUS_AUDIENCE", "all")
-    media = item.get("media") or []
-    commands = []
-    temp_folders = []
-    for path in media:
-        if os.path.splitext(path)[1].lower() == ".mp4":
-            parts = _video_parts(path)
-            commands.extend(("--video", part) for part in parts)
-            if parts != [path]:
-                temp_folders.append(os.path.dirname(parts[0]))
-        else:
-            commands.append(("--image", path))
-    if not commands:
-        commands = [(None, None)]
-    try:
-        for flag, path in commands:
-            args = [script]
-            args.extend(("--to", audience))
+    with tempfile.TemporaryDirectory(prefix="status-", dir=pmlib.whatsapp_scratch()) as folder:
+        commands = []
+        for path in item.get("media") or []:
+            if os.path.splitext(path)[1].lower() == ".mp4":
+                commands.extend(("--video", part) for part in _video_parts(path, folder))
+            else:
+                commands.append(("--image", path))
+        for flag, path in commands or [(None, None)]:
+            args = [script, "--to", audience]
             if audience != "test":
                 args.append("--yes")
             if flag:
@@ -126,9 +118,6 @@ def _send_item(item):
             if item.get("caption"):
                 args.append(item["caption"])
             subprocess.run(args, check=True)
-    finally:
-        for folder in temp_folders:
-            shutil.rmtree(folder, ignore_errors=True)
 
 
 def process(env, dry_run=False):

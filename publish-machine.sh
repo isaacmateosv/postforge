@@ -419,6 +419,10 @@ case "${1:-}" in
     # Scheduled posts and sends in progress: warn first (the menu bar app asks, then passes --force)
     if [ "${2:-}" = "--idle" ]; then
       python3 "$STATE_PY" --guard-idle || exit 3
+      if [ "${3:-}" = "--notify-self" ]; then
+        "$DIR/scripts/wa-inbox.sh" --idle-notice || echo "Idle notice could not be sent."
+        python3 "$STATE_PY" --guard-idle || exit 3
+      fi
     elif [ "${2:-}" != "--force" ] && ! python3 "$STATE_PY" --guard; then
       if [ -t 0 ]; then
         printf "Turn it off anyway? [y/N] "

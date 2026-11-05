@@ -44,6 +44,36 @@ tunnel = module("tunnel_url", "tunnel_url.py")
 
 
 class Operations(unittest.TestCase):
+    def test_video_warnings_respect_platform_thresholds(self):
+        networks = {"facebook", "youtube", "whatsapp"}
+        self.assertEqual(plan_post.video_warnings(networks, [59], "English"), [])
+        self.assertEqual(len(plan_post.video_warnings(networks, [60], "English")), 1)
+        warnings = plan_post.video_warnings(networks, [181], "Spanish")
+        self.assertEqual(len(warnings), 3)
+        self.assertIn("4 partes", warnings[-1])
+        self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
+
+    def test_whatsapp_cleanup_keeps_future_confirmation_and_other_uploads(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            uploads = root / "postiz-uploads"
+            plans = root / "wa-confirmations"
+            scratch = root / "wa-cache"
+            (uploads / "whatsapp-pending").mkdir(parents=True)
+            plans.mkdir()
+            scratch.mkdir()
+            for name, when in (("expired", "2020-01-01T00:00:00Z"), ("future", "2099-01-01T00:00:00Z")):
+                (plans / (name + ".json")).write_text(json.dumps({"result": {"when_utc": when}}))
+            old = [scratch / "stale.mp4", uploads / "whatsapp-pending" / "delivered.mp4", uploads / "other.mp4"]
+            for file in old:
+                file.touch()
+            for file in old + list(plans.iterdir()):
+                os.utime(file, (1, 1))
+            with patch.object(retention, "ROOTS", tuple(map(str, (uploads, plans, scratch)))), \
+                 patch.object(retention, "referenced_media", return_value=""):
+                self.assertEqual({Path(p).name for p in retention.candidates(time.time(), whatsapp_only=True)},
+                                 {"expired.json", "stale.mp4", "delivered.mp4"})
+
     def test_idle_stop_requires_live_empty_queue(self):
         for state, cached, total, expected in (
             ("on", False, 0, True), ("on", True, 0, False),

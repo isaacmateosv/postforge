@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.7]
+
+- Offer an optional WhatsApp self-chat notice before idle shutdown, and a Turn On button in the composer opened by Siri.
+- Show Facebook length advisories, YouTube Shorts limits, and WhatsApp Status segment counts in the plan.
+- Automatically clean expired WhatsApp staging and abandoned download files while preserving pending work and referenced Postiz media.
+- Rename the preview button to **👨‍🍳 Bake idea**.
+
 ## [1.0.6]
 
 - Require a continuous idle period and recheck the live queue before automatically stopping services.

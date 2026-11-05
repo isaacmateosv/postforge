@@ -341,8 +341,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         super.init()
     }
 
-    /// postforge://new-post (Shortcuts, Siri, a link) opens the New Post window; the shipped shortcuts
-    /// still use the legacy publishmachine:// scheme, so both are accepted.
+    /// The shipped Siri shortcuts open the composer through postforge://new-post.
+    /// Keep accepting older user-created shortcuts that use publishmachine://.
     func application(_ application: NSApplication, open urls: [URL]) {
         let schemes: Set<String> = ["postforge", "publishmachine"]
         if urls.contains(where: { schemes.contains($0.scheme ?? "") && $0.host == "new-post" }) { openNewPost() }
@@ -1078,7 +1078,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func stopWhenIdleIfNeeded() {
         guard idleStopDue(at: Date()) else { return }
-        runLifecycle(["stop", "--idle"], busyText: text("Entering idle mode…", "Entrando en modo inactivo…"), showProgress: false) { code, _ in
+        var args = ["stop", "--idle"]
+        if defaults.bool(forKey: "whatsappIdleNotice") { args.append("--notify-self") }
+        runLifecycle(args, busyText: text("Entering idle mode…", "Entrando en modo inactivo…"), showProgress: false) { code, _ in
             if code == 0 {
                 self.notify(self.text("PostForge is idle", "PostForge está inactivo"),
                             self.text("Services are off. WhatsApp intake resumes when you turn PostForge on.",
@@ -1217,6 +1219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
         menu.addItem(sectionHeader(text("Behavior", "Comportamiento")))
         menu.addItem(toggle(text("Turn Off When Idle", "Apagar al estar inactivo"), key: "autoStopWhenIdle"))
+        menu.addItem(toggle(text("Notify My WhatsApp Before Idle", "Avisarme por WhatsApp antes de apagar"), key: "whatsappIdleNotice"))
         menu.addItem(toggle(text("Keep Mac Awake While Posts Wait", "Mantener Mac activa mientras espera"), key: "keepAwake"))
         menu.addItem(toggle(text("Remind Me Before Posts When Off", "Recordarme antes de publicar apagado"), key: "remindWhenOff"))
         let login = action(text("Open at Login", "Abrir al iniciar sesión"), #selector(toggleLogin), enabled: true)
@@ -2298,6 +2301,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     let placeholder = PassthroughLabel(wrappingLabelWithString: "")
     let emptyState = NSStackView()
     let status = NSTextField(labelWithString: "")
+    let turnOnButton = NSButton(title: "", target: nil, action: nil)
     let connections = NSTextField(wrappingLabelWithString: "")
     let instruction = NSTextView()
     let result = NSTextView()
@@ -2378,6 +2382,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         connections.toolTip = state.map { delegate?.connectionLines($0).joined(separator: "\n") ?? "" }
         connections.isHidden = connection.isEmpty
         status.textColor = tone
+        turnOnButton.isHidden = state?.state != "off" && state?.state != "partial"
     }
 
     func caption(_ text: String) -> NSTextField {
@@ -2444,7 +2449,15 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         status.font = .systemFont(ofSize: 12, weight: .medium)
         let spacer = NSView()
         spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let header = NSStackView(views: [icon, titles, spacer, status])
+        turnOnButton.title = t("Turn On", "Encender")
+        turnOnButton.target = self
+        turnOnButton.action = #selector(turnOnFromWindow)
+        turnOnButton.controlSize = .small
+        let serviceControls = NSStackView(views: [status, turnOnButton])
+        serviceControls.orientation = .vertical
+        serviceControls.alignment = .trailing
+        serviceControls.spacing = 4
+        let header = NSStackView(views: [icon, titles, spacer, serviceControls])
         header.spacing = 12
         header.alignment = .centerY
 
@@ -2518,7 +2531,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
                                image: NSImage(systemSymbolName: "mic", accessibilityDescription: nil) ?? NSImage(),
                                target: self, action: #selector(startDictation))
         dictate.imagePosition = .imageLeading
-        preview.title = t("Preview", "Vista previa")
+        preview.title = t("👨‍🍳 Bake idea", "👨‍🍳 Hornea la idea")
         preview.target = self
         preview.action = #selector(runPreview)
         create.title = t("Create Drafts", "Crear borradores")
@@ -2549,8 +2562,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         emptyTitle.font = .systemFont(ofSize: 13, weight: .medium)
         emptyTitle.textColor = .secondaryLabelColor
         let emptyHint = NSTextField(wrappingLabelWithString: t(
-            "Add your idea and press Preview. Nothing is published until you approve it in Postiz.",
-            "Escribe tu idea y pulsa Vista previa. Nada se publica hasta que lo apruebes en Postiz."))
+            "Add your idea and press Bake idea. Nothing is published until you approve it in Postiz.",
+            "Escribe tu idea y pulsa Hornea la idea. Nada se publica hasta que lo apruebes en Postiz."))
         emptyHint.font = .systemFont(ofSize: 12)
         emptyHint.textColor = .tertiaryLabelColor
         emptyHint.alignment = .center
@@ -2662,6 +2675,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         }
     }
 
+    @objc func turnOnFromWindow() {
+        guard let delegate = NSApp.delegate as? AppDelegate, delegate.busy == nil,
+              delegate.state?.state == "off" || delegate.state?.state == "partial" else { return }
+        delegate.turnOn()
+    }
+
     @objc func runPreview() { run(dryRun: true) }
     @objc func runCreate() {
         guard previewed else {
@@ -2686,6 +2705,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     }
 
     func run(dryRun: Bool) {
+        if (NSApp.delegate as? AppDelegate)?.state?.state == "off" {
+            show(t("Turn on PostForge to prepare a plan.", "Enciende PostForge para preparar un plan."))
+            return
+        }
         guard (NSApp.delegate as? AppDelegate)?.busy == nil else {
             show(t("Wait for the current operation to finish, then try again.", "Espera a que termine la operación actual y vuelve a intentar.")); return
         }
@@ -2753,7 +2776,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         } else {
             previewed = true
             create.isEnabled = true
-            lines.append(t("\nPlan verified. Click Create Drafts to continue, or edit and Preview again.", "\nPlan verificado. Haz clic en Crear borradores para continuar, o edita y revisa la vista previa otra vez."))
+            lines.append(t("\nPlan verified. Click Create Drafts to continue, or edit and bake the idea again.", "\nPlan verificado. Haz clic en Crear borradores para continuar, o edita y vuelve a hornear la idea."))
         }
         show(lines.joined(separator: "\n"))
     }
@@ -3513,7 +3536,7 @@ final class WhatsAppWindow: NSObject {
 let uiSpanish: [String: String] = [
     "A post failed": "Una publicación falló",
     "About PostForge": "Acerca de PostForge",
-    "Add your idea and press Preview. Nothing is published until you approve it in Postiz.": "Escribe tu idea y pulsa Vista previa. Nada se publica hasta que lo apruebes en Postiz.",
+    "Add your idea and press Bake idea. Nothing is published until you approve it in Postiz.": "Escribe tu idea y pulsa Hornea la idea. Nada se publica hasta que lo apruebes en Postiz.",
     "Allow Notifications (off in System Settings)…": "Permitir notificaciones (desactivadas en Configuración del Sistema)…",
     "Allow Notifications…": "Permitir notificaciones…",
     "Apply stable Docker updates?": "¿Actualizar los componentes de Docker?",
@@ -3646,6 +3669,7 @@ let uiSpanish: [String: String] = [
     "Postiz, WhatsApp and the tunnel are up.": "Postiz, WhatsApp y el túnel están funcionando.",
     "Posts already published on your social networks are not touched. Docker Desktop stays installed.": "Las publicaciones ya publicadas en tus redes no se tocan. Docker Desktop sigue instalado.",
     "Preview": "Vista previa",
+    "👨‍🍳 Bake idea": "👨‍🍳 Hornea la idea",
     "Preview the plan first. Nothing will be created until you confirm it.": "Revisa primero la vista previa del plan. No se creará nada hasta que lo confirmes.",
     "Private: test recipients": "Privado: destinatarios de prueba",
     "Public: all contacts": "Público: todos los contactos",
@@ -3780,7 +3804,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.newPost!.media = [URL(fileURLWithPath: "/tmp/keep-this-photo.jpg")]
     defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
-    precondition(delegate.newPost!.preview.title == "Vista previa")
+    precondition(delegate.newPost!.preview.title == "👨‍🍳 Hornea la idea")
     precondition(delegate.newPost!.create.title == "Crear borradores")
     precondition(delegate.newPost!.instruction.string == "Keep this idea / conserva esta idea")
     precondition(delegate.newPost!.media.count == 1)
@@ -3826,7 +3850,13 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(!delegate.versionIsNewer("", than: "1.2.0"))
     defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
-    precondition(delegate.newPost!.preview.title == "Preview")
+    precondition(delegate.newPost!.preview.title == "👨‍🍳 Bake idea")
+    delegate.application(app, open: [URL(string: "postforge://new-post")!])
+    precondition(delegate.newPost!.window.isVisible)
+    delegate.newPost!.window.orderOut(nil)
+    delegate.application(app, open: [URL(string: "publishmachine://new-post")!])
+    precondition(delegate.newPost!.window.isVisible)
+
     delegate.showOperation("Checking…", updateCheck: true)
     delegate.maintenance = MaintenanceStatus(updatesAvailable: false, components: [], dockerStack: "test", checkComplete: true)
     delegate.maintenanceCheckInFlight = true

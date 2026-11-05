@@ -36,12 +36,13 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pmlib  # noqa: E402
 from pmlib import PMError, info, warn  # noqa: E402
+from whatsapp_pending import STATUS_PART_SECONDS  # noqa: E402
 
 VIP_FILE = os.path.join(pmlib.ROOT, "config", "whatsapp", "vip-list.txt")
 EVO_BATCH = 10
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif", ".tif", ".tiff"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
-MAX_VIDEO_SECONDS = 60
+MAX_VIDEO_SECONDS = STATUS_PART_SECONDS
 MAX_SIDE = 1920
 LOG_FILE = "whatsapp-status.jsonl"
 STATUS_KINDS = {"conversation": "text", "extendedTextMessage": "text",

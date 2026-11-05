@@ -69,6 +69,12 @@ After one continuous hour without pending work or app interaction, PostForge ver
 again and stops its containers. While the tray shows **Idle · services off**, WhatsApp intake is paused
 until you choose **Turn On**. Turn off **Settings & Tools → Turn Off When Idle** if you want WhatsApp
 intake to stay available while the Mac is awake. The automatic stop is enabled by default.
+Enable **Notify My WhatsApp Before Idle** to get a notice in your self-chat before the listener stops.
+An incoming WhatsApp message waits until PostForge is running again.
+
+To open the composer with Siri on your Mac, import **New post.shortcut** or **Nueva publicación.shortcut**
+from `~/postforge/tray/shortcuts` and say its name. The shortcut opens the composer. Choose **Turn On**
+in that window if PostForge is idle.
 
 PostForge unloads its own caption model after each request. Idle stop leaves Docker Desktop and the
 Ollama daemon available to other apps. If no containers are running, Docker Desktop’s
@@ -410,7 +416,7 @@ cd ~/postforge
 The PostForge app checks stable app releases, declared Docker image digests, and upstream Evolution API and Manager releases hourly. Available updates appear in the tray and main window; the main window’s Updates button opens the same progress flow. It never silently upgrades Homebrew, macOS, Docker Desktop, Ollama, or
 social integrations.
 
-Saved history defaults to **30 days**, configurable through the tray’s **Settings & Tools → Maintenance → Saved History…** (`PM_RETENTION_DAYS`). Always preview `retention` before applying it. Cleanup removes old logs and unused uploads. It preserves referenced Postiz media, pending WhatsApp plans, databases, schedules, queues and credentials. If the database cannot be checked, uploads are retained. Changing the setting alone deletes nothing.
+Saved history defaults to **30 days**, configurable through the tray’s **Settings & Tools → Maintenance → Saved History…** (`PM_RETENTION_DAYS`). Always preview `retention` before applying it. Manual cleanup removes old logs and unused uploads. The running WhatsApp listener also cleans expired staging daily. It preserves referenced Postiz media, future confirmations, pending sends, databases, schedules, queues and credentials. If the database cannot be checked, uploads are retained. Changing the setting alone deletes nothing.
 Application logs rotate at 10 MiB with four older copies. Docker service logs retain
 five 10 MiB files per service. The 30-day retention command still removes older
 project log files.
