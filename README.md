@@ -235,7 +235,7 @@ Authoritative references: [Google OAuth expiry](https://developers.google.com/id
 ## Roadmap
 
 **Release 1 (`v1.0.x`)** provides the publishing foundation described here.
-**Release 2 (`v2.0.0`)** will add Telegram connection setup, health-aware pings and alerts.
+**Release 2 (`v2.0.0`)** adds a local browser dashboard, a separate MFA gateway for optional remote access, and private Telegram status and heartbeat. See the [v2 release candidate guide](v2/README.md) for setup and acceptance checks.
 Telegram code, credentials and background requests are excluded from release 1.
 See [ROADMAP.md](ROADMAP.md).
 

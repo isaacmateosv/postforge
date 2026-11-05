@@ -62,7 +62,7 @@ EOF
 )
 
 import_bundle() (
-  local source="" skip_installer=false replace=false stop_first=false credentials package postiz target arg work gateway_work=""
+  local source="" skip_installer=false replace=false stop_first=false credentials package postiz target arg work gateway_work="" created_override=""
   for arg in "$@"; do
     case "$arg" in
       --skip-installer) skip_installer=true ;;
@@ -134,6 +134,7 @@ import_bundle() (
     else
       rm -f "$target/.env"
     fi
+    if [ -n "$created_override" ]; then rm -f "$created_override"; fi
     if [ -n "$gateway_work" ]; then
       if [ ! -e "$gateway_work/incoming" ]; then
         rm -rf "$target/data/gateway" || { echo "Previous gateway settings are in $gateway_work" >&2; exit 1; }
@@ -149,6 +150,29 @@ import_bundle() (
     mv "$gateway_work/incoming" "$target/data/gateway"
   fi
   mv -f "$work/incoming" "$target/.env"
+  if [ -n "$gateway_work" ]; then
+    # A fresh destination must route ngrok through the restored gateway.
+    local override has_override=false
+    for override in compose.override.yaml compose.override.yml docker-compose.override.yaml docker-compose.override.yml; do
+      if [ -e "$target/$override" ] || [ -L "$target/$override" ]; then has_override=true; fi
+    done
+    if [ "$has_override" = false ]; then
+      [ -f "$target/v2/compose.gateway.yml" ] || { echo "✖ The gateway Compose file is missing." >&2; exit 1; }
+      ln -s v2/compose.gateway.yml "$target/docker-compose.override.yml"
+      created_override="$target/docker-compose.override.yml"
+    fi
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$target/scripts" python3 - "$target/.env" <<'PYTHON'
+import sys
+from pathlib import Path
+from tunnel_url import check_gateway_config, read_setting
+
+env = Path(sys.argv[1])
+try:
+    check_gateway_config(env, read_setting(env.read_text(), "NGROK_DOMAIN"))
+except (OSError, ValueError, KeyError, RuntimeError) as error:
+    sys.exit(f"Error: Gateway route could not be verified. {error}")
+PYTHON
+  fi
   args=(import "$postiz")
   if [ "$replace" = true ]; then args+=(--replace); fi
   "$target/scripts/postiz-transfer.sh" "${args[@]}"

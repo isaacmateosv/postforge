@@ -117,6 +117,40 @@ class Operations(unittest.TestCase):
                 self.assertEqual(env.stat().st_mode & 0o777, 0o600)
             self.assertFalse((env.parent / "run/tunnel-url.previous").exists())
 
+    def test_gateway_tunnel_rollback_preserves_enrollment_keys(self):
+        from v2.gateway_setup import config
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            env = root / ".env"
+            original = b"NGROK_DOMAIN=old.example.org\nFRONTEND_URL=https://old.example.org\n"
+            original += b"NEXT_PUBLIC_BACKEND_URL=https://old.example.org/api\nMAIN_URL=https://old.example.org\n"
+            env.write_bytes(original)
+            gateway = root / "data/gateway/configuration.yml"
+            gateway.parent.mkdir(parents=True)
+            original_gateway = json.dumps(config("old.example.org")).encode()
+            gateway.write_bytes(original_gateway)
+
+            def verify(local, public, expected, *, gated):
+                self.assertTrue(gated)
+                current = json.loads(gateway.read_text())
+                self.assertEqual(current["storage"], json.loads(original_gateway)["storage"])
+                self.assertEqual(current["session"]["cookies"][0]["domain"], tunnel.normalize(public)[0])
+                if public == "https://new.example.org":
+                    raise RuntimeError("simulated public verification failure")
+
+            with patch.object(tunnel, "probe", return_value=b"Postiz") as probe, \
+                 patch.object(tunnel, "gateway_ready", return_value=True), \
+                 patch.object(tunnel, "check_gateway_config"), patch.object(tunnel, "compose") as compose, \
+                 patch.object(tunnel, "wait_until_ready", side_effect=verify):
+                with self.assertRaisesRegex(RuntimeError, "previous settings and services were restored"):
+                    tunnel.switch(env, "new.example.org")
+                self.assertEqual(env.read_bytes(), original)
+                self.assertEqual(gateway.read_bytes(), original_gateway)
+                self.assertEqual([call.args[1:] for call in compose.call_args_list].count(("stop", "ngrok")), 2)
+                probe.assert_called_once_with("http://localhost:4200")
+            self.assertFalse((root / "run/tunnel-gateway.previous").exists())
+
     def test_uninstall_preserves_data_and_aborts_on_failed_docker_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

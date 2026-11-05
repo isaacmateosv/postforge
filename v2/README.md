@@ -1,10 +1,10 @@
-# PostForge v2 development preview
+# PostForge 2 release candidate
 
 This branch adds a local, read-only browser dashboard and an optional Telegram
 health worker. It uses Docker Compose and Python on macOS, Windows with
 Docker Desktop, and Linux with Docker Engine and the Compose plugin.
 The shared Compose services and the existing Postiz web app handle publishing.
-The preview has not been validated on physical Windows and Linux hosts.
+The release candidate still needs end-to-end Windows and Linux host validation.
 
 ## Local web dashboard
 
@@ -51,11 +51,13 @@ before declaring the cutover ready.
 A machine callback that cannot carry browser authentication needs its own
 narrow, verified route. Keep the rest of the API gated.
 
-The v1 tunnel switch expects anonymous public API health to return HTTP 200.
-A gated endpoint will intentionally fail that check. Before a cutover,
-update the switch to verify origin health locally and verify the gateway
-separately from a signed-out client. Do not exempt the API from MFA to
-make the old health check pass.
+On the v2 release candidate, **Tunnel URL** in the Mac tray and
+`./postforge.sh tunnel-url NEW-HOST` update the Postiz origin and gateway
+cookie settings together. The switch verifies local Postiz and its scheduler,
+then confirms that the new public API redirects signed-out visitors to the
+gateway. It restores the previous configuration if verification fails.
+Set up TLS, DNS and the ngrok hostname first. Provider OAuth callback changes
+and their full sign-in round trips are operator checks.
 
 For a fully local deployment, no tunnel is needed. If remote access is required,
 put the authenticated gateway on the network edge. Keep the dashboard,
@@ -127,3 +129,16 @@ liveness. If the host or internet goes down, an external monitor must detect
 the missed heartbeat. A bot on the stopped host cannot send its own outage alert.
 
 See [Telegram’s Bot API](https://core.telegram.org/bots/api) for bot behavior.
+
+## Release candidate acceptance checks
+
+1. On each host, start the local dashboard and Postiz. Open the dashboard on
+   localhost, check service status, and sign in to Postiz.
+2. On a remote deployment, open the public URL in a private browser window.
+   Sign in with the gateway password and authenticator, then with Postiz.
+   Confirm an account outside the allowlist cannot reach Postiz. On a test
+   channel, complete an OAuth reconnection before using a new hostname.
+3. Export **Backup & Move** and restore on a spare host. Verify the gateway
+   accepts the same password and authenticator and verify pending Postiz work.
+4. From the Telegram owner's private chat, run `/status`, use **Refresh
+   status**, and verify a heartbeat arrives if one was configured.

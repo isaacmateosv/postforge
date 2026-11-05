@@ -31,9 +31,26 @@ jobs:
       - name: Verify icon artwork, sizes, version, architectures and signature
         run: ./scripts/verify-artifacts.sh
 
+  v2-smoke:
+    name: Validate the v2 browser and gateway configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Test gateway migration and Telegram
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s v2 -p 'test_*.py'
+      - name: Validate Compose and start the local dashboard
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.yml -f v2/compose.gateway.yml config --quiet
+          docker compose -f docker-compose.yml -f v2/compose.yml --profile web --profile telegram config --quiet
+          docker compose -f docker-compose.yml -f v2/compose.yml --profile web up -d --build --no-deps postforge-web
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --max-time 5 -o /tmp/postforge-dashboard.html http://127.0.0.1:8787/
+          grep -q PostForge /tmp/postforge-dashboard.html
+
   package:
     name: Build the installer package
-    needs: recheck
+    needs: [recheck, v2-smoke]
     runs-on: macos-14
     timeout-minutes: 20
     steps:
