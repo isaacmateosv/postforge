@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.2]
+
+- Put **About PostForge** directly above **Quit PostForge** in the menu bar menu.
+- Move **Check for Updates…** to the top-level menu and show an install shortcut when a new app version is available.
+- Group posting activity and channel connections separately so reconnection timers are easier to scan.
+
 ## [1.0.1]
 
 - Backup export verifies the Postiz archive in a temporary database and can run without a Swift compiler.
