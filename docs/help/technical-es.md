@@ -14,7 +14,7 @@ Textos locales con Ollama ────┘              │
 
 1. Instala el paquete de PostForge y los requisitos de SETUP.md, incluidos Docker Desktop, Ollama y FFmpeg.
 2. Copia .env.example a .env. Configura las credenciales de la base de datos, el secreto JWT, el dominio y token de ngrok y la clave de Evolution. Si trabajas fuera de Ecuador, configura PM_TIMEZONE.
-3. Habilita el dominio HTTPS en ngrok, configura las credenciales y URL de retorno de OAuth y conecta las redes sociales en Postiz.
+3. Elige acceso local o una puerta de enlace HTTPS con autenticación. Configura las credenciales y URL de retorno de OAuth para la dirección de Postiz y conecta las redes sociales.
 4. Enciende PostForge. Abre **WhatsApp Manager** y escanea el código QR con el teléfono autorizado. Mantén la clave de la API en privado.
 5. Ejecuta las verificaciones de solo lectura desde la carpeta del proyecto.
 
@@ -23,6 +23,23 @@ cd ~/postforge
 ./postforge.sh doctor
 ./scripts/recheck.sh --live
 ```
+
+## Acceso independiente sin ngrok
+
+Para una instalación local, ejecuta Compose en el Mac, en Linux o en Windows
+con Docker Desktop. El panel web de v2 está disponible en el equipo anfitrión.
+También puedes abrir Postiz en su puerto local. El README de v2 incluye los
+comandos de Compose y el estado de las pruebas por plataforma.
+
+Para entrar desde otros equipos, usa una puerta de enlace HTTPS con autenticación
+o una red privada con controles de acceso. Mantén los puertos directos en privado.
+Configura primero los usuarios y la autenticación de varios factores de la puerta
+de enlace. Luego crea la cuenta de Postiz por esa ruta protegida. Si necesitas
+habilitar el registro para crear la cuenta inicial, vuelve a deshabilitarlo al terminar.
+
+Si usas ngrok, protege toda la dirección pública. Si usas un dominio propio,
+actualiza la dirección de Postiz y las URL de retorno de los proveedores.
+Revisa el README de v2 antes de cambiar una instalación pública.
 
 ## Operación diaria
 
