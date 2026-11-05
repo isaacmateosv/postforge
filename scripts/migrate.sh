@@ -27,8 +27,8 @@ export_bundle() (
   trap 'rm -rf "$out"' EXIT
   trap 'exit 1' HUP INT TERM
 
-  step 1 4 "Encrypting credentials"
-  python3 "$DIR/scripts/credentials.py" export "$out/credentials.env.enc"
+  step 1 4 "Encrypting credentials and gateway settings"
+  python3 "$DIR/scripts/credentials.py" export "$out/credentials.env.enc" --include-gateway
   unset PM_PASSPHRASE
   step 2 4 "Exporting Postiz data"
   archive="$out/postiz-$(date +%Y%m%d-%H%M%S).tar"
@@ -46,7 +46,8 @@ export_bundle() (
 PostForge private migration handoff
 
 Copy this folder privately. The Postiz archive contains channel tokens and
-media. The passphrase protects credentials.env.enc only.
+media. The passphrase protects credentials.env.enc and gateway.enc (if present).
+Keep the gateway file with the rest of this backup.
 
 On the destination Mac, install the included PostForge package if present,
 or get the matching version from https://github.com/isaacmateosv/postforge/releases.
@@ -61,7 +62,7 @@ EOF
 )
 
 import_bundle() (
-  local source="" skip_installer=false replace=false stop_first=false credentials package postiz target arg work
+  local source="" skip_installer=false replace=false stop_first=false credentials package postiz target arg work gateway_work=""
   for arg in "$@"; do
     case "$arg" in
       --skip-installer) skip_installer=true ;;
@@ -93,15 +94,39 @@ import_bundle() (
 
   mkdir -p "$target/run"
   work=$(mktemp -d "$target/run/restore.XXXXXX")
-  trap 'rm -rf "$work"' EXIT
+  cleanup() {
+    rm -rf "$work"
+    if [ -n "$gateway_work" ]; then rm -rf "$gateway_work"; fi
+  }
+  trap cleanup EXIT
   trap 'exit 1' HUP INT TERM
-  step 1 3 "Validating credentials"
-  python3 "$target/scripts/credentials.py" import "$credentials" --output "$work/incoming"
+  step 1 3 "Validating backup credentials"
+  args=(import "$credentials" --output "$work/incoming")
+  if [ -e "$source/gateway.enc" ] || [ -L "$source/gateway.enc" ]; then
+    [ -f "$target/scripts/gateway_backup.py" ] || { echo "✖ Install a PostForge version with gateway backup support first." >&2; exit 1; }
+    mkdir -p "$target/data"
+    gateway_work=$(mktemp -d "$target/data/.gateway-restore.XXXXXX")
+    args+=(--gateway-stage "$gateway_work/incoming")
+  fi
+  python3 "$target/scripts/credentials.py" "${args[@]}"
   unset PM_PASSPHRASE
   if [ "$stop_first" = true ] && [ -f "$target/.env" ]; then
     "$target/postforge.sh" stop --force --keep-docker
   fi
-  step 2 3 "Restoring Postiz data"
+  if [ -n "$gateway_work" ]; then
+    # A running Authelia keeps the old database open across directory renames.
+    local active_auth
+    active_auth=$(docker ps --filter label=com.docker.compose.service=postforge-auth -q)
+    if [ -n "$active_auth" ]; then
+      echo "✖ Stop the running PostForge gateway before restoring gateway settings." >&2
+      exit 1
+    fi
+    if [ -L "$target/data/gateway" ] || { [ -e "$target/data/gateway" ] && [ ! -d "$target/data/gateway" ]; }; then
+      echo "✖ The destination gateway path must be a local directory." >&2
+      exit 1
+    fi
+  fi
+  step 2 3 "Restoring Postiz and gateway data"
   if [ -e "$target/.env" ]; then cp -p "$target/.env" "$work/previous"; fi
   trap '
     if [ -e "$work/previous" ]; then
@@ -109,13 +134,25 @@ import_bundle() (
     else
       rm -f "$target/.env"
     fi
-    rm -rf "$work"
+    if [ -n "$gateway_work" ]; then
+      if [ ! -e "$gateway_work/incoming" ]; then
+        rm -rf "$target/data/gateway" || { echo "Previous gateway settings are in $gateway_work" >&2; exit 1; }
+      fi
+      if [ -d "$gateway_work/previous" ]; then
+        mv "$gateway_work/previous" "$target/data/gateway" || { echo "Previous gateway settings are in $gateway_work" >&2; exit 1; }
+      fi
+    fi
+    cleanup
   ' EXIT
+  if [ -n "$gateway_work" ]; then
+    if [ -d "$target/data/gateway" ]; then mv "$target/data/gateway" "$gateway_work/previous"; fi
+    mv "$gateway_work/incoming" "$target/data/gateway"
+  fi
   mv -f "$work/incoming" "$target/.env"
   args=(import "$postiz")
   if [ "$replace" = true ]; then args+=(--replace); fi
   "$target/scripts/postiz-transfer.sh" "${args[@]}"
-  trap 'rm -rf "$work"' EXIT
+  trap cleanup EXIT
   step 3 3 "Finishing"
   echo "Import complete. Turn PostForge on, verify pending posts, and link WhatsApp again by QR on the destination Mac."
 )

@@ -92,3 +92,20 @@ When moving to a purchased domain, run `gateway_setup.py set-hostname NEW-HOST`
 against a private staging copy. This changes the Authelia cookie domain and
 URLs while preserving the MFA storage and its encryption key. Update the
 gateway host, Postiz origin, and OAuth callbacks together. Protect the new hostname before retiring the old route.
+
+### Back up and move the gateway
+
+Use **Backup & Move** or `scripts/migrate.sh export` on a build that supports
+gateway migration. After Authelia storage has been initialized, the export
+includes an authenticated, encrypted `gateway.enc` with the access policy,
+users and a consistent database snapshot. Keep it with the migration folder.
+The same backup passphrase unlocks it. Enrollment QR images and browser
+sessions stay outside the backup.
+
+Restore with **Backup & Move** on the destination, or run
+`scripts/migrate.sh import BACKUP --skip-installer --stop-first`. Keep the
+gateway stopped during restore. Start it privately and verify password and
+authenticator sign-in before pointing the public tunnel at the destination.
+Existing passwords and authenticator codes carry over. If the hostname changes
+too, follow the hostname procedure above. Older bundles leave the destination
+gateway files in place.
