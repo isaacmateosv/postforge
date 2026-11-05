@@ -424,26 +424,23 @@ It creates a rollback snapshot before changing the Docker stack. It never update
 macOS, Docker Desktop, Ollama, Homebrew, or social-channel permissions
 automatically. Those require separate user-controlled installers and approvals.
 
-To change the public ngrok or custom-domain URL, use **Tunnel URL…** in the
-PostForge app, or run:
+To change the public URL, first provision the domain in ngrok and wait for DNS and TLS to be ready.
+[ngrok custom-domain setup](https://ngrok.com/docs/gateway/domains/custom-domains)
+
+With PostForge running, choose **Settings & Tools → Tunnel URL…** or run:
 
 ```bash
 ./postforge.sh tunnel-url https://publish.example.com
-./postforge.sh restart
 ```
 
-Only an HTTPS domain without a path is accepted. The command updates all public
-Postiz URL settings together and leaves credentials untouched.
+Use an HTTPS domain without a path or port. PostForge updates the public URL settings together and
+recreates Postiz and ngrok. Expect a brief interruption. It checks local Postiz, the public HTTPS API,
+and the scheduler before accepting the change. If a check fails, it restores the previous configuration.
+If recovery itself fails, the command reports where it kept the previous settings.
 
-After changing the domain, verify both:
-
-```bash
-./postforge.sh restart
-./postforge.sh status
-```
-
-Then open the new HTTPS URL in a browser and confirm that Postiz loads and login
-cookies persist across a page refresh.
+Open the new URL and check that you can sign in to Postiz and stay signed in after refreshing.
+Update each provider’s registered OAuth callback URL for the new domain before connecting or
+reconnecting channels. PostForge cannot change settings in your provider dashboards.
 
 ## Moving the project again
 
