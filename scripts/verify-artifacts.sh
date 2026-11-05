@@ -20,6 +20,13 @@ for notice in LICENSE COPYRIGHT NOTICE; do
   cmp "$DIR/${notice/NOTICE/NOTICE.md}" "$APP/Contents/Resources/$notice.txt"
 done
 
+for guide in quick-en quick-es technical-en technical-es; do
+  cmp "$DIR/docs/help/$guide.md" "$APP/Contents/Resources/Help/$guide.md"
+done
+for shortcut in 'New post in PostForge' 'Nueva publicación en PostForge'; do
+  cmp "$DIR/tray/shortcuts/$shortcut.shortcut" "$APP/Contents/Resources/Shortcuts/$shortcut.shortcut"
+done
+
 archs="$(lipo -archs "$APP/Contents/MacOS/PostForgeTray")"
 [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "Missing universal architecture" >&2; exit 1; }
 iconutil -c iconset "$APP/Contents/Resources/PostForge.icns" -o "$WORK/PostForge.iconset"
@@ -40,13 +47,13 @@ if [ -n "$PKG" ]; then
   (cd "$(dirname "$PKG")" && shasum -a 256 -c "$(basename "$PKG").sha256")
   pkgutil --payload-files "$PKG" > "$WORK/payload.txt"
   python3 - "$WORK/payload.txt" <<'PY'
-import re, sys
-paths = open(sys.argv[1]).read().splitlines()
+import re, sys, unicodedata
+paths = unicodedata.normalize("NFC", open(sys.argv[1]).read()).splitlines()
 blocked = re.compile(r'(^|/)(\.env$|\.git(/|$)|\.checkpoint(/|$)|data(/|$)|exports(/|$)|logs(/|$)|run(/|$)|backups(/|$)|tunnel(/|$)|vip-list\.txt$)')
 leaks = [path for path in paths if blocked.search(path)]
 if leaks:
     raise SystemExit('Unexpected private/generated payload entries: ' + ', '.join(leaks[:10]))
-for required in ('scripts/component_updates.py', 'scripts/lib/wa_inbox.py', 'scripts/lib/wa-media-stream.mjs', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
+for required in ('scripts/component_updates.py', 'scripts/lib/wa_inbox.py', 'scripts/lib/wa-media-stream.mjs', 'docs/help/technical-es.md', 'tray/shortcuts/New post in PostForge.shortcut', 'tray/shortcuts/Nueva publicación en PostForge.shortcut', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
     assert any(path.endswith('/' + required) for path in paths), required
 print('PASS: installer payload contains required assets and excludes private runtime data')
 PY

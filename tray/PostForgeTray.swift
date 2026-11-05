@@ -322,6 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     var aboutWindow: NSWindow?
     var flowWindow: NSWindow?
     var licenseWindow: NSWindow?
+    var guideWindow: UserGuideWindow?
     var idleSince: Date?
     var wakeSchedule: (at: String, retryAfter: Date)?
     var wokeFromSleep = false
@@ -480,6 +481,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         submenu(text("Window", "Ventana"), [
             item(text("Minimize", "Minimizar"), #selector(NSWindow.performMiniaturize(_:)), "m"),
             item(text("Close", "Cerrar"), #selector(NSWindow.performClose(_:)), "w"),
+        ])
+        submenu(text("Help", "Ayuda"), [
+            item(text("PostForge Help", "Ayuda de PostForge"), #selector(showUserGuide), target: self),
         ])
         return main
     }
@@ -1207,6 +1211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         tools.submenu = settingsMenu(up: up, canAct: canAct)
         menu.addItem(tools)
         menu.addItem(.separator())
+        menu.addItem(action(text("PostForge Help", "Ayuda de PostForge"), #selector(showUserGuide), enabled: true))
         menu.addItem(action(text("About PostForge", "Acerca de PostForge"), #selector(showAbout), enabled: true))
         menu.addItem(action(up ? text("Quit PostForge (posting keeps running)", "Salir de PostForge (sigue publicando)") :
                             text("Quit PostForge", "Salir de PostForge"),
@@ -1914,6 +1919,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
 
+    @objc func showUserGuide() {
+        if guideWindow == nil { guideWindow = UserGuideWindow() }
+        guideWindow?.refresh(spanish: spanish)
+        guideWindow?.window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc func showLicense() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -2012,6 +2024,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     func refreshLocalizedWindows() {
+        guideWindow?.refresh(spanish: spanish)
         busy = busy.map(localizedUI)
         func walk(_ view: NSView) {
             if let label = view as? NSTextField {
@@ -2288,6 +2301,113 @@ final class DropView: NSView {
             forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         onFiles?(urls)
         return !urls.isEmpty
+    }
+}
+
+/// Read the same Markdown files shipped in the repository without a web connection.
+final class UserGuideWindow: NSObject {
+    let window: NSWindow
+    let topics = NSSegmentedControl(labels: ["Quick Start", "Technical"], trackingMode: .selectOne,
+                                    target: nil, action: nil)
+    let article = NSTextView()
+    let shortcuts = NSButton(title: "", target: nil, action: nil)
+    private var spanish = false
+
+    override init() {
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 630),
+                          styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        super.init()
+        window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: 520, height: 400)
+        window.center()
+        topics.target = self
+        topics.action = #selector(selectTopic)
+        topics.selectedSegment = 0
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        article.isEditable = false
+        article.isVerticallyResizable = true
+        article.autoresizingMask = [.width]
+        article.textContainer?.widthTracksTextView = true
+        article.textContainerInset = NSSize(width: 26, height: 18)
+        scroll.documentView = article
+
+        let root = NSView()
+        let icon = NSImageView(image: NSApp.applicationIconImage)
+        icon.imageScaling = .scaleProportionallyDown
+        shortcuts.target = self
+        shortcuts.action = #selector(showShortcuts)
+        let header = NSStackView(views: [icon, topics, shortcuts])
+        header.spacing = 12
+        header.alignment = .centerY
+        header.translatesAutoresizingMaskIntoConstraints = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(header)
+        root.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 32),
+            icon.heightAnchor.constraint(equalToConstant: 32),
+            header.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+            header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 24),
+            scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+        ])
+        window.contentView = root
+    }
+
+    func refresh(spanish: Bool) {
+        self.spanish = spanish
+        window.title = spanish ? "Ayuda de PostForge" : "PostForge Help"
+        topics.setLabel(spanish ? "Inicio rápido" : "Quick Start", forSegment: 0)
+        topics.setLabel(spanish ? "Técnica" : "Technical", forSegment: 1)
+        shortcuts.title = spanish ? "Atajos de Siri…" : "Siri Shortcuts…"
+        selectTopic()
+    }
+
+    @objc func showShortcuts() {
+        if let resources = Bundle.main.resourceURL {
+            NSWorkspace.shared.open(resources.appendingPathComponent("Shortcuts", isDirectory: true))
+        }
+    }
+
+    @objc func selectTopic() {
+        let name = (topics.selectedSegment == 1 ? "technical" : "quick") + (spanish ? "-es" : "-en")
+        guard let url = Bundle.main.url(forResource: name, withExtension: "md", subdirectory: "Help"),
+              let markdown = try? String(contentsOf: url, encoding: .utf8) else {
+            article.string = spanish ? "La guía no está disponible." : "The guide is unavailable."
+            return
+        }
+        article.textStorage?.setAttributedString(render(markdown))
+        article.scrollRangeToVisible(NSRange(location: 0, length: 0))
+    }
+
+    private func render(_ markdown: String) -> NSAttributedString {
+        let rendered = NSMutableAttributedString(string: "")
+        var code = false
+        for line in markdown.components(separatedBy: .newlines) {
+            if line.hasPrefix("```") { code.toggle(); continue }
+            let major = !code && line.hasPrefix("# ")
+            let minor = !code && line.hasPrefix("## ")
+            let body = major ? String(line.dropFirst(2)) : minor ? String(line.dropFirst(3)) :
+                !code && line.hasPrefix("- ") ? "• " + String(line.dropFirst(2)) : line
+            let style = NSMutableParagraphStyle()
+            style.lineSpacing = code ? 2 : 3
+            style.paragraphSpacing = major ? 12 : minor ? 6 : 1
+            let pieces = code ? [body] : body.components(separatedBy: "**")
+            for (index, piece) in pieces.enumerated() {
+                let font: NSFont = code ? .monospacedSystemFont(ofSize: 12, weight: .regular) :
+                    .systemFont(ofSize: major ? 28 : minor ? 18 : 14,
+                                weight: major || minor || index % 2 == 1 ? .semibold : .regular)
+                rendered.append(NSAttributedString(string: piece + (index == pieces.count - 1 ? "\n" : ""),
+                    attributes: [.font: font, .foregroundColor: code ? NSColor.systemTeal : NSColor.labelColor,
+                                 .paragraphStyle: style]))
+            }
+        }
+        return rendered
     }
 }
 
@@ -3857,6 +3977,18 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.application(app, open: [URL(string: "publishmachine://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
 
+    let guide = UserGuideWindow()
+    guide.refresh(spanish: false)
+    precondition(guide.article.string.contains("PostForge Quick Start"))
+    guide.topics.selectedSegment = 1
+    guide.selectTopic()
+    precondition(guide.article.string.contains("PostForge Technical Guide"))
+    guide.refresh(spanish: true)
+    precondition(guide.article.string.contains("Guía técnica de PostForge"))
+    guide.topics.selectedSegment = 0
+    guide.selectTopic()
+    precondition(guide.article.string.contains("Inicio rápido de PostForge"))
+    precondition(guide.article.string.contains("→"))
     delegate.showOperation("Checking…", updateCheck: true)
     delegate.maintenance = MaintenanceStatus(updatesAvailable: false, components: [], dockerStack: "test", checkComplete: true)
     delegate.maintenanceCheckInFlight = true
@@ -3913,7 +4045,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(legalText.string.contains("SPDX-License-Identifier: GPL-3.0-or-later"))
     precondition(!legalText.string.contains(": unavailable"))
     defaults.setVolatileDomain(original, forName: UserDefaults.argumentDomain)
-    print("PASS: bilingual tray layout, idle protection, badges, preserved idea/media and update-check states")
+    print("PASS: bilingual offline Help, Shortcuts routes, tray layout, idle protection, badges and updates")
     exit(0)
 }
 app.run()

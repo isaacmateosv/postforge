@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.8]
+
+- Add illustrated flow diagrams and bilingual quick-start and technical guides to the repository and offline app Help.
+- Ship freshly signed PostForge-branded English and Ecuadorian Spanish Siri shortcuts.
+
 ## [1.0.7]
 
 - Offer an optional WhatsApp self-chat notice before idle shutdown, and a Turn On button in the composer opened by Siri.

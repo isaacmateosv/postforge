@@ -72,8 +72,8 @@ intake to stay available while the Mac is awake. The automatic stop is enabled b
 Enable **Notify My WhatsApp Before Idle** to get a notice in your self-chat before the listener stops.
 An incoming WhatsApp message waits until PostForge is running again.
 
-To open the composer with Siri on your Mac, import **New post.shortcut** or **Nueva publicación.shortcut**
-from `~/postforge/tray/shortcuts` and say its name. The shortcut opens the composer. Choose **Turn On**
+To open the composer with Siri on your Mac, import **New post in PostForge.shortcut** or **Nueva publicación en PostForge.shortcut**
+from **PostForge Help → Siri Shortcuts…** and say its name. Previously imported shortcuts keep their original names until you rename or replace them. The shortcut opens the composer. Choose **Turn On**
 in that window if PostForge is idle.
 
 PostForge unloads its own caption model after each request. Idle stop leaves Docker Desktop and the
