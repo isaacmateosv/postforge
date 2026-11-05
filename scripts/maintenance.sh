@@ -22,7 +22,7 @@ snapshot() {
            scripts/maintenance.sh scripts/wa-inbox.sh scripts/plan-post.sh scripts/component_updates.py scripts/image_rollback.py; do
     cp "$DIR/$f" "$DIR/$SNAPSHOT/$f"
   done
-  for f in "$DIR"/scripts/lib/*.py; do cp "$f" "$DIR/$SNAPSHOT/scripts/lib/"; done
+  for f in "$DIR"/scripts/lib/*.py "$DIR"/scripts/lib/*.mjs; do cp "$f" "$DIR/$SNAPSHOT/scripts/lib/"; done
   cp "$DIR"/tray/*.swift "$DIR"/tray/*.sh "$DIR"/tray/Info.plist "$DIR/$SNAPSHOT/tray/"
   cp -R "$DIR/tray/assets" "$DIR/$SNAPSHOT/tray/"
   cp "$DIR/config/whatsapp/vip-list.example.txt" "$DIR/$SNAPSHOT/config/whatsapp/"

@@ -43,6 +43,13 @@ tunnel = module("tunnel_url", "tunnel_url.py")
 
 
 class Operations(unittest.TestCase):
+    def test_evolution_manager_reports_new_stable_release(self):
+        with patch.object(updates, 'run', return_value=json.dumps({'tag_name': 'v2.3.8', 'prerelease': False})):
+            self.assertEqual(updates.evolution_status([updates.EVOLUTION_PIN]),
+                             {'installed': '2.3.7', 'latest': '2.3.8', 'update_available': True})
+        with patch.object(updates, 'run', return_value=json.dumps({'tag_name': 'v2.4.0-rc1', 'prerelease': True})):
+            self.assertIsNone(updates.evolution_status([updates.EVOLUTION_PIN]))
+
     def test_tunnel_validation_and_rollback(self):
         for url in ("http://example.org", "https://user@example.org", "example.org:443",
                     "example.org/path", "example.org?", "-bad.example.org", "127.0.0.1"):
@@ -141,9 +148,11 @@ class Operations(unittest.TestCase):
         self.assertNotIn('frases cortas', result)
         self.assertNotIn('🍎', result)
         self.assertEqual(result.count('Pan de yuca recién horneado.'), 1)
-        self.assertEqual(result.count('WhatsApp'), 1)
+        self.assertNotIn('WhatsApp', result)
         self.assertEqual(result.count('#PanDeYuca'), 1)
-        self.assertIn('retíralo', result)
+        configured = create_draft.finish(text, 'Spanish', env={'CAPTION_CTA_ES': 'Escríbenos para más información.'})
+        self.assertIn('Escríbenos para más información.', configured)
+        self.assertNotIn('WhatsApp', configured)
 
     def test_draft_contract_cannot_schedule_a_live_post(self):
         api = object.__new__(pmlib.Postiz)

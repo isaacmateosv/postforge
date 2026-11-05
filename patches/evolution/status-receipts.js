@@ -17,7 +17,7 @@
 //    picture for each). Statuses this account posts, here or from the phone, are still stored,
 //    so their receipts can be too. In v2.3.7 readStatus does nothing else: its "mark statuses as
 //    read" branch compares a message id with "status@broadcast" and never runs. A newer image
-//    that fixed it would view contacts' statuses for the bakery, but they never get that far
+//    that fixed it would view contacts' statuses for the account, but they never get that far
 //    while this patch is applied.
 //
 // docker-compose.yml runs this before Evolution starts, on the container's own copy of
@@ -48,7 +48,7 @@ const PATCHES = [
     needs: ["this.prismaRepository.$executeRaw`", "this.instanceId", "this.client.signalRepository.lidMapping.getPNForLID"],
     // Receipts name people by LID (a private WhatsApp id, "...@lid"); the phone number is stored
     // instead whenever Baileys knows it (it learns it for every number a status is sent to), so
-    // receipts match contact names and the bakery's own phone can be left out of the counts.
+    // receipts match contact names and the account’s own phone can be left out of the counts.
     // Every receipt gets one log line ("pm-status-receipts: READ status@broadcast from ... stored").
     // Baileys only emits this event for group and status messages, and this instance sends no
     // group messages, so the volume stays low.

@@ -5,7 +5,7 @@
 """Hands-free posting: your media plus one sentence become one Postiz DRAFT per network, scheduled at
 the time you said. HITL: drafts only. You review, edit and approve them on the Postiz calendar.
 
-    ./scripts/plan-post.sh --media guaguas.mp4 "Instagram y TikTok el viernes a las 6 de la tarde; idea: guaguas de higo solo hasta el domingo"
+    ./scripts/plan-post.sh --media demo.mp4 "Instagram y TikTok el viernes a las 6 de la tarde; idea: taller de fotografía solo hasta el domingo"
     ./scripts/plan-post.sh --media torta.jpg 'Facebook mañana 9am texto: "Nuestra torta de chocolate 🍫"'
     ./scripts/plan-post.sh --dry-run ...   show the plan, create nothing
     ./scripts/plan-post.sh --json ...      machine-readable result (menu bar app, WhatsApp door)
@@ -16,7 +16,7 @@ The networks and the time are read with rules, not AI, from the part before your
 - times: "18:00", "6pm", "6 de la tarde", "a las 6" (1-7 means pm), mediodía, "en la noche".
 The caption comes from your idea ("idea:", "sobre", "about", "la idea es"), written by the local
 model with the brand rules and the fixed order line. Your exact words ("texto:", "caption:", or in
-quotes) are kept as written. Times are the bakery's (PM_TIMEZONE, default America/Guayaquil).
+quotes) are kept as written. Times are configured locally (PM_TIMEZONE, default America/Guayaquil).
 """
 import argparse
 import json
@@ -110,7 +110,7 @@ def parse_networks(command):
 
 
 def parse_when(command, now):
-    """Datetime (bakery time) for the command, plus the assumptions made. None if it gives no time."""
+    """Datetime (local time) for the command, plus the assumptions made. None if it gives no time."""
     words = plain(command)
     clock = re.sub(r"\b(" + "|".join(NUMBER_WORDS) + r")\b", lambda m: str(NUMBER_WORDS[m.group(1)]), words)
     clock = re.sub(r"\b(\d{1,2}) y media\b", r"\1:30", re.sub(r"\b(\d{1,2}) y cuarto\b", r"\1:15", clock))
@@ -396,7 +396,7 @@ def run(env, p, dry_run):
 
 def show(result):
     head = "Plan (nothing created)" if result["dry_run"] else "Drafts created"
-    info("%s for %s (bakery time)" % (head, result["when_local"]))
+    info("%s for %s (local time)" % (head, result["when_local"]))
     for t in result.get("targets", []):
         done = next((d for d in result["drafts"] if d["channel"] == t["channel"]
                      and d["network"] == t["network"]), None)

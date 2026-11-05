@@ -52,13 +52,13 @@ GUIDES = {"facebook": "meta.md", "instagram": "meta.md", "instagram-standalone":
           "youtube": "youtube.md", "tiktok": "tiktok.md", "tiktok-business": "tiktok.md", "threads": "threads.md"}
 # Keyed by the provider's first word (instagram-standalone -> instagram).
 LOGINS = {
-    "facebook": "Log in to Facebook with an account that manages the bakery's Page, keep every "
+    "facebook": "Log in to Facebook with an account that manages the organization’s Page, keep every "
                 "permission ticked, and pick the same Page.",
-    "instagram": "Log in to Facebook with an account that manages the bakery's Page, keep every "
+    "instagram": "Log in to Facebook with an account that manages the organization’s Page, keep every "
                  "permission ticked, and pick the same Page and its Instagram account.",
     "youtube": "Sign in with the Google account that owns the YouTube channel and allow access.",
-    "tiktok": "Log in with the bakery's TikTok account and allow access.",
-    "threads": "Log in to Threads with the bakery's Instagram account and allow access.",
+    "tiktok": "Log in with the organization’s TikTok account and allow access.",
+    "threads": "Log in to Threads with the organization’s Instagram account and allow access.",
 }
 
 STATUS_TEXT = ("left(coalesce(m.message->'extendedTextMessage'->>'text', m.message->>'conversation', "

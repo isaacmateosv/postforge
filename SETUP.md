@@ -15,7 +15,7 @@ It contains the application source, Docker configuration, PostForge app source,
 installer, setup guide, and scripts. It deliberately does **not** contain private
 credentials, channel tokens, databases, WhatsApp sessions, media, or Postiz data.
 Those items must travel separately so one accidentally shared package cannot expose
-the bakery account.
+the organization’s account.
 
 This is not an Apple Developer-signed or notarized installer. The PostForge app is
 ad-hoc signed locally during installation. No Apple Developer subscription is
@@ -47,7 +47,7 @@ these approvals:
 - **Browser/network:** allow the browser to open the ngrok URL and approve the
   social-channel permissions when connecting Facebook, Instagram, TikTok,
   YouTube, or Threads in Postiz.
-- **WhatsApp:** scan the QR code with the authorized bakery phone. This is the
+- **WhatsApp:** scan the QR code with the authorized phone. This is the
   only required account-login step for the WhatsApp door.
 - **Test recipients:** copy `config/whatsapp/vip-list.example.txt` to
   `config/whatsapp/vip-list.txt` and replace the example number only if you
@@ -198,16 +198,13 @@ If the installer reports an error, fix the named requirement and run
 
 ### Upgrade or uninstall
 
-To upgrade an existing installation safely, stop PostForge and install the new `.pkg` directly:
+Install the new `PostForge-*.pkg` directly or use **Check for Updates…** in the tray.
+The package merges application files and preserves credentials, databases, media, exports, logs,
+and runtime state. If PostForge is running, the installer recreates its services and reloads
+WhatsApp intake. Expect a short interruption. If it was stopped, it stays stopped.
 
-```bash
-cd ~/postforge
-./postforge.sh stop
-```
-
-Then double-click the new `PostForge-*.pkg`. It merges application files, preserves `.env`, databases, media, exports,
-logs, and runtime state, and installs and opens the updated app (the log is `~/Library/Logs/PostForge-install.log`;
-if the app did not open, run `~/postforge/install.sh`). Do not run uninstall first during an upgrade.
+See `~/Library/Logs/PostForge-install.log` for details. If the app does not open, run
+`~/postforge/install.sh`.
 
 For a complete removal, use **Uninstall PostForge…** in the app (menu bar → Settings & Tools → Maintenance, the
 PostForge app menu, or **Backup & Move**). It lists everything that will be deleted (the app and project folder,
@@ -330,7 +327,7 @@ cd ~/postforge
 ./scripts/link-whatsapp.sh
 ```
 
-Scan the QR code using the bakery WhatsApp phone. This only links the configured
+Scan the QR code using the phone linked to the WhatsApp account. This only links the configured
 WhatsApp account; it does not publish anything.
 
 ## First safety check
@@ -405,7 +402,7 @@ cd ~/postforge
 ./postforge.sh maintenance check
 ```
 
-The PostForge app checks stable app releases and declared Docker image digests every six hours. Available updates appear in the tray; the main window’s Updates button opens the same progress flow. It never silently upgrades Homebrew, macOS, Docker Desktop, Ollama, or
+The PostForge app checks stable app releases, declared Docker image digests, and upstream Evolution API and Manager releases hourly. Available updates appear in the tray and main window; the main window’s Updates button opens the same progress flow. It never silently upgrades Homebrew, macOS, Docker Desktop, Ollama, or
 social integrations.
 
 Saved history defaults to **30 days**, configurable through the tray’s **Settings & Tools → Maintenance → Saved History…** (`PM_RETENTION_DAYS`). Always preview `retention` before applying it. Cleanup removes old logs and unused uploads. It preserves referenced Postiz media, pending WhatsApp plans, databases, schedules, queues and credentials. If the database cannot be checked, uploads are retained. Changing the setting alone deletes nothing.

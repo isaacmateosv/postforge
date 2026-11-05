@@ -37,6 +37,9 @@ COPYFILE_DISABLE=1 rsync -a \
   "$DIR/" "$STAGE/usr/local/share/postforge/"
 find "$STAGE" -name '._*' -exec rm -rf {} +
 xattr -cr "$STAGE" 2>/dev/null || true
+# List only this package's files. The system payload directory can retain files
+# from an older installer, and copying the entire directory would resurrect them.
+(cd "$STAGE/usr/local/share/postforge" && find . \( -type f -o -type l \) -print0) > "$SCRIPTS/payload-files"
 
 COPYFILE_DISABLE=1 pkgbuild --root "$STAGE" \
   --filter '(^|/)(\.DS_Store|\.svn|CVS|\._[^/]*)(/|$)' \
