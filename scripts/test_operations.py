@@ -39,9 +39,35 @@ import plan_post
 import postiz_transfer
 import pmlib
 credentials = module("credentials", "credentials.py")
+tunnel = module("tunnel_url", "tunnel_url.py")
 
 
 class Operations(unittest.TestCase):
+    def test_tunnel_validation_and_rollback(self):
+        for url in ("http://example.org", "https://user@example.org", "example.org:443",
+                    "example.org/path", "example.org?", "-bad.example.org", "127.0.0.1"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                tunnel.normalize(url)
+        with tempfile.TemporaryDirectory() as folder:
+            env = Path(folder) / ".env"
+            previous = b"NGROK_DOMAIN=old.example.org\nFRONTEND_URL=https://old.example.org\n"
+            previous += b"NEXT_PUBLIC_BACKEND_URL=https://old.example.org/api\nMAIN_URL=https://old.example.org\n"
+            previous += b"UNCHANGED=synthetic\n"
+            env.write_bytes(previous)
+            with patch.object(tunnel, "probe", return_value=b"Postiz"), patch.object(tunnel, "compose") as compose, \
+                 patch.object(tunnel, "wait_until_ready", side_effect=[RuntimeError("bad endpoint"), None]) as ready:
+                with self.assertRaisesRegex(RuntimeError, "previous settings and services were restored"):
+                    tunnel.switch(env, "new.example.org")
+                self.assertEqual(env.read_bytes(), previous)
+                self.assertEqual(compose.call_count, 3)
+                self.assertEqual(ready.call_args.args[1], "https://old.example.org")
+            with patch.object(tunnel, "probe", return_value=b"Postiz"), patch.object(tunnel, "compose"), \
+                 patch.object(tunnel, "wait_until_ready"):
+                self.assertEqual(tunnel.switch(env, "https://New.Example.org/"), "https://new.example.org")
+                self.assertEqual(env.read_bytes(), previous.replace(b"old.example.org", b"new.example.org"))
+                self.assertEqual(env.stat().st_mode & 0o777, 0o600)
+            self.assertFalse((env.parent / "run/tunnel-url.previous").exists())
+
     def test_uninstall_preserves_data_and_aborts_on_failed_docker_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

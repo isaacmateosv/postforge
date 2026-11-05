@@ -507,7 +507,6 @@ case "${1:-}" in
       exit 2
     }
     python3 "$DIR/scripts/tunnel_url.py" --env-file "$DIR/.env" "$1"
-    echo "Tunnel URL saved. Restart PostForge to apply it."
     ;;
 
   status)

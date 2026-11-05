@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.3]
+
+- Verify the public Postiz endpoint and scheduler when changing the tunnel URL, and automatically restore the previous settings if verification fails.
+- Apply the tunnel change without restarting the database, WhatsApp, or the rest of the stack.
+- Reject malformed or ambiguous tunnel settings before applying changes.
+
 ## [1.0.2]
 
 - Put **About PostForge** directly above **Quit PostForge** in the menu bar menu.

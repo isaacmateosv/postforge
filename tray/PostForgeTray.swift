@@ -1528,7 +1528,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         field.frame = NSRect(x: 0, y: 0, width: 360, height: 24)
         let dialog = NSAlert()
         dialog.messageText = text("Tunnel URL", "URL del túnel")
-        dialog.informativeText = text("Enter the HTTPS domain used by ngrok or your custom domain. The related Postiz URLs will be updated together; restart afterward.",
+        dialog.informativeText = text("Enter the HTTPS domain used by ngrok or your custom domain. Postiz will briefly restart. If verification fails, PostForge will restore the previous URL. Update your providers’ OAuth callback URLs for the new domain.",
                                       "Escribe el dominio HTTPS de ngrok o tu dominio personalizado. Las URL relacionadas de Postiz se actualizarán juntas; reinicia después.")
         dialog.accessoryView = field
         dialog.addButton(withTitle: text("Save", "Guardar"))
@@ -1536,14 +1536,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         NSApp.activate(ignoringOtherApps: true)
         guard dialog.runModal() == .alertFirstButtonReturn else { return }
         let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let result = runCommand(["/bin/bash", project + "/postforge.sh", "tunnel-url", value],
-                                in: project, timeout: 30)
-        if result.0 == 0 {
-            alert(text("Tunnel URL saved", "URL del túnel guardada"),
-                  text("Restart PostForge to apply it.", "Reinicia PostForge para aplicarla."))
-        } else {
-            alert(text("Couldn't save tunnel URL", "No se pudo guardar la URL del túnel"),
-                  result.1.isEmpty ? text("Use an HTTPS domain without a path.", "Usa un dominio HTTPS sin ruta.") : result.1)
+        guard !value.isEmpty else {
+            alert(text("Couldn't change tunnel URL", "No se pudo cambiar la URL del túnel"),
+                  text("Enter an HTTPS domain.", "Escribe un dominio HTTPS."))
+            return
+        }
+        runLifecycle(["tunnel-url", value], busyText: text("Changing tunnel URL…", "Cambiando la URL del túnel…")) { code, output in
+            if code == 0 {
+                self.alert(self.text("Tunnel URL verified", "URL del túnel verificada"),
+                           self.text("Check Postiz sign-in and your providers’ OAuth settings on the new domain.",
+                                     "Verifica el inicio de sesión en Postiz y la configuración de OAuth de tus proveedores en el nuevo dominio."))
+            } else {
+                self.alert(self.text("Couldn't change tunnel URL", "No se pudo cambiar la URL del túnel"), failureSummary(output))
+            }
         }
     }
 
@@ -1928,7 +1933,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func localizedOperation(_ line: String) -> String {
         guard spanish else { return line }
-        let stages = ["1/5": "Preparando el respaldo", "2/5": "Descargando componentes", "3/5": "Reiniciando servicios", "4/5": "Verificando el funcionamiento", "5/5": "Actualización completada"]
+        let stages = ["1/2": "Reiniciando Postiz y ngrok", "2/2": "Verificando el túnel y el programador", "1/5": "Preparando el respaldo", "2/5": "Descargando componentes", "3/5": "Reiniciando servicios", "4/5": "Verificando el funcionamiento", "5/5": "Actualización completada"]
         let number = line.split(separator: " ").dropFirst().first.map(String.init) ?? ""
         return stages[number].map { "\(number) · \($0)…" } ?? text("Working…", "Procesando…")
     }
@@ -3480,7 +3485,7 @@ let uiSpanish: [String: String] = [
     "Edit": "Edición",
     "Enter a whole number from 1 to 36500.": "Ingresa un número entero entre 1 y 36500.",
     "Enter country-code numbers separated by commas, without + signs.\nExample: 593991234567,593998765432": "Ingresa números con código de país separados por comas, sin signos +.\nEjemplo: 593991234567,593998765432",
-    "Enter the HTTPS domain used by ngrok or your custom domain. The related Postiz URLs will be updated together; restart afterward.": "Escribe el dominio HTTPS de ngrok o tu dominio personalizado. Las URL relacionadas de Postiz se actualizarán juntas; reinicia después.",
+    "Enter the HTTPS domain used by ngrok or your custom domain. Postiz will briefly restart. If verification fails, PostForge will restore the previous URL. Update your providers’ OAuth callback URLs for the new domain.": "Escribe el dominio HTTPS de ngrok o tu dominio personalizado. Las URL relacionadas de Postiz se actualizarán juntas; reinicia después.",
     "Enter the backup's passphrase.": "Escribe la contraseña del respaldo.",
     "Everything is sent": "Se envió todo",
     "Export Backup": "Exportar respaldo",
