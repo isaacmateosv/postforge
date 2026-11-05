@@ -38,11 +38,23 @@ import create_draft
 import plan_post
 import postiz_transfer
 import pmlib
+import machine_state
 credentials = module("credentials", "credentials.py")
 tunnel = module("tunnel_url", "tunnel_url.py")
 
 
 class Operations(unittest.TestCase):
+    def test_idle_stop_requires_live_empty_queue(self):
+        for state, cached, total, expected in (
+            ("on", False, 0, True), ("on", True, 0, False),
+            ("on", False, 1, False), ("partial", False, 0, False),
+            ("off", False, 0, False),
+        ):
+            with self.subTest(state=state, cached=cached, total=total):
+                self.assertEqual(machine_state.idle_eligible({
+                    "state": state, "pending": {"from_cache": cached, "total": total}
+                }), expected)
+
     def test_evolution_manager_reports_new_stable_release(self):
         with patch.object(updates, 'run', return_value=json.dumps({'tag_name': 'v2.3.8', 'prerelease': False})):
             self.assertEqual(updates.evolution_status([updates.EVOLUTION_PIN]),

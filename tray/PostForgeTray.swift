@@ -157,6 +157,7 @@ struct PackageUpdateState {
 struct MachineState: Decodable {
     let state: String  // off | starting | stopping | on | partial
     let activity: String?  // idle | active, only while on
+    let idleStopped: Bool?
     let docker: Bool
     let services: Services
     let pending: Pending
@@ -279,9 +280,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     var state: MachineState?
     var stateError: String?
-    var busy: String? { didSet { updateButton() } }
-    var windowWork = 0 { didSet { updateButton() } }
-    var planningWork = 0 { didSet { updateButton() } }
+    var busy: String? { didSet { idleSince = nil; updateButton() } }
+    var windowWork = 0 { didSet { idleSince = nil; updateButton() } }
+    var planningWork = 0 { didSet { idleSince = nil; updateButton() } }
     var activeProcessCount: Int {
         (busy != nil || state?.state == "starting" || state?.state == "stopping" ? 1 : 0)
             + windowWork + max(planningWork, state?.pending.jobs.count ?? 0)
@@ -321,8 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     var aboutWindow: NSWindow?
     var flowWindow: NSWindow?
     var licenseWindow: NSWindow?
-    var idleTimer: Timer?
-    var lastInteraction = Date()
+    var idleSince: Date?
+    var wakeSchedule: (at: String, retryAfter: Date)?
     var wokeFromSleep = false
 
     var spanish: Bool {
@@ -419,8 +420,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
-        idleTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            self?.stopWhenIdleIfNeeded()
+        _ = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .scrollWheel]) { [weak self] event in
+            self?.idleSince = nil
+            return event
         }
         poll()
         scheduleMaintenanceCheck()
@@ -485,6 +487,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     // MARK: Polling
 
     @objc func didWake() {
+        idleSince = nil
         wokeFromSleep = true
         poll()
     }
@@ -531,6 +534,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         updateSleepAssertion()
         if menuOpen, let menu = statusItem.menu { menuNeedsUpdate(menu) }  // fresh numbers while it's open
         if CommandLine.arguments.contains("--dump-menu") { dumpMenu() }
+        stopWhenIdleIfNeeded()
         scheduleNextPoll()
     }
 
@@ -597,7 +601,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             seconds = 5
         } else if state?.state == "off" {
             let soon = (state?.pending.next).flatMap { isoParser.date(from: $0.at) }.map { $0.timeIntervalSinceNow < 3600 } ?? false
-            seconds = soon ? 30 : 120
+            seconds = soon ? 30 : (state?.pending.total == 0 ? 300 : 120)
         }
 
         pollTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in self?.poll() }
@@ -1020,7 +1024,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 symbol = "exclamationmark.triangle"
                 tip = "Partly running: use Turn On to restore all services"
             default:
-                tip = count > 0 ? text("Off: \(plural(count, "scheduled post")) waiting", "Apagado: \(count) publicaciones pendientes") : "Off"
+                tip = st.idleStopped == true ? text("Idle · WhatsApp intake paused", "Inactivo · recepción de WhatsApp pausada") : count > 0 ? text("Off: \(plural(count, "scheduled post")) waiting", "Apagado: \(count) publicaciones pendientes") : "Off"
             }
         } else if stateError != nil {
             symbol = "exclamationmark.triangle"
@@ -1053,31 +1057,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     /// Opening the menu checks again, so views and sends show up without waiting for the timer.
     func menuWillOpen(_ menu: NSMenu) {
         menuOpen = true
-        lastInteraction = Date()
+        idleSince = nil
         refreshNotificationStatus()
         poll()
     }
 
     func menuDidClose(_ menu: NSMenu) { menuOpen = false }
 
-    func stopWhenIdleIfNeeded() {
-        guard defaults.bool(forKey: "autoStopWhenIdle"),
-              !menuOpen, busy == nil, state?.state == "on",
-              state?.pending.total == 0 else { return }
+    func idleStopDue(at now: Date) -> Bool {
+        guard defaults.bool(forKey: "autoStopWhenIdle"), !uninstalling, !menuOpen,
+              busy == nil, windowWork == 0, planningWork == 0, stateError == nil,
+              let st = state, st.isUp, !st.pending.fromCache, st.pending.total == 0 else {
+            idleSince = nil
+            return false
+        }
+        if idleSince == nil { idleSince = now }
         let minutes = max(1, defaults.integer(forKey: "idleStopMinutes"))
-        guard Date().timeIntervalSince(lastInteraction) >= TimeInterval(minutes * 60) else { return }
-        lastInteraction = Date()
-        notify("PostForge is idle", "The stack is turning off to save resources. Docker Desktop and Ollama stay running.")
-        stop()
+        return now.timeIntervalSince(idleSince ?? now) >= TimeInterval(minutes * 60)
+    }
+
+    func stopWhenIdleIfNeeded() {
+        guard idleStopDue(at: Date()) else { return }
+        runLifecycle(["stop", "--idle"], busyText: text("Entering idle mode…", "Entrando en modo inactivo…"), showProgress: false) { code, _ in
+            if code == 0 {
+                self.notify(self.text("PostForge is idle", "PostForge está inactivo"),
+                            self.text("Services are off. WhatsApp intake resumes when you turn PostForge on.",
+                                      "Los servicios están apagados. La recepción de WhatsApp se reanuda al encender PostForge."))
+            } else if code != 3 {
+                self.notify("PostForge didn't stop cleanly", "See Open Log in the menu bar app.")
+            }
+        }
     }
 
     func scheduleWake(for post: ScheduledPost?) {
-        guard let post = post else { return }
+        guard let post, let at = isoParser.date(from: post.at), at > Date() else {
+            wakeSchedule = nil
+            return
+        }
+        if let wakeSchedule, wakeSchedule.at == post.at, wakeSchedule.retryAfter > Date() { return }
+        wakeSchedule = (post.at, .distantFuture)
         let dir = project
         DispatchQueue.global(qos: .utility).async {
             let result = runCommand(["/usr/bin/python3", dir + "/scripts/schedule-wake.py", "--at", post.at],
                                     in: dir, timeout: 20)
-            if result.0 != 0 { self.log("wake scheduling failed (exit \(result.0))\n\(result.1)") }
+            if result.0 != 0 {
+                self.log("wake scheduling failed (exit \(result.0))")
+                DispatchQueue.main.async {
+                    if self.wakeSchedule?.at == post.at {
+                        self.wakeSchedule = (post.at, Date().addingTimeInterval(900))
+                    }
+                }
+            }
         }
     }
 
@@ -1098,7 +1128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             case "partial": header = text("Needs attention", "Requiere atención")
             case "starting": header = text("Turning on…", "Encendiendo…")
             case "stopping": header = text("Turning off…", "Apagando…")
-            default: header = st.docker ? text("Off", "Apagado") : text("Off (Docker Desktop not running)", "Apagado (Docker Desktop no está abierto)")
+            default: header = st.idleStopped == true ? text("Idle · services off", "Inactivo · servicios apagados") : st.docker ? text("Off", "Apagado") : text("Off (Docker Desktop not running)", "Apagado (Docker Desktop no está abierto)")
             }
         } else {
             header = stateError == nil ? text("Checking…", "Comprobando…") : text("Can't read status", "No se puede leer el estado")
@@ -1186,6 +1216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.autoenablesItems = false
 
         menu.addItem(sectionHeader(text("Behavior", "Comportamiento")))
+        menu.addItem(toggle(text("Turn Off When Idle", "Apagar al estar inactivo"), key: "autoStopWhenIdle"))
         menu.addItem(toggle(text("Keep Mac Awake While Posts Wait", "Mantener Mac activa mientras espera"), key: "keepAwake"))
         menu.addItem(toggle(text("Remind Me Before Posts When Off", "Recordarme antes de publicar apagado"), key: "remindWhenOff"))
         let login = action(text("Open at Login", "Abrir al iniciar sesión"), #selector(toggleLogin), enabled: true)
@@ -1667,7 +1698,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     func performUninstall() {
         uninstalling = true
         pollTimer?.invalidate()
-        idleTimer?.invalidate()
         maintenanceTimer?.invalidate()
         [newPost?.window, backupWindow?.window, whatsappWindow?.window].forEach { $0?.orderOut(nil) }
         if sleepAssertion != 0 { IOPMAssertionRelease(sleepAssertion); sleepAssertion = 0 }
@@ -1715,9 +1745,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                     self.uninstalling = false
                     self.poll()
                     self.scheduleMaintenanceCheck()
-                    self.idleTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self = self] _ in
-                        self?.stopWhenIdleIfNeeded()
-                    }
                     return
                 }
                 self.quittingFromMenu = true
@@ -2007,23 +2034,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         if licenseWindow?.isVisible == true { showLicense() }
     }
 
-    func runLifecycle(_ args: [String], busyText: String, done: @escaping (Int32, String) -> Void) {
+    func runLifecycle(_ args: [String], busyText: String, showProgress: Bool = true, done: @escaping (Int32, String) -> Void) {
         busy = localizedUI(busyText)
-        showOperation(localizedUI(busyText))
+        if showProgress { showOperation(localizedUI(busyText)) }
         updateButton()
         updateSleepAssertion()
         scheduleNextPoll()
         let dir = project
         DispatchQueue.global(qos: .userInitiated).async {
             let (code, output) = runStreaming(["/bin/bash", dir + "/postforge.sh"] + args, in: dir, timeout: 900) { line in
-                if line.hasPrefix("STEP ") {
+                if showProgress, line.hasPrefix("STEP ") {
                     DispatchQueue.main.async { self.operationStage = line; self.operationLabel?.stringValue = self.localizedOperation(line) }
                 }
             }
             DispatchQueue.main.async {
                 self.log("postforge.sh \(args.joined(separator: " ")) -> exit \(code)\n\(output)")
                 self.busy = nil
-                self.finishOperation(code == 0)
+                if showProgress { self.finishOperation(code == 0) }
                 done(code, output)
                 self.poll()
             }
@@ -2337,7 +2364,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         var tone = NSColor.secondaryLabelColor
         switch state?.state {
         case "on": (label, tone) = (t("Running", "En marcha"), .systemGreen)
-        case "off": (label, tone) = (t("Off", "Apagado"), .secondaryLabelColor)
+        case "off": (label, tone) = (state?.idleStopped == true
+            ? t("Idle · services off", "Inactivo · servicios apagados") : t("Off", "Apagado"), .secondaryLabelColor)
         case "partial": (label, tone) = (t("Needs attention", "Requiere atención"), .systemOrange)
         case "starting": (label, tone) = (t("Starting…", "Iniciando…"), .systemOrange)
         case "stopping": (label, tone) = (t("Stopping…", "Apagando…"), .systemOrange)
@@ -3772,6 +3800,21 @@ if CommandLine.arguments.contains("--verify-ui") {
         precondition(settings.items.allSatisfy { $0.title != updates && $0.title != about })
     }
 
+    let idleFixture = #"{"state":"on","docker":true,"services":{"postiz":true,"evolution":true,"scheduler":true,"tunnel":true},"pending":{"total":0,"scheduled":0,"overdue":0,"jobs":[],"fromCache":false},"scheduled":[],"postizUrl":"https://example.org"}"#
+    delegate.state = try! JSONDecoder().decode(MachineState.self, from: Data(idleFixture.utf8))
+    defaults.setVolatileDomain(["uiLanguage": "en", "autoStopWhenIdle": true, "idleStopMinutes": 1], forName: UserDefaults.argumentDomain)
+    let idleStart = Date()
+    precondition(!delegate.idleStopDue(at: idleStart))
+    precondition(!delegate.idleStopDue(at: idleStart.addingTimeInterval(59)))
+    precondition(delegate.idleStopDue(at: idleStart.addingTimeInterval(60)))
+    delegate.windowWork = 1
+    precondition(!delegate.idleStopDue(at: idleStart.addingTimeInterval(70)))
+    delegate.windowWork = 0
+    precondition(!delegate.idleStopDue(at: idleStart.addingTimeInterval(71)))
+    delegate.stateError = "test unavailable"
+    precondition(!delegate.idleStopDue(at: idleStart.addingTimeInterval(150)))
+    delegate.state = nil
+    delegate.stateError = nil
     let fixture = #"{"tag_name":"v9.0.0","html_url":"https://github.com/isaacmateosv/postforge/releases/tag/v9.0.0","draft":false,"prerelease":false,"assets":[{"name":"PostForge-9.0.0.pkg","browser_download_url":"https://github.com/isaacmateosv/postforge/releases/download/v9.0.0/PostForge-9.0.0.pkg"}]}"#
     let release = try! JSONDecoder().decode(PackageRelease.self, from: Data(fixture.utf8))
     precondition(release.tagName == "v9.0.0" && release.assets.first!.browserDownloadUrl != nil)
@@ -3840,7 +3883,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(legalText.string.contains("SPDX-License-Identifier: GPL-3.0-or-later"))
     precondition(!legalText.string.contains(": unavailable"))
     defaults.setVolatileDomain(original, forName: UserDefaults.argumentDomain)
-    print("PASS: English ↔ Ecuadorian Spanish, tray menu placement, preserved idea/media, release decoding and update-check states")
+    print("PASS: bilingual tray layout, idle protection, badges, preserved idea/media and update-check states")
     exit(0)
 }
 app.run()

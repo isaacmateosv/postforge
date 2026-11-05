@@ -346,6 +346,7 @@ print_health() {
 
 case "${1:-}" in
   start)
+    rm -f "$RUN_DIR/idle-stop"
     echo "======================================================"
     echo "  STARTING PUBLISH MACHINE (M1 Optimized Mode)"
     echo "======================================================"
@@ -416,7 +417,9 @@ case "${1:-}" in
 
   stop)
     # Scheduled posts and sends in progress: warn first (the menu bar app asks, then passes --force)
-    if [ "${2:-}" != "--force" ] && ! python3 "$STATE_PY" --guard; then
+    if [ "${2:-}" = "--idle" ]; then
+      python3 "$STATE_PY" --guard-idle || exit 3
+    elif [ "${2:-}" != "--force" ] && ! python3 "$STATE_PY" --guard; then
       if [ -t 0 ]; then
         printf "Turn it off anyway? [y/N] "
         read -r answer
@@ -434,7 +437,7 @@ case "${1:-}" in
     echo "  SHUTTING DOWN PUBLISH MACHINE & RECLAIMING RAM"
     echo "======================================================"
     mark_lifecycle stopping
-
+    rm -f "$RUN_DIR/idle-stop"
 
     stop_wa_door  # before Evolution goes away
 
@@ -445,6 +448,14 @@ case "${1:-}" in
       docker compose down --remove-orphans  # also removes services dropped from the compose file
     else
       echo "      Docker Desktop is not running: nothing to stop."
+    fi
+
+    # Automatic idle stops leave shared tools alone. PostForge caption requests
+    # already unload their own model with keep_alive=0.
+    if [ "${2:-}" = "--idle" ]; then
+      touch "$RUN_DIR/idle-stop"
+      echo "PostForge is idle. WhatsApp intake will resume when PostForge is turned on."
+      exit 0
     fi
 
     # 2. Force unload every Ollama model from Unified VRAM

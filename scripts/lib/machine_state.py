@@ -32,6 +32,7 @@ import pmlib  # noqa: E402
 CONTAINERS = ("pm-postgres", "pm-redis", "pm-temporal",
               "pm-postiz", "pm-evolution-api", "pm-tunnel")
 CACHE_FILE = os.path.join(pmlib.RUN_DIR, "schedule-cache.json")
+IDLE_STOP_FILE = os.path.join(pmlib.RUN_DIR, "idle-stop")
 LIFECYCLE_FILE = os.path.join(pmlib.RUN_DIR, "lifecycle.json")
 GUARD_EXIT = 3
 MAX_LISTED = 10
@@ -349,6 +350,7 @@ def collect(env):
         "checked_at": now_iso(),
         "state": state,
         "activity": ("active" if total else "idle") if state == "on" else None,
+        "idle_stopped": state == "off" and os.path.isfile(IDLE_STOP_FILE),
         "docker": docker_up,
         "containers": running,
         "services": svc,
@@ -420,11 +422,17 @@ def report(st):
     return "\n".join(lines)
 
 
+def idle_eligible(state):
+    pending = state["pending"]
+    return state["state"] == "on" and not pending["from_cache"] and pending["total"] == 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Report what the Publish Machine is doing (read-only).")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--json", action="store_true", help="print one JSON object")
     mode.add_argument("--guard", action="store_true", help="exit %d if the stack is on and work is waiting" % GUARD_EXIT)
+    mode.add_argument("--guard-idle", action="store_true", help="require a live, empty queue before automatic stop")
     mode.add_argument("--cache", action="store_true", help="refresh the schedule cache (needs the database)")
     mode.add_argument("--check-scheduler", action="store_true",
                       help="exit 0 if a Postiz worker polls Temporal, else 1 (publish-machine.sh start)")
@@ -443,6 +451,11 @@ def main():
         return 0
 
     st = collect(env)
+    if args.guard_idle:
+        if idle_eligible(st):
+            return 0
+        print("Automatic stop skipped: work is waiting or live idle status could not be verified.", file=sys.stderr)
+        return GUARD_EXIT
     if args.json:
         print(json.dumps(st, ensure_ascii=False))
         return 0
