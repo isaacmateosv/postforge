@@ -231,13 +231,22 @@ def save_confirmation(instruction, media_paths, heard, result, lang):
     folder = os.path.join(CONFIRM_DIR, request_id)
     os.makedirs(folder, exist_ok=True)
     staged = []
-    for index, path in enumerate(media_paths):
-        target = os.path.join(folder, "%02d-%s" % (index, os.path.basename(path)))
-        shutil.copy2(path, target)
-        staged.append(target)
-    with open(os.path.join(CONFIRM_DIR, request_id + ".json"), "w", encoding="utf-8") as fh:
-        json.dump({"id": request_id, "instruction": instruction, "media": staged,
-                   "heard": heard, "lang": lang, "result": result}, fh, ensure_ascii=False, indent=1)
+    record = os.path.join(CONFIRM_DIR, request_id + ".json")
+    temporary = record + ".tmp"
+    try:
+        for index, path in enumerate(media_paths):
+            target = os.path.join(folder, "%02d-%s" % (index, os.path.basename(path)))
+            shutil.move(path, target)
+            staged.append(target)
+        with open(temporary, "w", encoding="utf-8") as fh:
+            json.dump({"id": request_id, "instruction": instruction, "media": staged,
+                       "heard": heard, "lang": lang, "result": result}, fh, ensure_ascii=False, indent=1)
+        os.replace(temporary, record)
+    except OSError:
+        shutil.rmtree(folder, ignore_errors=True)
+        if os.path.exists(temporary):
+            os.remove(temporary)
+        raise
     return request_id
 
 
@@ -372,13 +381,13 @@ def hint(error, lang, heard=None):
     return "\n".join(lines)
 
 
-def reply(env, instance, number, own_number, text, state, dry_run):
+def reply(env, instance, number, own_number, text, state, dry_run, timeout=120):
     if number != own_number:  # the door only ever talks to your own chat
         raise PMError("refusing to message anyone but your own chat")
     if dry_run:
         log("would reply:\n" + text)
         return
-    status, data = evo_call(env, "POST", "/message/sendText/" + instance, {"number": number, "text": text})
+    status, data = evo_call(env, "POST", "/message/sendText/" + instance, {"number": number, "text": text}, timeout=timeout)
     if status >= 400:
         raise PMError("Reply failed (HTTP %s)" % status)
     sent_id = ((data or {}).get("key") or {}).get("id") if isinstance(data, dict) else None
@@ -412,7 +421,15 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
             reply(env, name, number, number, "No hay una publicación pendiente de confirmación.", state, dry_run)
             return True
         try:
+            saved_when = (confirmation.get("result") or {}).get("when_utc")
+            scheduled = datetime.fromisoformat(saved_when.replace("Z", "+00:00")) if saved_when else None
+            if scheduled and scheduled < now + timedelta(minutes=5):
+                remove_confirmation(confirmation_path)
+                raise PMError("Ese plan ya venció. Envía una hora nueva." if ui_language() == "Spanish"
+                              else "That plan has expired. Send a new time.")
             p = plan_post.plan(env, confirmation["instruction"], confirmation.get("media") or [], None, now)
+            if scheduled:
+                p["when"] = scheduled.astimezone(tz)
             override = (confirmation.get("caption_override") or "").strip()
             if override:  # edited in the PostForge app's WhatsApp window: use it as the exact caption
                 p["exact"] = override
@@ -481,7 +498,7 @@ def one_pass(env, state, dry_run):
     sent = set(state.get("sent", []))
     fresh = [r for r in rows if r["id"] not in done and r["key"].get("id") not in sent]
     finished = []
-    folder = tempfile.mkdtemp(prefix="pm-wa-")
+    folder = tempfile.mkdtemp(prefix="intake-", dir=pmlib.whatsapp_scratch())
     try:
         for row in fresh:
             if row["ts"] > now_ts - SETTLE:
@@ -536,11 +553,20 @@ def main():
     global stopping
     parser = argparse.ArgumentParser(prog="wa-inbox.sh", description=__doc__.split("\n")[0],
                                      epilog=__doc__.split("\n", 1)[1], formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--idle-notice", action="store_true", help="send an idle notice to your own chat")
     parser.add_argument("--once", action="store_true", help="one pass, then exit")
     parser.add_argument("--dry-run", action="store_true", help="no drafts, no replies, nothing marked done")
     parser.add_argument("--reject-plan", metavar="ID", help="reject a saved confirmation plan")
     parser.add_argument("--send-plan-approval", metavar="ID", help="send a plan approval to your own WhatsApp chat")
     args = parser.parse_args()
+    if args.idle_notice:
+        env = pmlib.load_env()
+        instance, _, number, _ = own_identity(env)
+        message = ("PostForge está por entrar en modo inactivo. La recepción se pausa hasta que lo enciendas en el Mac."
+                   if ui_language() == "Spanish" else
+                   "PostForge is about to go idle. Intake will pause until you turn it on at the Mac.")
+        reply(env, instance, number, number, REPLY_MARK + "\n" + message, {}, False, timeout=5)
+        return 0
     if args.reject_plan or args.send_plan_approval:
         env = pmlib.load_env()
         if args.reject_plan:
@@ -561,6 +587,7 @@ def main():
     env = pmlib.load_env()
     state = load_state()
     log("listening to your own chat (dry run)" if args.dry_run else "listening to your own chat")
+    next_cleanup = 0
     while True:
         try:
             one_pass(env, state, args.dry_run)
@@ -570,6 +597,14 @@ def main():
             log("pass failed: %s: %s" % (type(exc).__name__, exc))
         if args.once or stopping:
             return 0
+        if not args.dry_run and time.monotonic() >= next_cleanup:
+            next_cleanup = time.monotonic() + 86400
+            try:
+                subprocess.run([sys.executable, os.path.join(pmlib.ROOT, "scripts", "retention.py"),
+                                "--whatsapp-cache", "--apply", "--json"], timeout=30,
+                               stdout=subprocess.DEVNULL, check=True)
+            except (OSError, subprocess.SubprocessError):
+                log("WhatsApp cache cleanup could not finish")
         for _ in range(POLL_SECONDS):
             if stopping:
                 return 0

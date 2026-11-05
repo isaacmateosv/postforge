@@ -289,6 +289,23 @@ def plan(env, text, media_paths, lang_arg, now):
             "text_approved": bool(TEXT_APPROVED.search(command))}
 
 
+def video_warnings(networks, durations, lang, short=False):
+    es = lang == "Spanish"
+    warnings = []
+    longest = max(durations, default=0)
+    if "facebook" in networks and longest >= 60:
+        warnings.append("Facebook: el video dura un minuto o más. Considera una versión más corta si buscas un clip breve."
+                        if es else "Facebook: the video is at least one minute long. Consider a shorter cut for a quick clip.")
+    if "youtube" in networks and longest > 180 and not short:
+        warnings.append("YouTube: el video supera los 3 minutos y se publicaría como video normal."
+                        if es else "YouTube: the video exceeds three minutes and would publish as a regular video.")
+    if "whatsapp" in networks and longest > whatsapp_pending.STATUS_PART_SECONDS:
+        parts = whatsapp_pending.video_part_count(longest)
+        warnings.append(f"Estado de WhatsApp: después de aprobarlo, el video se dividirá en {parts} partes de hasta 60 segundos."
+                        if es else f"WhatsApp Status: after approval, the video will be split into {parts} parts of up to 60 seconds.")
+    return warnings
+
+
 def run(env, p, dry_run):
     result = {"when_local": p["when"].strftime("%a %d %b %Y %H:%M"), "when_utc": p["when"].astimezone(timezone.utc).isoformat(),
               "networks": p["networks"], "lang": p["lang"], "notes": list(p["notes"]), "warnings": [], "drafts": [],
@@ -336,6 +353,11 @@ def run(env, p, dry_run):
                 usable.append((network, channel, placement(p["command"], network)))
         if not usable:
             raise PMError("Nothing to draft: " + "; ".join(result["warnings"]))
+
+        video_networks = {network for network, _, _ in usable} & {"facebook", "youtube", "whatsapp"}
+        if video_networks:
+            durations = [pmlib.ffprobe(path)[0] for kind, path in ready if kind == "video"]
+            result["warnings"].extend(video_warnings(video_networks, durations, p["lang"], short))
 
         if p["exact"]:
             caption, source = p["exact"], "your text"

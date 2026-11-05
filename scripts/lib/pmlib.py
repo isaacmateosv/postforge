@@ -225,6 +225,12 @@ def ffprobe(path):
     return duration, vcodec, acodec, width, height
 
 
+def whatsapp_scratch():
+    path = os.path.join(RUN_DIR, "wa-cache")
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    return path
+
+
 def stage_into_uploads(src, subdir):
     """Copy a host file into data/postiz-uploads/<subdir>/ (no-op if already inside uploads).
 

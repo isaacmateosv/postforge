@@ -11,10 +11,12 @@ import argparse
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.parse
 import time
+from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DAYS = 30
@@ -22,6 +24,7 @@ ROOTS = (
     os.path.join(ROOT, "data", "postiz-uploads"),
     os.path.join(ROOT, "logs"),
     os.path.join(ROOT, "run", "wa-confirmations"),
+    os.path.join(ROOT, "run", "wa-cache"),
 )
 
 
@@ -52,29 +55,64 @@ def referenced_media():
         if result.returncode != 0:
             return None
         references = result.stdout
-        pending = [os.path.join(ROOT, 'run', 'whatsapp-pending.json')] + glob.glob(os.path.join(ROOT, 'run', 'wa-confirmations', '*.json'))
-        for path in pending:
-            if os.path.exists(path):
-                with open(path, encoding='utf-8') as source:
-                    references += json.dumps(json.load(source))
+        queue_path = os.path.join(ROOT, 'run', 'whatsapp-pending.json')
+        if os.path.exists(queue_path):
+            with open(queue_path, encoding='utf-8') as source:
+                queue = json.load(source)
+            if not isinstance(queue, list) or not all(isinstance(item, dict) for item in queue):
+                return None
+            references += json.dumps([item for item in queue if item.get("status") != "sent"])
+        for path in glob.glob(os.path.join(ROOT, 'run', 'wa-confirmations', '*.json')):
+            with open(path, encoding='utf-8') as source:
+                references += json.dumps(json.load(source))
         return urllib.parse.unquote(references)
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
 
 
-def candidates(cutoff):
+def expired_confirmations(root, cutoff):
+    for path in glob.glob(os.path.join(root, "*.json")):
+        try:
+            if os.path.getmtime(path) >= cutoff:
+                continue
+            with open(path, encoding="utf-8") as source:
+                scheduled = datetime.fromisoformat(json.load(source)["result"]["when_utc"].replace("Z", "+00:00"))
+            if scheduled.tzinfo is not None and scheduled.timestamp() < cutoff:
+                yield path
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            continue
+
+
+def candidates(cutoff, whatsapp_only=False):
     references = referenced_media()
     for root in ROOTS:
         if not os.path.isdir(root):
             continue
+        if root.endswith('wa-confirmations'):
+            yield from expired_confirmations(root, cutoff)
+            # Only sweep abandoned, old confirmation media with no metadata.
+            for folder in glob.glob(os.path.join(root, "*")):
+                if os.path.isdir(folder) and not os.path.islink(folder) and not os.path.exists(folder + ".json"):
+                    for directory, _, filenames in os.walk(folder):
+                        for name in filenames:
+                            path = os.path.join(directory, name)
+                            try:
+                                if os.path.getmtime(path) < cutoff:
+                                    yield path
+                            except OSError:
+                                continue
+            continue
+        uploads = root.endswith('postiz-uploads')
+        if whatsapp_only:
+            if uploads:
+                root = os.path.join(root, "whatsapp-pending")
+            elif not root.endswith('wa-cache'):
+                continue
         for directory, _, filenames in os.walk(root):
             for name in filenames:
                 path = os.path.join(directory, name)
                 try:
-                    # Pending WhatsApp confirmations are actionable plans, not disposable history.
-                    if root.endswith('wa-confirmations'):
-                        continue
-                    if root.endswith('postiz-uploads') and (references is None or name in references):
+                    if uploads and (references is None or name in references):
                         continue
                     if os.path.getmtime(path) < cutoff:
                         yield path
@@ -87,13 +125,14 @@ def main():
     parser.add_argument("--apply", action="store_true", help="delete the listed files")
     parser.add_argument("--days", type=int, default=None,
                         help="retain this many days (default: PM_RETENTION_DAYS, else 30)")
+    parser.add_argument("--whatsapp-cache", action="store_true", help="limit cleanup to PostForge-owned WhatsApp staging")
     parser.add_argument("--json", action="store_true", help="print one JSON summary instead of the file list")
     args = parser.parse_args()
     days = args.days if args.days is not None else configured_days()
     if days < 1:
         parser.error("--days must be at least 1")
     cutoff = time.time() - days * 86400
-    files = list(candidates(cutoff))
+    files = list(candidates(cutoff, whatsapp_only=args.whatsapp_cache))
     size = 0
     for path in files:
         try:
@@ -105,11 +144,18 @@ def main():
         if args.apply:
             try:
                 os.remove(path)
+                if path.endswith(".json") and os.path.basename(os.path.dirname(path)) == "wa-confirmations":
+                    # Remove only that confirmation’s owned sibling folder.
+                    shutil.rmtree(os.path.splitext(path)[0], ignore_errors=True)
             except OSError as exc:
                 if not args.json:
                     print("  could not delete: %s" % exc)
     if args.apply:
         for root in ROOTS:
+            if args.whatsapp_cache and root.endswith('postiz-uploads'):
+                root = os.path.join(root, 'whatsapp-pending')
+            elif args.whatsapp_cache and root.endswith('logs'):
+                continue
             for directory, subdirectories, _ in os.walk(root, topdown=False):
                 for name in subdirectories:
                     path = os.path.join(directory, name)
