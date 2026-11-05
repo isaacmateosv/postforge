@@ -14,7 +14,7 @@ Local Ollama captions ──────┘                │
 
 1. Install the PostForge package and the prerequisites listed in SETUP.md, including Docker Desktop, Ollama, and FFmpeg.
 2. Copy .env.example to .env. Set the database credentials and JWT secret, the ngrok domain and token, and the Evolution API key. Set the project time zone with PM_TIMEZONE if you operate outside Ecuador.
-3. Provision the HTTPS domain in ngrok, configure provider OAuth credentials and callback URLs, then connect the social accounts in Postiz.
+3. Choose local access or an authenticated HTTPS gateway. Configure provider OAuth credentials and callback URLs for the selected Postiz origin, then connect the social accounts in Postiz.
 4. Turn on PostForge. Open **WhatsApp Manager**, then use the authorized phone to scan its QR code. Keep its API key private.
 5. Run the read-only health checks from the project directory.
 
@@ -23,6 +23,24 @@ cd ~/postforge
 ./postforge.sh doctor
 ./scripts/recheck.sh --live
 ```
+
+## Standalone access without ngrok
+
+For on-premises use, run the Compose stack on the Mac, Linux host, or Windows
+host with Docker Desktop. The v2 browser dashboard is available locally.
+The Postiz UI is also available through its local port. The v2 README has
+the Compose commands and the platform verification status.
+
+For access from other devices, use an authenticated HTTPS gateway on the
+network edge or use a private network with access controls. Point the
+gateway to the Postiz origin and keep all direct ports private. Configure
+the gateway’s users and MFA first. Then create the separate Postiz owner
+account through that protected route. Enable Postiz registration only for
+the initial owner setup if needed, then disable it.
+
+If you use ngrok, put the access gate in front of the entire endpoint.
+If you use your own domain, set the Postiz origin and provider callback
+URLs to match it. Review the v2 README before making a public cutover.
 
 ## Daily operation
 
