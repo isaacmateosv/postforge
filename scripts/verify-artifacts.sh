@@ -46,7 +46,7 @@ blocked = re.compile(r'(^|/)(\.env$|\.git(/|$)|\.checkpoint(/|$)|data(/|$)|expor
 leaks = [path for path in paths if blocked.search(path)]
 if leaks:
     raise SystemExit('Unexpected private/generated payload entries: ' + ', '.join(leaks[:10]))
-for required in ('scripts/component_updates.py', 'scripts/lib/wa_inbox.py', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
+for required in ('scripts/component_updates.py', 'scripts/lib/wa_inbox.py', 'scripts/lib/wa-media-stream.mjs', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
     assert any(path.endswith('/' + required) for path in paths), required
 print('PASS: installer payload contains required assets and excludes private runtime data')
 PY

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4]
+
+- Stream WhatsApp videos up to 256 MiB to disk and verify their size and SHA-256.
+- Check the requested schedule before downloading media.
+- Flag ineligible videos when the request explicitly says YouTube Shorts.
+
+After updating, restart PostForge services to reload an already-running WhatsApp listener.
+
 ## [1.0.3]
 
 - Verify the public Postiz endpoint and scheduler when changing the tunnel URL, and automatically restore the previous settings if verification fails.

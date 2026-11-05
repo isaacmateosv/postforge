@@ -48,6 +48,7 @@ REPLY_MARK = "🤖 Publish Machine"  # its own replies start with this, so it ne
 MEDIA_WINDOW = 10 * 60  # seconds a photo or video waits for its instruction
 SETTLE = 5  # seconds to wait for the rest of an album before acting
 POLL_SECONDS = 15
+STREAM_VIDEO_LIMIT = 256 * 1024 * 1024
 TEXT_TYPES = ("conversation", "extendedTextMessage")
 MEDIA_TYPES = ("imageMessage", "videoMessage")
 # Words whisper should expect (it wrote "huaguas" without them).
@@ -132,7 +133,8 @@ def text_of(row):
 
 def media_size(row):
     """WhatsApp encodes protobuf uint64 sizes as integers, strings, or {low, high}."""
-    raw = ((row.get('message') or {}).get(row.get('type')) or {}).get('fileLength')
+    payload = (row.get('message') or {}).get(row.get('type'))
+    raw = payload.get('fileLength') if isinstance(payload, dict) else None
     try:
         if isinstance(raw, dict):
             return ((int(raw['high']) & 0xffffffff) << 32) | (int(raw['low']) & 0xffffffff)
@@ -148,9 +150,42 @@ def media_limit(env):
         return 32 * 1024 * 1024
 
 
+def stream_video(row, folder, size):
+    payload = row["message"]["videoMessage"]
+    metadata = {key: payload.get(key) for key in ("mediaKey", "fileSha256", "directPath")}
+    if not all(isinstance(value, str) and value for value in metadata.values()):
+        raise PMError("WhatsApp did not provide enough information to download this large video. Use New Post in the Mac app.")
+    metadata["size"] = size
+    extension = EXTENSIONS.get((payload.get("mimetype") or "").split(";")[0], ".mp4")
+    helper = os.path.join(os.path.dirname(__file__), "wa-media-stream.mjs")
+    with open(helper, encoding="utf-8") as source:
+        command = ["docker", "exec", "-i", "pm-evolution-api",
+                   "node", "--input-type=module", "-e", source.read()]
+    fd, path = tempfile.mkstemp(suffix=extension, dir=folder)
+    complete = False
+    try:
+        with os.fdopen(fd, "wb") as output:
+            result = subprocess.run(command, input=json.dumps(metadata).encode(), stdout=output,
+                                    stderr=subprocess.DEVNULL, timeout=240)
+        complete = result.returncode == 0 and os.path.getsize(path) == size
+        if not complete:
+            raise PMError("Could not verify the large WhatsApp video. Resend it or use New Post in the Mac app.")
+        return path
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PMError("Could not download the large WhatsApp video. Resend it or use New Post in the Mac app.") from exc
+    finally:
+        if not complete:
+            os.unlink(path)
+
+
 def download(env, instance, row, folder):
     size = media_size(row)
     limit = media_limit(env)
+    if row.get("type") == "videoMessage":
+        if size is not None and limit < size <= STREAM_VIDEO_LIMIT:
+            return stream_video(row, folder, size)
+        if size is not None and size > STREAM_VIDEO_LIMIT:
+            limit = STREAM_VIDEO_LIMIT
     if size is None or size < 1 or size > limit:
         es = ui_language() == 'Spanish'
         raise PMError(("Este archivo supera el límite de WhatsApp de %d MB o no informa un tamaño válido. Usa Nueva publicación en la app para Mac para archivos grandes." if es else
@@ -416,12 +451,12 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     caption = ""
     confirmation_id = None
     try:
-        paths = [download(env, name, m, folder) for m in media_rows]
-        p = plan_post.plan(env, instruction, paths, None, now)
+        p = plan_post.plan(env, instruction, [], None, now)
+        p["media"] = [download(env, name, m, folder) for m in media_rows]
         with pmlib.Job("draft", "WhatsApp: " + instruction[:50]):
             result = plan_post.run(env, p, True)
         caption = clean_caption(result.get("caption") or "")
-        confirmation_id = None if dry_run else save_confirmation(instruction, paths, heard, result, p["lang"])
+        confirmation_id = None if dry_run else save_confirmation(instruction, p["media"], heard, result, p["lang"])
         confirmation_ref_id = confirmation_ref(confirmation_id) if confirmation_id else None
         text = summary(result, p["lang"], heard, bool(caption), confirmation_ref_id)
         log("awaiting confirmation %s for %s → %s" %

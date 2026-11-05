@@ -171,6 +171,32 @@ class Operations(unittest.TestCase):
         self.assertEqual(wa_inbox.media_size({'type': 'audioMessage', 'message': {'audioMessage': {'fileLength': '1024'}}}), 1024)
         self.assertIsNone(wa_inbox.media_size({'type': 'imageMessage', 'message': {}}))
 
+    def test_large_video_uses_disk_stream_and_checks_length(self):
+        size = 180887424
+        row = {'type': 'videoMessage', 'message': {'videoMessage': {
+            'fileLength': size, 'directPath': '/video', 'mediaKey': 'synthetic',
+            'fileSha256': 'synthetic', 'mimetype': 'video/mp4',
+        }}}
+        with tempfile.TemporaryDirectory() as folder, patch.object(wa_inbox, 'evo_call') as api:
+            with patch.object(wa_inbox, 'stream_video', return_value='video.mp4') as stream:
+                self.assertEqual(wa_inbox.download({}, 'test', row, folder), 'video.mp4')
+                stream.assert_called_once_with(row, folder, size)
+            with patch.object(wa_inbox.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
+                with self.assertRaisesRegex(pmlib.PMError, 'verify'):
+                    wa_inbox.download({}, 'test', row, folder)
+                self.assertEqual(list(Path(folder).iterdir()), [])
+            api.assert_not_called()
+
+    def test_explicit_short_rejects_ineligible_video(self):
+        now = datetime(2026, 11, 5, 6, tzinfo=timezone(timedelta(hours=-5)))
+        plan = plan_post.plan({}, 'YouTube Shorts today at 8am, caption: Test', ['sample.mp4'], 'English', now)
+        with patch.object(pmlib, 'Postiz') as api, patch.object(pmlib, 'normalize_media', return_value=('video', 'sample.mp4')), \
+             patch.object(pmlib, 'is_short', return_value=False):
+            api.return_value.integrations.return_value = [{'identifier': 'youtube'}]
+            with self.assertRaisesRegex(pmlib.PMError, 'at most 3 minutes'):
+                plan_post.run({}, plan, True)
+            api.return_value.upload.assert_not_called()
+
     def test_retention_preserves_referenced_media_and_pending_plans(self):
         with tempfile.TemporaryDirectory() as folder:
             roots = [Path(folder) / name for name in ('postiz-uploads', 'logs', 'wa-confirmations')]
