@@ -20,7 +20,7 @@ Setup and the sandbox: [../tiktok-app-form.md](../tiktok-app-form.md).
 1. Turn PostForge on. Click the menu bar warning → **Open Postiz**, or run
    `./postforge.sh channels --reconnect tiktok`.
 2. In Postiz, open the TikTok channel's menu → **Reconnect channel**.
-3. Log in with the bakery's TikTok account (`tk.almadulce.bakery`) and allow every permission.
+3. Log in with the organization’s TikTok account and allow every permission.
 
 ## When the keys change (sandbox ↔ production, or a reset secret)
 

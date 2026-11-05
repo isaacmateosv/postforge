@@ -280,8 +280,17 @@ start_wa_door() {
   wa_door_running && { echo "      WhatsApp door already listening."; return 0; }
   mkdir -p "$DIR/run" "$DIR/logs"
   rotate_log "$DIR/logs/wa-inbox.log"
-  nohup python3 "$DIR/scripts/lib/wa_inbox.py" >> "$DIR/logs/wa-inbox.log" 2>&1 &
-  echo $! > "$WA_DOOR_PID"
+  python3 - "$DIR" "$WA_DOOR_PID" <<'PYTHON'
+from pathlib import Path
+import subprocess
+import sys
+
+root, pidfile = map(Path, sys.argv[1:])
+with (root / "logs/wa-inbox.log").open("ab") as log:
+    worker = subprocess.Popen([sys.executable, str(root / "scripts/lib/wa_inbox.py")],
+                              stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+Path(pidfile).write_text(str(worker.pid) + "\n")
+PYTHON
   echo "      WhatsApp door listening to your own chat (log: logs/wa-inbox.log)."
 }
 stop_wa_door() {
@@ -460,6 +469,30 @@ case "${1:-}" in
     echo "======================================================"
     echo "  PUBLISH MACHINE IS OFF ($docker_note)"
     echo "======================================================"
+    ;;
+
+  refresh-installed-services)
+    # A package upgrade refreshes an active stack. A stopped stack or a
+    # Postgres-only restore stays as it was.
+    if ! docker info >/dev/null 2>&1; then
+      echo "Docker Desktop is unavailable. Services will load the new files on the next start."
+      exit 0
+    fi
+    if ! container_running pm-postiz && ! container_running pm-evolution-api; then
+      echo "PostForge services are stopped. They will load the new files on the next start."
+      exit 0
+    fi
+    docker compose config --quiet
+    docker compose pull --policy missing
+    mark_lifecycle stopping
+    stop_wa_door
+    docker compose down --remove-orphans
+    "$0" start
+    if ! container_running pm-tunnel || ! wait_for_scheduler 0 ||
+       ! [[ "$(http_code "$POSTIZ_URL/api/")" == 200 && "$(http_code "$EVO_URL/")" == 200 ]]; then
+      echo "✖ The refreshed PostForge services did not pass their health checks." >&2
+      exit 1
+    fi
     ;;
 
   restart)

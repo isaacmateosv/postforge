@@ -1,6 +1,6 @@
 # Threads
 
-Threads connects with the bakery's Instagram account (`almadulce.bakery`) through its own Meta app
+Threads connects with the organization’s Instagram account through its own Meta app
 keys (`THREADS_APP_ID`, `THREADS_APP_SECRET`). Its token lasts about 60 days, but unlike Facebook and
 Instagram, Postiz renews it by itself before then. Automatic renewal can fail. Reconnection may be needed if someone removes the
 app (Instagram → Settings → Website permissions / Apps and websites), the keys change, or the renewal
@@ -11,7 +11,7 @@ fails, and then Postiz marks it disconnected and the menu bar warns.
 1. Turn PostForge on. Click the menu bar warning → **Open Postiz**, or run
    `./postforge.sh channels --reconnect threads`.
 2. In Postiz, open the Threads channel's menu → **Reconnect channel**.
-3. Log in with the bakery's Instagram account and allow every permission.
+3. Log in with the organization’s Instagram account and allow every permission.
 
 ## If it fails
 

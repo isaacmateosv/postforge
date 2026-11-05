@@ -62,7 +62,7 @@ struct LastStatus: Decodable {
     let received: Int
     let viewed: Int
     let text: String
-    let viewerNames: [String]?  // up to 15, the bakery phone left out
+    let viewerNames: [String]?  // up to 15, the primary phone left out
 }
 
 /// A channel that needs reconnecting, or will soon (Facebook and Instagram can't renew themselves).
@@ -105,11 +105,18 @@ struct MaintenanceComponent: Decodable {
     let kind: String
 }
 
+struct EvolutionUpdateStatus: Decodable {
+    let installed: String
+    let latest: String
+    let updateAvailable: Bool
+}
+
 struct MaintenanceStatus: Decodable {
     let updatesAvailable: Bool
     let components: [MaintenanceComponent]
     let dockerStack: String
     let checkComplete: Bool?
+    var evolution: EvolutionUpdateStatus? = nil
 }
 
 struct PackageAsset: Decodable {
@@ -272,7 +279,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     var state: MachineState?
     var stateError: String?
-    var busy: String?  // "Turning on…" while a lifecycle command runs
+    var busy: String? { didSet { updateButton() } }
+    var windowWork = 0 { didSet { updateButton() } }
+    var planningWork = 0 { didSet { updateButton() } }
+    var activeProcessCount: Int {
+        (busy != nil || state?.state == "starting" || state?.state == "stopping" ? 1 : 0)
+            + windowWork + max(planningWork, state?.pending.jobs.count ?? 0)
+            + (operationIsUpdateCheck && (packageCheckInFlight || maintenanceCheckInFlight) ? 1 : 0)
+    }
+    var updatesAvailable: Bool {
+        latestPackageUpdate != nil || maintenance?.updatesAvailable == true || maintenance?.evolution?.updateAvailable == true
+    }
     var pollTimer: Timer?
     var polling = false
     var menuOpen = false
@@ -289,7 +306,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     var maintenanceCheckInFlight = false
     var maintenanceTimer: Timer?
     var updateNoticeShown = false
-    var packageUpdateNoticeShown = false
+    var notifiedPackageVersion: String?
+    var notifiedEvolutionVersion: String?
     var latestPackageUpdate: PackageUpdateState?
     var packageCheckFailing = false
     var packageCheckInFlight = false
@@ -587,7 +605,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func scheduleMaintenanceCheck() {
         maintenanceTimer?.invalidate()
-        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 21600, repeats: false) { [weak self] _ in
+        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: false) { [weak self] _ in
             self?.checkForUpdates(notifyIfAvailable: true)
         }
     }
@@ -598,6 +616,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         maintenance = nil
         packageCheckFailing = false
         refreshPackageUpdateStatus(notifyIfAvailable: notifyIfAvailable)
+        updateButton()
         let dir = project
         DispatchQueue.global(qos: .utility).async {
             let result = runCommand(["/bin/bash", dir + "/scripts/maintenance.sh", "check", "--json"],
@@ -615,10 +634,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                         self.notify("Stable updates are available",
                                     "Open the tray menu to review them. Host tools remain manual; the approved action updates the Docker stack.")
                     }
+                    if !status.updatesAvailable { self.updateNoticeShown = false }
+                    if notifyIfAvailable, let evolution = status.evolution, evolution.updateAvailable,
+                       self.notifiedEvolutionVersion != evolution.latest {
+                        self.notifiedEvolutionVersion = evolution.latest
+                        self.notify(self.text("Evolution update available", "Actualización de Evolution disponible"),
+                                    self.text("A newer upstream release is available for review.", "Hay una versión nueva del proveedor para revisar."))
+                    }
                     if let menu = self.statusItem.menu { self.menuNeedsUpdate(menu) }
                 } else {
                     self.log("maintenance check failed (exit \(result.0))\n\(result.1)")
                 }
+                self.updateButton()
                 self.finishUpdateCheckIfReady()
                 self.scheduleMaintenanceCheck()
             }
@@ -680,6 +707,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     func consumePackageRelease(_ result: (Int32, String), current: String, notifyIfAvailable: Bool) {
         defer {
             packageCheckInFlight = false
+            updateButton()
             finishUpdateCheckIfReady()
         }
         let body = result.1.split(separator: "\n", omittingEmptySubsequences: false).dropLast().joined(separator: "\n")
@@ -722,8 +750,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                                             releaseURL: releaseURL,
                                                             packageURL: packageURL,
                                                             packageName: packageName, checksumURL: checksumURL)
-                if notifyIfAvailable && !self.packageUpdateNoticeShown {
-                    self.packageUpdateNoticeShown = true
+                if notifyIfAvailable && self.notifiedPackageVersion != release.tagName {
+                    self.notifiedPackageVersion = release.tagName
                     self.notify("PostForge update is available",
                                 text("Latest stable release: \(release.tagName). Install it from the tray menu.", "Versión estable disponible: \(release.tagName). Instálala desde el menú de la barra."))
                 }
@@ -741,8 +769,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         guard busy == nil, let update = latestPackageUpdate else { return }
         let confirmed = ask(
             text("Install PostForge \(update.latestVersion)?", "¿Instalar PostForge \(update.latestVersion)?"),
-            text("Download the stable package and install it in the background. The tray app may restart.",
-                 "Descarga el paquete estable e instálalo en segundo plano. La app de la barra de menús puede reiniciarse."),
+            text("Download and install the stable package. Running PostForge services and the tray app may restart briefly.",
+                 "Descarga e instala el paquete estable. Los servicios activos de PostForge y la app pueden reiniciarse brevemente."),
             safe: text("Cancel", "Cancelar"),
             risky: text("Install Update", "Instalar actualización"))
         guard confirmed else { return }
@@ -795,7 +823,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             let quotedPath = destination.path.replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "\"", with: "\\\"")
             let script = "do shell script \"installer -pkg \\\"\(quotedPath)\\\" -target /\" with administrator privileges"
-            let install = runCommand(["/usr/bin/osascript", "-e", script], in: self.project, timeout: 300, quietErrors: true)
+            let install = runCommand(["/usr/bin/osascript", "-e", script], in: self.project, timeout: 900, quietErrors: true)
             DispatchQueue.main.async {
                 try? FileManager.default.removeItem(at: destination)
                 self.busy = nil
@@ -969,6 +997,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     func updateButton() {
+        let active = activeProcessCount
+        NSApp.dockTile.badgeLabel = active > 0 ? String(active) : nil
+        newPost?.refreshUpdates(available: updatesAvailable)
         guard let button = statusItem.button else { return }
         var symbol = "paperplane"
         var count = 0
@@ -1011,7 +1042,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         button.alphaValue = symbol == "paperplane" ? 0.5 : 1  // the glyph is dimmed while the stack is off
         button.imagePosition = .imageLeading
         button.imageScaling = .scaleProportionallyUpOrDown
-        button.title = count > 0 ? " \(count)" : ""
+        button.title = (active > 0 ? " \(active)" : "") + (updatesAvailable ? " •" : "")
+        if active > 0 { tip += text(" · \(active) running", " · \(active) en curso") }
+        if updatesAvailable { tip += text(" · Updates available", " · Hay actualizaciones disponibles") }
         button.toolTip = "PostForge: " + tip
     }
 
@@ -1135,11 +1168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
 
         menu.addItem(.separator())
-        if let update = latestPackageUpdate {
-            menu.addItem(action(text("Install PostForge \(update.latestVersion)…", "Instalar PostForge \(update.latestVersion)…"),
-                                #selector(downloadLatestPackage), enabled: busy == nil))
-        }
-        menu.addItem(action(text("Check for Updates…", "Buscar actualizaciones…"),
+        menu.addItem(action(updatesAvailable ? text("Updates Available…", "Actualizaciones disponibles…") :
+                            text("Check for Updates…", "Buscar actualizaciones…"),
                             #selector(checkUpdatesFromMenu), enabled: busy == nil))
         let tools = NSMenuItem(title: text("Settings & Tools", "Ajustes y herramientas"), action: nil, keyEquivalent: "")
         tools.submenu = settingsMenu(up: up, canAct: canAct)
@@ -1708,7 +1738,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let incomplete = packageCheckFailing || maintenance?.checkComplete != true
         let appUpdate = latestPackageUpdate
         let componentCount = maintenance?.components.filter { $0.kind == "docker" }.count ?? 0
-        let available = appUpdate != nil || componentCount > 0
+        let evolution = maintenance?.evolution
+        let evolutionUpdate = evolution?.updateAvailable == true
+        let available = appUpdate != nil || componentCount > 0 || evolutionUpdate
         let heading = incomplete ? text("Some checks could not finish.", "No se pudieron completar algunas revisiones.") :
             available ? text("Updates are available.", "Hay actualizaciones disponibles.") :
             text("You’re up to date.", "Todo está actualizado.")
@@ -1718,13 +1750,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let dockerStatus = maintenance?.checkComplete != true ? text("Docker: some components could not be checked. Try again.", "Docker: no se pudieron revisar algunos componentes. Vuelve a intentar.") :
             componentCount > 0 ? text("Docker: \(componentCount) component update(s) available.", "Docker: hay \(componentCount) actualizaciones de componentes disponibles.") :
             text("Docker components: up to date.", "Componentes de Docker: actualizados.")
-        operationLabel?.stringValue = [heading, appStatus, dockerStatus].joined(separator: "\n\n")
+        let evolutionStatus = evolution.map {
+            $0.updateAvailable
+                ? text("Evolution API & Manager: \($0.latest) is available upstream. A compatible PostForge release is required.",
+                       "API y Manager de Evolution: la versión \($0.latest) está disponible. Hace falta una versión compatible de PostForge.")
+                : text("Evolution API & Manager \($0.installed): up to date.", "API y Manager de Evolution \($0.installed): actualizados.")
+        } ?? text("Evolution API & Manager: release check unavailable.", "API y Manager de Evolution: no se pudo consultar la versión.")
+        operationLabel?.stringValue = [heading, appStatus, dockerStatus, evolutionStatus].joined(separator: "\n\n")
         operationSpinner?.stopAnimation(nil)
         operationSpinner?.isHidden = true
         operationCloseButton?.title = text("Done", "Listo")
         operationActionButton?.isHidden = !available && !incomplete
         operationActionButton?.title = appUpdate != nil ? text("Install App Update…", "Actualizar la app…") :
-            componentCount > 0 ? text("Update Components…", "Actualizar componentes…") : text("Try Again", "Volver a intentar")
+            componentCount > 0 ? text("Update Components…", "Actualizar componentes…") :
+            evolutionUpdate ? text("Evolution Release Notes…", "Notas de la versión de Evolution…") : text("Try Again", "Volver a intentar")
         if CommandLine.arguments.contains("--check-updates-once") {
             print(operationLabel?.stringValue ?? "")
             precondition(operationSpinner?.isHidden == true)
@@ -1738,7 +1777,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     @objc func performUpdateAction() {
         if latestPackageUpdate != nil { downloadLatestPackage() }
         else if maintenance?.updatesAvailable == true { applyStableUpdates() }
-        else { openUpdates() }
+        else if maintenance?.evolution?.updateAvailable == true {
+            if let url = URL(string: "https://github.com/evolution-foundation/evolution-api/releases/latest") {
+                NSWorkspace.shared.open(url)
+            }
+        } else { openUpdates() }
     }
 
     @objc func closeOperation() { operationWindow?.orderOut(nil) }
@@ -2234,6 +2277,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     let preview = NSButton(title: "Preview", target: nil, action: nil)
     let create = NSButton(title: "Create Drafts", target: nil, action: nil)
     let calendar = NSButton(title: "Open Postiz Calendar", target: nil, action: nil)
+    let updatesButton = NSButton(title: "", target: nil, action: nil)
     let spinner = NSProgressIndicator()
     var statsQueue = NSTextField(labelWithString: "0")
     var statsDrafts = NSTextField(labelWithString: "0")
@@ -2270,6 +2314,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
 
     func t(_ english: String, _ spanish: String) -> String {
         (NSApp.delegate as? AppDelegate)?.text(english, spanish) ?? english
+    }
+
+    func refreshUpdates(available: Bool) {
+        updatesButton.title = available ? t("Updates Available…", "Actualizaciones disponibles…") : t("Updates", "Actualizaciones")
+        updatesButton.contentTintColor = available ? .systemOrange : nil
     }
 
     func refreshState(_ state: MachineState?) {
@@ -2509,8 +2558,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         for button in [whatsappButton, backupButton, calendar] { button.controlSize = .small }
         let footerSpacer = NSView()
         footerSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let updatesButton = NSButton(title: t("Updates", "Actualizaciones"), target: NSApp.delegate, action: #selector(AppDelegate.openUpdates))
+        updatesButton.target = NSApp.delegate
+        updatesButton.action = #selector(AppDelegate.openUpdates)
         updatesButton.controlSize = .small
+        refreshUpdates(available: (NSApp.delegate as? AppDelegate)?.updatesAvailable == true)
         let footer = NSStackView(views: [whatsappButton, updatesButton, footerSpacer, backupButton])
         footer.spacing = 8
         footer.alignment = .centerY
@@ -2620,11 +2671,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         create.isEnabled = false
         if dryRun { previewed = false }
         spinner.startAnimation(nil)
+        (NSApp.delegate as? AppDelegate)?.planningWork += 1
         show(dryRun ? t("Reading your plan and writing the caption…", "Leyendo tu plan y redactando el texto…") : t("Creating drafts…", "Creando borradores…"))
         DispatchQueue.global(qos: .userInitiated).async {
             let (code, output) = runCommand(args, in: self.project, timeout: 900, quietErrors: true)
             DispatchQueue.main.async {
                 self.spinner.stopAnimation(nil)
+                if let delegate = NSApp.delegate as? AppDelegate {
+                    delegate.planningWork -= 1
+                    delegate.poll()
+                }
                 self.preview.isEnabled = true
                 self.create.isEnabled = true
                 self.report(output, dryRun: dryRun, exitCode: code)
@@ -2645,7 +2701,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         let names = ["instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
                      "threads": "Threads", "whatsapp": "WhatsApp Status"]
         var lines = [(dryRun ? t("Plan (nothing created yet) for ", "Plan (aún no se ha creado nada) para ") : t("Drafts created for ", "Borradores creados para "))
-                     + ((json["when_utc"] as? String).map { shortDate(iso: $0) } ?? (json["when_local"] as? String ?? "")) + t(" (bakery time)", " (hora de la panadería)")]
+                     + ((json["when_utc"] as? String).map { shortDate(iso: $0) } ?? (json["when_local"] as? String ?? "")) + t(" (local time)", " (hora local)")]
         for target in json["targets"] as? [[String: Any]] ?? [] {
             let network = target["network"] as? String ?? ""
             let short = network == "youtube" && (json["short"] as? Bool ?? false) ? " (Short)" : ""
@@ -3030,6 +3086,7 @@ final class BackupWindow: NSObject {
         exportButton.isEnabled = false
         revealButton.isHidden = true
         exportSpinner.startAnimation(nil)
+        delegate.windowWork += 1
         setStatus(exportStatus, t("Starting…", "Iniciando…"))
         let dir = project
         DispatchQueue.global(qos: .userInitiated).async {
@@ -3041,6 +3098,7 @@ final class BackupWindow: NSObject {
             }
             DispatchQueue.main.async {
                 self.exportSpinner.stopAnimation(nil)
+                self.delegate.windowWork -= 1
                 self.exportButton.isEnabled = true
                 self.delegate.log("migration export -> exit \(code)\n\(output)")
                 if code == 0 {
@@ -3079,6 +3137,7 @@ final class BackupWindow: NSObject {
                            safe: t("Cancel", "Cancelar"), risky: t("Replace and Restore", "Reemplazar y restaurar")) else { return }
         restoreButton.isEnabled = false
         restoreSpinner.startAnimation(nil)
+        delegate.windowWork += 1
         setStatus(restoreStatus, t("Checking backup…", "Revisando el respaldo…"))
         let dir = project
         DispatchQueue.global(qos: .userInitiated).async {
@@ -3090,6 +3149,7 @@ final class BackupWindow: NSObject {
             }
             DispatchQueue.main.async {
                 self.restoreSpinner.stopAnimation(nil)
+                self.delegate.windowWork -= 1
                 self.restoreButton.isEnabled = true
                 self.delegate.log("migration import -> exit \(code)\n\(output)")
                 if code == 0 {
@@ -3478,7 +3538,7 @@ let uiSpanish: [String: String] = [
     "Default: 30 days. This sets the cleanup age for logs and unused uploaded media. Cleanup requires a separate review and apply command; changing this value deletes nothing. Scheduled posts and the database are preserved.": "Por defecto: 30 días. Define la antigüedad para limpiar registros y archivos subidos que ya no se usan. Debes revisar y ejecutar la limpieza por separado; cambiar este valor no borra nada. Se conservan la base de datos y las publicaciones programadas.",
     "Dictate": "Dictar",
     "Dictation isn't on. Turn it on in System Settings → Keyboard → Dictation, then press the dictation key.": "El dictado está desactivado. Actívalo en Configuración del Sistema → Teclado → Dictado y presiona la tecla de dictado.",
-    "Download the stable package and install it in the background. The tray app may restart.": "Descarga el paquete estable e instálalo en segundo plano. La app de la barra de menús puede reiniciarse.",
+    "Download and install the stable package. Running PostForge services and the tray app may restart briefly.": "Descarga e instala el paquete estable. Los servicios activos de PostForge y la app pueden reiniciarse brevemente.",
     "Downloading update…": "Descargando actualización…",
     "Drafts": "Borradores",
     "Drop photos or videos here": "Suelta fotos o videos aquí",
@@ -3643,6 +3703,7 @@ let uiSpanish: [String: String] = [
     "Update download failed": "No se pudo descargar la actualización",
     "Update install failed": "No se pudo instalar la actualización",
     "Updates": "Actualizaciones",
+    "Updates Available…": "Actualizaciones disponibles…",
     "Updating safely…": "Actualizando de forma segura…",
     "Use 7–15 digits per number, separated by commas.": "Usa entre 7 y 15 dígitos por número, separados por comas.",
     "Use a passphrase of at least 12 characters.": "Usa una contraseña de al menos 12 caracteres.",
@@ -3742,6 +3803,16 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.maintenance = MaintenanceStatus(updatesAvailable: true, components: [MaintenanceComponent(name: "test", kind: "docker")], dockerStack: "test", checkComplete: true)
     delegate.finishUpdateCheckIfReady()
     precondition(delegate.operationActionButton?.title == "Update Components…")
+    delegate.updateButton()
+    delegate.menuNeedsUpdate(trayMenu)
+    precondition(trayMenu.items.contains { $0.title == "Updates Available…" })
+    precondition(delegate.newPost!.updatesButton.title == "Updates Available…")
+    delegate.windowWork = 2
+    precondition(NSApp.dockTile.badgeLabel == "2")
+    precondition(delegate.statusItem.button?.title == " 2 •")
+    delegate.windowWork = 0
+    precondition(NSApp.dockTile.badgeLabel == nil)
+
     defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
     delegate.maintenance = MaintenanceStatus(updatesAvailable: false, components: [], dockerStack: "test", checkComplete: true)
     delegate.finishUpdateCheckIfReady()

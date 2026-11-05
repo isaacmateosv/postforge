@@ -291,7 +291,7 @@ def draft_settings(identifier, content, env=None, short=False):
     if identifier == "youtube":
         lines = [l for l in re.sub(r"#\S+", "", content).splitlines() if l.strip()]
         title = (lines[0].strip() if lines else "")[:100]
-        title = title if len(title) >= 2 else "Alma Dulce Bakery"
+        title = title if len(title) >= 2 else "Untitled video"
         settings["title"] = title[:92].rstrip() + " #Shorts" if short else title
     return settings
 

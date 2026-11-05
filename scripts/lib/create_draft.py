@@ -21,64 +21,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pmlib  # noqa: E402
 from pmlib import PMError, info  # noqa: E402
 
-# Caption A/B 2026-10-30 (scripts/caption-ab.sh, logs/caption-ab/): small models follow examples
-# better than rules and drift into English when the instructions are in English, so Spanish has its
-# own prompt; and the call to action was their most common mistake (a shop to visit, odd verb
-# forms). So the model writes one or two sentences and topic hashtags, and the call to action and
-# brand hashtags are fixed text added here. The owner's blind test set the facts and voice: no shop
-# (orders are picked up or sent by Uber courier), premium tone, Ecuadorian Spanish.
-# CAPTION_CTA_ES / CAPTION_CTA_EN in .env replace the call to action.
-CTA = {
-    "Spanish": "Haz tu pedido por WhatsApp y retíralo o recíbelo con Uber.",
-    "English": "Order on WhatsApp, then pick it up or have it delivered by Uber.",
-}
+# An optional call to action can be configured per language.
 CTA_SETTING = {"Spanish": "CAPTION_CTA_ES", "English": "CAPTION_CTA_EN"}
-# These networks have no text-only posts; Postiz would accept the draft and fail when publishing.
 NEEDS_MEDIA = {"instagram": "Instagram", "instagram-standalone": "Instagram", "tiktok": "TikTok",
                "youtube": "YouTube"}
-BRAND_TAGS = {
-    "Spanish": ["#AlmaDulce", "#ReposteríaGourmet", "#BajoPedido"],
-    "English": ["#AlmaDulce", "#GourmetPastry", "#MadeToOrder"],
-}
 
-PROMPT = """You write Instagram and Facebook captions for Alma Dulce Bakery, a gourmet, avant-garde pastry kitchen in Ecuador that works only to order. Everything is fresh: baked the same day, with sourdough cared for daily. Its voice is refined and warm: a premium experience at accessible prices.
+PROMPT = """Write one social media caption in {lang} about: {topic}
+- Use one or two short sentences and at most two relevant emojis.
+- Use only the facts in the topic. Do not invent a business name, prices, dates, locations or contact details.
+- Add 3 to 5 relevant hashtags on the next line.
+Return only the caption."""
 
-Example topic: Chocolate raspberry cake, made to order
-Example caption:
-Dark chocolate and fresh raspberries in a cake made for your special moments. 🍫
-#ChocolateCake #Raspberries #Celebrations
-
-Example topic: Mother's Day orders until Thursday
-Example caption:
-Surprise mom with something handmade, with all the care she deserves. 💐 We take orders until Thursday.
-#MothersDay #HandmadeGifts #Pastry
-
-Now write ONE caption in {lang} about: {topic}
-- 1 or 2 short sentences about the topic. At most 2 emojis, only ones that fit the product; if unsure, none.
-- Don't say how to order and don't mention a shop, store or neighborhood: we add that part.
-- Use only the facts in the topic: don't invent prices, dates, times or addresses.
-- On the next line, 3 to 5 hashtags about the topic.
-Return only the caption, with no preamble or quotation marks."""
-
-PROMPT_ES = """Escribes publicaciones para Instagram y Facebook de Alma Dulce Bakery, una repostería gourmet de vanguardia en Ecuador que trabaja solo bajo pedido. Todo es fresco: se hornea el mismo día y la masa madre se cuida a diario. Su estilo es elegante y cálido: una experiencia premium a precios accesibles.
-
-Ejemplo de tema: Torta de chocolate y frambuesa por encargo
-Ejemplo de publicación:
-Chocolate intenso y frambuesas frescas en una torta pensada para tus momentos especiales. 🍫
-#TortaDeChocolate #Frambuesas #Celebraciones
-
-Ejemplo de tema: Pedidos para el Día de la Madre hasta el jueves
-Ejemplo de publicación:
-Sorprende a mamá con un detalle hecho a mano, con todo el cariño que merece. 💐 Recibimos pedidos hasta el jueves.
-#DiaDeLaMadre #RegalosHechosAMano #Repostería
-
-Ahora escribe UNA publicación sobre: {topic}
-- Español de Ecuador. De 1 a 2 frases cortas sobre el tema. Máximo 2 emojis, solo si encajan con el producto; si dudas, ninguno.
-- No escribas cómo pedir ni menciones un local, una tienda o un barrio: eso lo agregamos nosotros.
-- No uses las palabras "dulces" ni "recoger".
-- Usa solo los datos del tema: no inventes precios, fechas, horarios ni direcciones.
-- En la línea siguiente, de 3 a 5 hashtags en español sobre el tema.
-Devuelve solo la publicación, sin introducción ni comillas."""
+PROMPT_ES = """Escribe una publicación en español de Ecuador sobre: {topic}
+- Usa una o dos frases cortas y hasta dos emojis pertinentes.
+- Usa solo los datos del tema. Evita inventar nombres de negocios, precios, fechas, lugares o datos de contacto.
+- Agrega de 3 a 5 hashtags pertinentes en la siguiente línea.
+Devuelve solo la publicación."""
 
 PREAMBLE = re.compile(r"^¡?(here(?:'s| is)|sure|caption|aquí (?:tienes|está)|claro|por supuesto)\b[^\n]*:\s*\n+",
                       re.IGNORECASE)
@@ -87,13 +45,10 @@ TRAILING_TAGS = re.compile(r"(?:\s*#\w+)+\s*$")
 SEPARATOR = re.compile(r"\s*[_=*~—–-]{3,}\s*")
 SENTENCE = re.compile(r"[^.!?…]+(?:[.!?…]+|$)")
 ORDER_CHANNEL = re.compile(r"\b(whatsapp|uber|dm|inbox|mensaje|message)\b", re.IGNORECASE)
-# Emoji guard (owner's blind test 2026-10-31: 🍎 for figs, 🥭/🥔 for pan de yuca, 🍰 for guaguas, 💔 for
-# Día de Difuntos, 🚚 for deliveries; "if unsure, better none"). Kept: always-safe ones, and food or
-# occasion emojis only when the topic or caption names that thing. Everything else goes.
+# Keep contextual emojis only when the topic or caption supports them.
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B50\u2B55]\uFE0F?(?:\u200D[\U0001F000-\U0001FAFF\u2600-\u27BF]\uFE0F?)*")
 EMOJI_SWAP = {"🚚": "🛵", "🚛": "🛵", "📦": "🛵", "💔": "🤍"}
-# Sentences that copy the prompt's rules into the caption (the 3B did), and claims of baking in the
-# mornings: the owner bakes fresh the same day, not necessarily in the morning.
+# Remove leaked instructions and unsupported claims about recurring morning activity.
 INSTRUCTION_ECHO = re.compile(r"frases? cortas?|sobre el tema|short sentences?|about the topic|\bemojis?\b|"
                               r"\bhashtags?\b|español de ecuador|si dudas|if unsure", re.IGNORECASE)
 MORNING_CLAIM = re.compile(r"(every|each) morning|mornings|(todas las|cada|por las|en las) mañanas?", re.IGNORECASE)
@@ -186,29 +141,23 @@ def drop_repeats(body, topic=""):
 
 
 def finish(text, lang="English", env=None, topic=""):
-    """A model's answer as a caption: no preamble or wrapping quotes, only emojis that fit (at most 2),
-    no repeated sentence, no sentence of its own on how to order (unless that's all it wrote), then
-    the fixed call to action, then the hashtags (the topic's, then the brand's) on one line after a
-    blank line, at most 8, no repeats. Empty if the model wrote no sentence."""
+    """Clean generated copy and append the operator's optional call to action."""
     body, tags = split_hashtags(PREAMBLE.sub("", text.strip()).strip().strip('"').strip())
     body = re.sub(r"[ \t]{2,}", " ", fitting_emojis(body, topic)).strip()
     body = drop_repeats(body, topic)
     if not re.search(r"\w", body):
         return ""  # nothing but emojis or punctuation survived
-    lines = ("".join(s for s in SENTENCE.findall(line) if not ORDER_CHANNEL.search(s)).strip()
-             for line in body.splitlines())
-    kept = "\n".join(line for line in lines if line)
-    if not re.search(r"\w", kept):
-        kept = ""  # only emojis or punctuation were left
-    if not body:
-        return ""
     lang = language(lang)
-    cta = (env or {}).get(CTA_SETTING.get(lang, ""), "").strip() or CTA.get(lang, "")
-    if not kept:
-        cta = ""  # a topic about ordering: the model's sentences are the call to action
-    body = kept or body
+    cta = (env or {}).get(CTA_SETTING.get(lang, ""), "").strip()
+    if cta or not ORDER_CHANNEL.search(topic):
+        kept = "\n".join("".join(s for s in SENTENCE.findall(line) if not ORDER_CHANNEL.search(s)).strip()
+                         for line in body.splitlines()).strip()
+        if re.search(r"\w", kept):
+            body = kept
+        else:
+            cta = ""
     unique = []
-    for tag in tags[:5] + BRAND_TAGS.get(lang, []):
+    for tag in tags[:5]:
         if tag.lower() not in {t.lower() for t in unique}:
             unique.append(tag)
     caption = body + ("\n" + cta if cta else "")

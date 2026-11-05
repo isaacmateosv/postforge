@@ -2,11 +2,11 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
-"""Link the bakery's WhatsApp to Evolution as a linked device (first setup, or after a logout).
+"""Link the organization’s WhatsApp to Evolution as a linked device (first setup, or after a logout).
 
 It never touches a working link: if the instance is already connected it says so and stops.
 Otherwise it creates the instance when missing, saves the QR to run/whatsapp-qr.png, opens it,
-and waits while you scan it on the bakery phone (WhatsApp > Linked devices > Link a device).
+and waits while you scan it on the primary phone (WhatsApp > Linked devices > Link a device).
 The QR changes about every 45 s; the file is refreshed. Once linked, it turns on what status
 receipts need (wa_settings.py).
 """
@@ -74,7 +74,7 @@ def main():
         info("Instance '%s' exists but is not connected (state: %s)." % (instance, current))
         have_qr = False
 
-    info("On the bakery phone: WhatsApp > Settings > Linked devices > Link a device, then scan the QR.")
+    info("On the primary phone: WhatsApp > Settings > Linked devices > Link a device, then scan the QR.")
     deadline = time.time() + args.wait
     opened = False
     next_qr = 0

@@ -20,4 +20,4 @@ reconnect every channel.
    `…/integrations/social/youtube`.
 6. `./postforge.sh restart`, then reconnect each channel ([README.md](README.md)).
 
-The policy pages on GitHub Pages (`https://isaacmateosv.github.io/almadulce-bakery/`) don't change.
+Policy pages hosted separately keep their existing addresses.

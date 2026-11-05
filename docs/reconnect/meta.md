@@ -7,9 +7,9 @@ Both connect through Facebook Login in the same Meta app. This installed Postiz 
 1. Turn PostForge on. Then click the menu bar warning → **Open Postiz**, or run
    `./postforge.sh channels --reconnect meta` (it confirms when each one works again).
 2. In Postiz, in the channel list on the left, open the **Facebook Page**'s menu → **Reconnect channel**.
-3. Facebook asks you to log in. Use an account that **manages the bakery's Page** and has a **role on
+3. Facebook asks you to log in. Use an account that **manages the organization’s Page** and has a **role on
    the Meta app** . Continue as yourself (not as the Page), keep every permission
-   ticked, and select the bakery's Page.
+   ticked, and select the organization’s Page.
 4. Do the same for **Instagram**, selecting the Page and its Instagram account.
 5. Within a minute the menu bar shows the new date, and a "works again" notification confirms it.
 

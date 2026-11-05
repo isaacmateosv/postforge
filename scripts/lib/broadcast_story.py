@@ -2,7 +2,7 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
-"""WhatsApp Status (Stories) broadcaster for Alma Dulce Bakery via Evolution API.
+"""WhatsApp Status (Stories) broadcaster via Evolution API.
 
 Scope guardrail: posts ONLY to status@broadcast. It never sends DMs or group messages.
 
@@ -19,7 +19,7 @@ Why it is built this way (Evolution v2.3.7 + Baileys 7.0.0-rc.9, see docs/reconn
     patches/evolution/status-receipts.js, applied when the container boots, stores them in
     evolution."MessageUpdate"; --history counts them and --viewers lists them.
   * Baileys delivers a status only to the devices of the JIDs in statusJidList (minus the
-    sending device), so the bakery's own number is always added, uncounted. Without it the
+    sending device), so the account’s own number is always added, uncounted. Without it the
     phone never gets the post: no "My status" entry, no viewer list, no delete from the phone.
 """
 import argparse
@@ -270,7 +270,7 @@ def logged_sends():
 
 
 def show_history(env, limit):
-    # received/viewed: distinct recipients with any receipt / a read receipt, the bakery phone excluded
+    # received/viewed: distinct recipients with any receipt / a read receipt, the primary phone excluded
     receipts = ("(SELECT count(DISTINCT u.participant) FROM evolution.\"MessageUpdate\" u "
                 "WHERE u.\"messageId\" = m.id AND u.participant IS DISTINCT FROM i.\"ownerJid\"%s)")
     rows = pmlib.psql(
@@ -293,7 +293,7 @@ def show_history(env, limit):
         rec = sends.get(mid, {})
         info(row_fmt % (when, mid, STATUS_KINDS.get(mtype, mtype), rec.get("recipients", "-"),
                         rec.get("seconds", "-"), received, viewed, text))
-    info("\nreceived/viewed: people whose phone sent WhatsApp a receipt (the bakery phone not counted).\n"
+    info("\nreceived/viewed: people whose phone sent WhatsApp a receipt (the primary phone not counted).\n"
          "A view only shows if both phones have read receipts on (Settings > Privacy > Read receipts).\n"
          "n/a = sent before receipts were recorded. Who viewed: --viewers <message id>.\n"
          "recipients/seconds come from logs/%s ('-' = not sent by this script)." % LOG_FILE)
@@ -319,7 +319,7 @@ def show_viewers(env, message_id):
         number = participant.split("@")[0]
         label = "viewed" if read == "t" else "received"
         viewed += read == "t" and own != "t"
-        info("  %-8s  %-16s  %s%s" % (label, number, name, "  (bakery phone)" if own == "t" else ""))
+        info("  %-8s  %-16s  %s%s" % (label, number, name, "  (primary phone)" if own == "t" else ""))
     info("%d viewed. A view only shows if both phones have read receipts on." % viewed)
 
 
@@ -377,7 +377,7 @@ def main():
         raise PMError("Give the status text, or --image / --video. Nothing is sent without content you chose.")
 
     info("======================================================")
-    info("  ALMA DULCE BAKERY: WHATSAPP STATUS BROADCAST")
+    info("  WHATSAPP STATUS BROADCAST")
     info("======================================================")
 
     status, state = pmlib.http("GET", evo(env, "/instance/connectionState/" + instance), evo_headers(env), timeout=15)
@@ -391,9 +391,9 @@ def main():
     own = [own_jid] if own_jid else []
     batches = math.ceil((len(jids) + len(own)) / float(EVO_BATCH))
     info("      Audience '%s': %d recipients%s (%d Evolution relays of %d)."
-         % (label, len(jids), " + the bakery's own phone" if own else "", batches, EVO_BATCH))
+         % (label, len(jids), " + the account’s own phone" if own else "", batches, EVO_BATCH))
     if not own:
-        warn("Could not read the bakery's own number: this status will not show in its My status list.")
+        warn("Could not read the account’s own number: this status will not show in its My status list.")
     if label != "test" and not args.yes and not args.dry_run:
         raise PMError("Audience '%s' reaches %d real people. Get the exact content approved first, then "
                       "re-run with --yes (or use --dry-run)." % (label, len(jids)))

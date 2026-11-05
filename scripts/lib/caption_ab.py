@@ -2,14 +2,12 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
-"""Caption A/B: the same Alma Dulce topics through each caption engine (DEPLOY-M1.md §2 option 1).
+"""Caption A/B: the same sample topics through each caption engine (DEPLOY-M1.md §2 option 1).
 
 Every engine gets create_draft.py's exact prompt. Ollama models also get its options (context
 2048, temperature 0.7, keep_alive 0), so each caption loads the model the way a real draft does.
 For each caption it records the time, Ollama's memory for the loaded model (/api/ps, sampled
-while it writes) and the prompt's rules: emojis, hashtags, sentences, call to action, language,
-numbers or contact details that weren't in the topic, and Alma Dulce's facts (no shop to visit;
-Ecuadorian Spanish: no "vosotros", "recoger" or "dulces"). Nothing is posted or staged.
+while it writes) and the prompt's rules: emojis, hashtags, sentences, language, and whether the caption adds unsupported numbers or contact details. Nothing is posted or staged.
 Results: logs/caption-ab/<date>.json.
 
     ./scripts/caption-ab.sh                                  llama3 8B, llama3.2 3B (+ Gemini if GEMINI_ENABLED=true)
@@ -33,20 +31,13 @@ OUT_DIR = os.path.join(pmlib.LOGS_DIR, "caption-ab")
 DEFAULT_MODELS = ["llama3.2:3b", "llama3:8b-instruct-q4_K_M"]
 OPTIONS = {"temperature": 0.5, "num_predict": 260, "num_ctx": 2048}  # = create_draft.py
 
-# The guagua items come from the bakery's own statuses; the rest are everyday bakery posts.
 TOPICS = [
-    ("Spanish", "Guaguas de pan rellenas de higos en almíbar especiado y queso cremoso, $2,00 cada una"),
-    ("Spanish", "Entregas de guaguas el sábado 31, domingo 1 y lunes 2 de noviembre; pide con anticipación"),
-    ("Spanish", "Guaguas de pan con colada morada, la tradición del Día de Difuntos"),
-    ("Spanish", "Pan fresco, horneado el mismo día"),
-    ("Spanish", "Tortas de cumpleaños por encargo, con 48 horas de anticipación"),
-    ("Spanish", "Rollos de canela recién salidos del horno este fin de semana"),
-    ("Spanish", "Pedidos por WhatsApp, para retirar o recibir con Uber"),
-    ("Spanish", "Café con pan de yuca para empezar el día"),
-    ("English", "Fig and cream cheese guaguas, an Ecuadorian Day of the Dead tradition, $2 each"),
-    ("English", "Fresh sourdough loaves, baked the same day"),
-    ("English", "Coffee and a warm croissant to start your day"),
-    ("English", "Holiday cookie boxes, pre-orders are open"),
+    ("Spanish", "Taller de fotografía el sábado 14 a las 10:00"),
+    ("Spanish", "Nuevas bicicletas disponibles para alquiler"),
+    ("Spanish", "Jornada de atención veterinaria preventiva"),
+    ("English", "Applications are open for the beginner ceramics workshop"),
+    ("English", "New bike tune-up appointments available this month"),
+    ("English", "Community book exchange this Saturday"),
 ]
 
 EMOJI = re.compile("[\U0001F1E6-\U0001F1FF\U0001F300-\U0001FAFF☀-➿⭐⭕]")
@@ -54,17 +45,6 @@ HASHTAG = re.compile(r"#\w+")
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 CONTACT = re.compile(r"@\w|www\.|https?://|\.com\b|\+?\d[\d -]{7,}\d")
 SENTENCE_END = re.compile(r"[.!?…]+(?=\s|$)")
-# Ordering, not visiting: Alma Dulce has no shop (orders are picked up or sent by Uber courier).
-CTA = re.compile(
-    r"\b(order|message|dm|pick ?up|pre-?order|reserve|deliver(y|ed)?|uber|whatsapp|pide|pídela|pídelo|"
-    r"pídelos|pídelas|pedido|ordena|ordénala|encarga|encárgala|escríbenos|escribenos|mensaje|"
-    r"reserva|separa|aparta|retira|retírala|retíralo|recíbela|recíbelo|envío)\b",
-    re.IGNORECASE)
-SHOP = re.compile(
-    r"\b(visit|visiting|stop by|come (in|by)|swing by|drop by|storefront|in[- ]store|our (shop|store)|"
-    r"neighbou?rhood|visítanos|visitanos|visítenos|pásate|pasate|pasa por|ven a|vengan|acércate|local|"
-    r"tienda|barrio)\b", re.IGNORECASE)
-NOT_ECUADORIAN = re.compile(r"\b(vosotros|vosotras|os|recoger|recoge|recógela|recógelo|dulces)\b", re.IGNORECASE)
 WORDS = {
     "Spanish": set("el la los las de del que y en para con tu tus nuestro nuestra nuestros nuestras por "
                    "una un es te ya al lo se más".split()),
@@ -86,15 +66,13 @@ def checks(text, topic, lang):
                 or bool(CONTACT.search(body)))
     return {
         "at most 2 emojis": len(EMOJI.findall(text)) <= 2,
-        "5 to 8 hashtags": 5 <= len(tags) <= 8,
+        "3 to 5 hashtags": 3 <= len(tags) <= 5,
         "hashtags on one line after a blank line": len(tag_lines) == 1 and tag_lines[0] > 0
                                                   and not lines[tag_lines[0] - 1].strip(),
         "1 to 3 sentences": 1 <= len(sentences) <= 3,
-        "call to action": bool(CTA.search(body)),
         "right language": sum(w in WORDS[lang] for w in words) > sum(w in WORDS[other] for w in words),
         "no details beyond the topic": not invented,
-        "fits Alma Dulce (no shop, Ecuadorian Spanish)": not SHOP.search(body)
-                                                         and not (lang == "Spanish" and NOT_ECUADORIAN.search(body)),
+
     }
 
 

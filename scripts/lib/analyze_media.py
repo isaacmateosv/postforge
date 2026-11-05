@@ -31,23 +31,14 @@ from create_draft import drop_repeats, fitting_emojis  # noqa: E402  (same guard
 API = "https://generativelanguage.googleapis.com"
 INLINE_LIMIT = 15 * 1024 * 1024
 
-PROMPT = """You are the social media manager of Alma Dulce Bakery, a gourmet, avant-garde pastry kitchen in
-Ecuador. It works only to order and has no shop or storefront: customers order on WhatsApp or by
-message, then pick up their order or have it delivered by an Uber courier. Premium experience,
-accessible prices; the voice is elegant and warm, with class. Everything is baked fresh the same day
-(never claim "every morning"). Use at most 2 emojis that fit what you see; if unsure, none.
-Look carefully at this {kind} and fill in the JSON fields:
-- description: what is shown (products, setting, mood) in 1-2 sentences.
-- caption: an engaging {lang} caption for Instagram/Facebook/TikTok, 1-3 short sentences,
-  at most 2 emojis, ending with an invitation to order (WhatsApp or message) for pickup or Uber
-  delivery. Never invite people to visit or mention a shop. Only mention products you can see.
-  In Spanish, write Latin American Spanish as spoken in Ecuador: "ustedes", never "vosotros";
-  "retirar", not "recoger"; don't call the products "dulces".
+PROMPT = """Analyze this {kind} for a social media post and fill in the JSON fields.
+Use only visible facts and the operator's context. Avoid inventing brand, pricing, or contact details.
+- description: what is shown in 1-2 sentences.
+- caption: 1-3 short sentences in {lang}, with at most 2 relevant emojis.
 - hashtags: 5-8 relevant hashtags.
 - alt_text: a concise accessibility description (max 125 characters).
 - suggested_platforms: which of instagram, facebook, tiktok, youtube_shorts, whatsapp_status fit best.
-- quality_notes: anything a human should check before posting (blur, lighting, framing,
-  legibility of text, people's faces), or "none".{hint}"""
+- quality_notes: anything a human should check before posting, or "none".{hint}"""
 
 SCHEMA = {
     "type": "OBJECT",

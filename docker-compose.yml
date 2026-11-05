@@ -169,7 +169,7 @@ services:
       # The image logs every level (DEBUG, VERBOSE, ...) in color; INFO keeps the receipt lines.
       - LOG_LEVEL=ERROR,WARN,INFO,LOG
       - LOG_COLOR=false
-      # The image is set to America/Sao_Paulo, which put log times 2 h ahead of the bakery's.
+      # The image is set to America/Sao_Paulo, which put log times 2 h ahead of the configured local time.
       - TZ=America/Guayaquil
     volumes:
       - ./data/evolution-store:/evolution/store

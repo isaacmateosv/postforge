@@ -6,23 +6,23 @@ Reviewed against your form export of 2026-10-31 ("ADP TK Posts").
 
 - **Description** (max 120 characters; replaces "Automated publishing", since TikTok expects a person in the
   loop):
-  `Internal tool for Alma Dulce Bakery: prepares our videos as drafts and posts them to our own TikTok after review.`
+  `Internal tool for your organization: prepares our videos as drafts and posts them to our own TikTok after review.`
 - **Category:** Utilities is fine (Business also fits).
-- **Terms of Service URL:** `https://isaacmateosv.github.io/almadulce-bakery/terms-of-service.html`
-- **Privacy Policy URL:** `https://isaacmateosv.github.io/almadulce-bakery/privacy-policy.html`
-- **Platforms:** tick **Web**, website URL `https://isaacmateosv.github.io/almadulce-bakery/index.html`
+- **Terms of Service URL:** `https://<YOUR_PUBLIC_SITE>/terms-of-service.html`
+- **Privacy Policy URL:** `https://<YOUR_PUBLIC_SITE>/privacy-policy.html`
+- **Platforms:** tick **Web**, website URL `https://<YOUR_PUBLIC_SITE>/index.html`
   (the same home page; TikTok left the bare site address unverified, see below).
-- **App name:** shown to you when you authorize. "ADP TK Posts" works; "Alma Dulce Publisher" reads clearer.
+- **App name:** shown to you when you authorize. "ADP TK Posts" works; "PostForge Publisher" reads clearer.
 
 ## Verify the URLs ("This URL is not verified")
 
-1. URL properties → verify a **URL prefix**: `https://isaacmateosv.github.io/almadulce-bakery/`.
+1. URL properties → verify a **URL prefix**: `https://<YOUR_PUBLIC_SITE>/`.
 2. Download the signature file TikTok shows (`tiktok….txt`). Hand it to me, or publish it yourself:
    copy it into `docs/site/`, then
    `git -C docs/site add -A && git -C docs/site commit -m "TikTok verification" && git -C docs/site push`.
 3. A minute later, click **Verify**. The prefix covers every link that starts with it.
 4. Seen 2026-10-31: the prefix verified and 2 of the 3 links with it. The third was most likely the
-   website link. TikTok seems to treat the bare `…/almadulce-bakery/` address as outside the prefix
+   website link. TikTok seems to treat the bare `…/<YOUR_PUBLIC_SITE>/` address as outside the prefix
    (it may drop the final `/`), so use the `…/index.html` address above. It's inside the prefix, and
    no second property is needed.
 
@@ -48,7 +48,7 @@ account's limits (longest video, privacy options).
 
 1. Next to the app's name, switch **Production → Sandbox** → **Create Sandbox** → name it and clone the
    production configuration → Confirm → check products and scopes → **Apply changes**.
-2. Sandbox settings → **Target users** → Add account → log in with the bakery's TikTok and accept
+2. Sandbox settings → **Target users** → Add account → log in with your organization’s TikTok and accept
    TikTok's developer terms (up to 10 accounts; it can take up to an hour to show).
 3. Paste the **sandbox's** Client key and Client secret into `.env` (`TIKTOK_CLIENT_ID` /
    `TIKTOK_CLIENT_SECRET`) and tell me: I recreate Postiz and check it. Then Postiz → Add Channel → TikTok.
@@ -61,7 +61,7 @@ account's limits (longest video, privacy options).
 
 TikTok's review guidelines (read 2026-10-31) turn down apps for private or personal use and apps still
 in development or testing, and the website URL can't be a landing or login page. An internal tool for
-one bakery account may be turned down on the first point however good the demo is, so test in the
+one organization’s account may be turned down on the first point however good the demo is, so test in the
 sandbox first, then decide. The demo must also show the website's domain (GitHub Pages); the tool
 itself runs on the ngrok domain, which the explanation below names.
 
@@ -70,7 +70,7 @@ itself runs on the ngrok domain, which the explanation below names.
 One paragraph, 927 characters:
 
 ```
-Alma Dulce Bakery is a small made-to-order pastry kitchen in Ecuador. This app is our team's publishing tool: a self-hosted Postiz instance at https://<NGROK_DOMAIN> (team login only); our website and policies are at https://isaacmateosv.github.io/almadulce-bakery/. Login Kit: we connect our TikTok account once; user.info.basic and user.info.profile show which account is connected, user.info.stats shows follower, like and video counts in the tool's analytics, and video.list finds our published videos so the tool can show their links and stats. Content Posting API: after a person on our team reviews and approves a draft in the calendar, the tool sends the video to our TikTok inbox (video.upload), where we finish and publish it in the TikTok app; video.publish reads our posting options and can post directly instead. Nothing is posted without human approval, and no other users' data is accessed.
+This app is our team's publishing tool: a self-hosted Postiz instance at https://<NGROK_DOMAIN> (team login only); our website and policies are at https://<YOUR_PUBLIC_SITE>/. Login Kit: we connect our TikTok account once; user.info.basic and user.info.profile show which account is connected, user.info.stats shows follower, like and video counts in the tool's analytics, and video.list finds our published videos so the tool can show their links and stats. Content Posting API: after a person on our team reviews and approves a draft in the calendar, the tool sends the video to our TikTok inbox (video.upload), where we finish and publish it in the TikTok app; video.publish reads our posting options and can post directly instead. Nothing is posted without human approval, and no other users' data is accessed.
 ```
 
 ## Demo video (mp4 or mov; up to 5 files of 50 MB each)
@@ -80,13 +80,13 @@ start to finish, so TikTok's reviewers see every product and scope at work. It c
 the sandbox works with Postiz (keys in `.env`, TikTok connected, a test draft in the inbox). Then I
 prepare a short test video and the draft, and you click through while recording. TikTok requires a
 first review's demo to come from the sandbox. The shots:
-1. Open the website URL (`…/almadulce-bakery/index.html`) and its privacy and terms links.
+1. Open the website URL (`…/<YOUR_PUBLIC_SITE>/index.html`) and its privacy and terms links.
 2. Postiz → Add Channel → TikTok → TikTok's login and consent screen with the scopes listed (Login Kit)
    → authorize. Show the connected account's name and picture (`user.info.basic`, `user.info.profile`).
 3. Create a post with a video, approve it, and send it to TikTok as an upload (`video.upload`). On the
    phone, show it arriving in the TikTok inbox, then publish it there.
 4. Send a second one as a direct post with privacy "Only me" (`video.publish`). Unaudited apps can
-   direct-post only to private accounts: if the bakery's account is public, add a private TikTok
+   direct-post only to private accounts: if your organization’s account is public, add a private TikTok
    account as a second target user for this part.
 5. Back in Postiz: the published video found and linked (`video.list`), and the channel's analytics
    with follower and like counts (`user.info.stats`).
@@ -106,7 +106,7 @@ only a test shows that. (Gemini's "completely disables access" goes further than
 The test (about 15 minutes, nothing public):
 1. Sandbox → Add products → **Content Posting API** → Direct Post on → **Apply changes**.
 2. `.env`: the sandbox's Client key → `TIKTOK_CLIENT_ID`, Client secret → `TIKTOK_CLIENT_SECRET`.
-3. `docker compose up -d postiz`, then Postiz → Add Channel → TikTok → log in as `tk.almadulce.bakery`.
+3. `docker compose up -d postiz`, then Postiz → Add Channel → TikTok → log in as `your organization’s TikTok account`.
 4. Send one short video as an upload (the default). In the TikTok app: does it reach the inbox, and
    can you post it as Everyone?
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.5]
+
+- Refresh running PostForge services and reload WhatsApp intake after package updates while preserving runtime data.
+- Check for updates hourly and surface available releases in the window, menu bar, and macOS notifications.
+- Check the upstream stable release for Evolution API and its bundled Manager.
+- Show active work on the Dock icon and beside the tray artwork.
+- Make built-in captions, prompts, UI copy, and setup guides business-agnostic.
+
 ## [1.0.4]
 
 - Stream WhatsApp videos up to 256 MiB to disk and verify their size and SHA-256.

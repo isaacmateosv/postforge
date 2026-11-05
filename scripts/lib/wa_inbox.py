@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
 """WhatsApp door for hands-free posting: what you send to your own chat ("Message yourself") on the
-bakery phone becomes Postiz drafts, like the menu bar's New Post window (same engine: plan_post.py).
+primary phone becomes Postiz drafts, like the menu bar's New Post window (same engine: plan_post.py).
 
 - Reads only your own chat and replies only there. It never writes to anyone else.
 - Acts only on messages that name a network and a time: a text, a photo or video caption, or a voice
@@ -51,9 +51,8 @@ POLL_SECONDS = 15
 STREAM_VIDEO_LIMIT = 256 * 1024 * 1024
 TEXT_TYPES = ("conversation", "extendedTextMessage")
 MEDIA_TYPES = ("imageMessage", "videoMessage")
-# Words whisper should expect (it wrote "huaguas" without them).
-VOCABULARY = ("Alma Dulce, guaguas de pan, colada morada, pan de yuca, rollos de canela, tortas, Instagram, "
-              "TikTok, YouTube Shorts, Facebook, Uber, WhatsApp.")
+# Provider vocabulary improves recognition of channel names.
+VOCABULARY = "Instagram, TikTok, YouTube Shorts, Facebook, Threads, WhatsApp."
 POST_VERB = re.compile(r"\b(publica\w*|public\w*|sub[ei]\w*|programa\w*|postea\w*|comparte\w*|post|publish|schedule|share|upload)\b",
                        re.IGNORECASE)
 APPROVE_WHATSAPP = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:whatsapp|wa)(?:\s+([a-f0-9]{12}))?$",
@@ -452,8 +451,8 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     confirmation_id = None
     try:
         p = plan_post.plan(env, instruction, [], None, now)
-        p["media"] = [download(env, name, m, folder) for m in media_rows]
         with pmlib.Job("draft", "WhatsApp: " + instruction[:50]):
+            p["media"] = [download(env, name, m, folder) for m in media_rows]
             result = plan_post.run(env, p, True)
         caption = clean_caption(result.get("caption") or "")
         confirmation_id = None if dry_run else save_confirmation(instruction, p["media"], heard, result, p["lang"])
