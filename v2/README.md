@@ -42,6 +42,12 @@ uploads offer no alternate anonymous route. Then test a full OAuth round trip.
 A machine callback that cannot carry browser authentication needs its own
 narrow, verified route. Keep the rest of the API gated.
 
+The v1 tunnel switch expects anonymous public API health to return HTTP 200.
+A gated endpoint will intentionally fail that check. Before a cutover,
+update the switch to verify origin health locally and verify the gateway
+separately from a signed-out client. Do not exempt the API from MFA to
+make the old health check pass.
+
 For a fully local deployment, no tunnel is needed. If remote access is required,
 put the authenticated gateway on the network edge. Keep the dashboard,
 database, Redis, Temporal, Ollama, and Evolution management endpoints private.
