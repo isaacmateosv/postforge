@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1]
+
+- Backup export verifies the Postiz archive in a temporary database and can run without a Swift compiler.
+- Restore rehearses the archive before replacing Postiz data, replaces the media directory, and restores the previous credentials and media if the database restore fails.
+- Standard uninstall preserves project data. Purge stops on Docker cleanup errors and removes package-managed system files and the installer receipt with administrator approval.
+- Backup and restore progress is available in English and Ecuadorian Spanish.
+
 ## [1.0.0]
 
 First stable public release of PostForge, licensed GPL-3.0-or-later.

@@ -1577,8 +1577,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     @objc func uninstallPostForge() {
         let backup = lastBackup()
         var detail = text("This permanently removes from this Mac:\n", "Esto elimina de forma permanente de este Mac:\n")
-            + text("• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The Docker containers and images PostForge uses\n",
-                   "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores e imágenes de Docker que usa PostForge\n")
+            + text("• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The PostForge Docker containers and installer files\n",
+                   "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores de Docker y los archivos de instalación de PostForge\n")
             + "\n"
         if let backup = backup {
             let when = DateFormatter.localizedString(from: backup.date, dateStyle: .medium, timeStyle: .short)
@@ -1678,7 +1678,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                          "Se quitaron la app, sus datos y sus contenedores de Docker. Tus publicaciones ya publicadas siguen intactas."))
                 } else {
                     self.alert(self.text("The uninstall had problems", "La desinstalación tuvo problemas"),
-                               failureSummary(output) + "\n\n" + self.text("You can finish by deleting ~/postforge by hand.", "Puedes terminar borrando ~/postforge a mano."))
+                               failureSummary(output))
+                    self.uninstalling = false
+                    self.poll()
+                    self.scheduleMaintenanceCheck()
+                    self.idleTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self = self] _ in
+                        self?.stopWhenIdleIfNeeded()
+                    }
+                    return
                 }
                 self.quittingFromMenu = true
                 NSApp.terminate(nil)
@@ -2892,8 +2899,8 @@ final class BackupWindow: NSObject {
         exportActions.spacing = 10
         exportActions.alignment = .centerY
         let exportBody = panelStack([
-            windowLabel(t("Creates a private folder with your encrypted credentials, your Postiz posts and channels, and the PostForge installer. Use it to move to another Mac or to keep a safe copy.",
-                          "Crea una carpeta privada con tus credenciales cifradas, tus publicaciones y canales de Postiz, y el instalador de PostForge. Úsala para mudarte a otro Mac o guardar una copia."),
+            windowLabel(t("Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.",
+                          "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales."),
                         size: 12, color: .secondaryLabelColor, lines: 4),
             exportRow, exportPass, exportPass2,
             windowLabel(t("You will need this passphrase to restore. It can't be recovered if you forget it.",
@@ -2990,10 +2997,20 @@ final class BackupWindow: NSObject {
         label.textColor = error ? .systemRed : .secondaryLabelColor
     }
 
-    func progress(from line: String, total: String) -> String? {
+    func progress(from line: String) -> String? {
         guard line.hasPrefix("STEP ") else { return nil }
         let parts = line.dropFirst(5).split(separator: " ", maxSplits: 1).map(String.init)
-        return parts.count == 2 ? "\(parts[0].replacingOccurrences(of: "/", with: " / ")) · \(parts[1])" : nil
+        guard parts.count == 2 else { return nil }
+        let translations = [
+            "Encrypting credentials": "Cifrando credenciales",
+            "Exporting Postiz data": "Exportando datos de Postiz",
+            "Verifying backup": "Verificando el respaldo",
+            "Validating credentials": "Validando credenciales",
+            "Restoring Postiz data": "Restaurando datos de Postiz",
+            "Finishing": "Finalizando",
+        ]
+        let label = t(parts[1], translations[parts[1]] ?? parts[1])
+        return "\(parts[0].replacingOccurrences(of: "/", with: " / ")) · \(label)"
     }
 
     @objc func runExport() {
@@ -3015,7 +3032,7 @@ final class BackupWindow: NSObject {
         DispatchQueue.global(qos: .userInitiated).async {
             let (code, output) = runStreaming(["/bin/bash", dir + "/scripts/migrate.sh", "export", out], in: dir,
                                               extraEnv: ["PM_PASSPHRASE": pass], timeout: 1800) { line in
-                if let text = self.progress(from: line, total: "4") {
+                if let text = self.progress(from: line) {
                     DispatchQueue.main.async { self.setStatus(self.exportStatus, text) }
                 }
             }
@@ -3059,13 +3076,12 @@ final class BackupWindow: NSObject {
                            safe: t("Cancel", "Cancelar"), risky: t("Replace and Restore", "Reemplazar y restaurar")) else { return }
         restoreButton.isEnabled = false
         restoreSpinner.startAnimation(nil)
-        setStatus(restoreStatus, t("Stopping PostForge…", "Deteniendo PostForge…"))
+        setStatus(restoreStatus, t("Checking backup…", "Revisando el respaldo…"))
         let dir = project
         DispatchQueue.global(qos: .userInitiated).async {
-            _ = runStreaming(["/bin/bash", dir + "/postforge.sh", "stop", "--force"], in: dir, timeout: 300) { _ in }
-            let (code, output) = runStreaming(["/bin/bash", dir + "/scripts/migrate.sh", "import", folder.path, "--skip-installer", "--replace"],
+            let (code, output) = runStreaming(["/bin/bash", dir + "/scripts/migrate.sh", "import", folder.path, "--skip-installer", "--replace", "--stop-first"],
                                               in: dir, extraEnv: ["PM_PASSPHRASE": pass], timeout: 1800) { line in
-                if let text = self.progress(from: line, total: "3") {
+                if let text = self.progress(from: line) {
                     DispatchQueue.main.async { self.setStatus(self.restoreStatus, text) }
                 }
             }
@@ -3078,8 +3094,8 @@ final class BackupWindow: NSObject {
                     self.setStatus(self.restoreStatus, self.t("Restored.", "Restaurado."))
                     self.restoreStatus.textColor = .systemGreen
                     self.delegate.alert(self.t("Backup restored", "Respaldo restaurado"),
-                                        self.t("Turn PostForge on from the menu, then link WhatsApp again by QR if you use it.",
-                                               "Enciende PostForge desde el menú y vuelve a vincular WhatsApp con QR si lo usas."))
+                                        self.t("Turn PostForge on, verify pending posts in Postiz, and link WhatsApp again by QR if you use it.",
+                                               "Enciende PostForge, verifica las publicaciones pendientes en Postiz y vuelve a vincular WhatsApp con QR si lo usas."))
                 } else {
                     self.setStatus(self.restoreStatus, self.t("The restore failed.", "La restauración falló."), error: true)
                     self.delegate.alert(self.t("The restore failed", "La restauración falló"), failureSummary(output))
@@ -3454,7 +3470,7 @@ let uiSpanish: [String: String] = [
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
     "Create Drafts": "Crear borradores",
-    "Creates a private folder with your encrypted credentials, your Postiz posts and channels, and the PostForge installer. Use it to move to another Mac or to keep a safe copy.": "Crea una carpeta privada con tus credenciales cifradas, tus publicaciones y canales de Postiz, y el instalador de PostForge. Úsala para mudarte a otro Mac o guardar una copia.",
+    "Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
     "Cut": "Cortar",
     "Default: 30 days. This sets the cleanup age for logs and unused uploaded media. Cleanup requires a separate review and apply command; changing this value deletes nothing. Scheduled posts and the database are preserved.": "Por defecto: 30 días. Define la antigüedad para limpiar registros y archivos subidos que ya no se usan. Debes revisar y ejecutar la limpieza por separado; cambiar este valor no borra nada. Se conservan la base de datos y las publicaciones programadas.",
     "Dictate": "Dictar",
@@ -3610,7 +3626,7 @@ let uiSpanish: [String: String] = [
     "Turn Off…": "Apagar…",
     "Turn On": "Encender",
     "Turn PostForge off anyway?": "¿Apagar PostForge de todas formas?",
-    "Turn PostForge on from the menu, then link WhatsApp again by QR if you use it.": "Enciende PostForge desde el menú y vuelve a vincular WhatsApp con QR si lo usas.",
+    "Turn PostForge on, verify pending posts in Postiz, and link WhatsApp again by QR if you use it.": "Enciende PostForge, verifica las publicaciones pendientes en Postiz y vuelve a vincular WhatsApp con QR si lo usas.",
     "Turning off…": "Apagando…",
     "Turning on…": "Encendiendo…",
     "Type UNINSTALL to remove PostForge and all its data from this Mac.": "Escribe UNINSTALL para quitar PostForge y todos sus datos de este Mac.",
@@ -3640,7 +3656,7 @@ let uiSpanish: [String: String] = [
     "You will need this passphrase to restore. It can't be recovered if you forget it.": "Necesitarás esta contraseña para restaurar. No se puede recuperar si la olvidas.",
     "Your idea": "Tu idea",
     "Your plan appears here": "Tu plan aparecerá aquí",
-    "• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The Docker containers and images PostForge uses\n": "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores e imágenes de Docker que usa PostForge\n",
+    "• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The PostForge Docker containers and installer files\n": "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores de Docker y los archivos de instalación de PostForge\n",
     "⚠︎ NO BACKUP WAS EXPORTED. If you continue, everything above is lost and cannot be recovered.": "⚠︎ NO SE EXPORTÓ NINGÚN RESPALDO. Si continúas, todo lo anterior se pierde y no se puede recuperar.",
     "⚠︎ Scheduled posts won't publish: scheduler is stopped": "⚠︎ Las publicaciones programadas no saldrán: el programador está detenido",
 ]

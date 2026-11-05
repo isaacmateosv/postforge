@@ -142,11 +142,12 @@ the project after restoring it, or keep it only in a private encrypted backup.
 ### One-folder migration (recommended)
 
 In the PostForge app on the old Mac, open **Backup & Move…**, choose where to save, enter a passphrase and press
-**Export Backup**. Docker Desktop must be running. The app shows each step (credentials, Postiz data, installer).
-This creates a private `PostForge-migration-…` folder containing the sanitized package, encrypted `.env`, and Postiz
-export. Copy that entire folder privately to the new Mac, then:
+**Export Backup**. Docker Desktop must be running. The backup contains encrypted `.env` credentials, a rehearsed
+Postiz export, and a matching installer if one is already available locally. Copy the entire folder privately.
+The Postiz archive contains channel tokens and media.
 
-1. Double-click the `PostForge-*.pkg` inside it. The installer copies the project and opens the app.
+1. Install the same PostForge version from the included package or
+   [GitHub Releases](https://github.com/isaacmateosv/postforge/releases), then open Docker Desktop.
 2. In the app, open **Backup & Move → Restore…**, choose the folder, enter the passphrase and confirm.
 3. Turn PostForge on and link WhatsApp again by QR (`./scripts/link-whatsapp.sh`).
 
@@ -163,8 +164,8 @@ cd ~/postforge
 ./scripts/recheck.sh --live
 ```
 
-The import restores credentials and Postiz data and refreshes the app. It does not copy WhatsApp sessions or Redis
-state; QR linking creates a safe new WhatsApp device session.
+The import restores credentials and Postiz data. Link WhatsApp again by QR and verify pending posts after
+moving. WhatsApp session data, Redis state and Temporal jobs are outside the archive.
 
 ## Install from the single package
 
@@ -210,12 +211,15 @@ if the app did not open, run `~/postforge/install.sh`). Do not run uninstall fir
 
 For a complete removal, use **Uninstall PostForge…** in the app (menu bar → Settings & Tools → Maintenance, the
 PostForge app menu, or **Backup & Move**). It lists everything that will be deleted (the app and project folder,
-`.env`, all Postiz posts and media, the WhatsApp session, logs, and the Docker containers and images), shows the
+`.env`, all Postiz posts and media, the WhatsApp session, logs, Docker containers, and installer files), shows the
 date of your last backup, and warns that **if no backup was exported everything is lost and cannot be recovered**.
 You can choose **Export Backup First…**, then you must tick a box and type `UNINSTALL`. Posts already published on
-your social networks are not touched, and Docker Desktop stays installed. From a terminal:
-`./scripts/uninstall.sh --purge-data` (type `PURGE` to confirm). Without `--purge-data` the project folder and your
-configuration stay and only the app, `.env` and runtime data are removed.
+your social networks stay published. Docker Desktop, shared images and other shared tools stay installed.
+Keep any backup you want to retain outside the project folder. Start Docker Desktop before removing PostForge.
+A package installation also requires administrator approval to remove the system files and receipt.
+
+From a terminal, run `./scripts/uninstall.sh --purge-data` and type `PURGE` to confirm. With no purge flag,
+uninstall stops the services and removes the app while preserving the project and private data.
 
 ### WhatsApp Status audience
 

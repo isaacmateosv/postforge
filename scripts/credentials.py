@@ -61,7 +61,7 @@ def export_credentials(path):
     print("Encrypted credentials written to %s" % path)
 
 
-def import_credentials(path):
+def import_credentials(path, output=None):
     if not os.path.isfile(path):
         raise RuntimeError("Encrypted credentials file not found: " + path)
     password, _ = passphrase("Decryption passphrase: ")
@@ -70,7 +70,7 @@ def import_credentials(path):
     try:
         run_openssl("decrypt", password, path, temporary)
         os.chmod(temporary, 0o600)
-        os.replace(temporary, ENV)
+        os.replace(temporary, output or ENV)
     except Exception as exc:
         if os.path.exists(temporary):
             os.remove(temporary)
@@ -87,11 +87,12 @@ def main():
     exporting.add_argument("path", nargs="?", default=os.path.join(ROOT, "exports", "credentials.env.enc"))
     importing = subparsers.add_parser("import")
     importing.add_argument("path")
+    importing.add_argument("--output", help="stage decrypted credentials at this path")
     args = parser.parse_args()
     if args.action == "export":
         export_credentials(os.path.abspath(args.path))
     else:
-        import_credentials(os.path.abspath(args.path))
+        import_credentials(os.path.abspath(args.path), args.output)
 
 
 if __name__ == "__main__":
