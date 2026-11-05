@@ -1116,30 +1116,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                         #selector(reviewWhatsAppPlans), enabled: true))
             }
         }
-        if let update = latestPackageUpdate {
-            attention.append(action(text("Install PostForge \(update.latestVersion)…", "Instalar PostForge \(update.latestVersion)…"),
-                                    #selector(downloadLatestPackage), enabled: busy == nil))
-        }
         if !attention.isEmpty {
             menu.addItem(.separator())
             menu.addItem(sectionHeader(text("Needs your attention", "Requiere tu atención")))
             attention.forEach(menu.addItem)
         }
 
-        // 4. What is coming up.
         if let st = st {
             menu.addItem(.separator())
-            menu.addItem(sectionHeader(text("Coming up", "Próximamente")))
-            for line in connectionLines(st) { menu.addItem(info(line)) }
+            menu.addItem(sectionHeader(text("Posting activity", "Actividad de publicaciones")))
             addWorkItems(st, to: menu)
+            let connections = connectionLines(st)
+            if !connections.isEmpty {
+                menu.addItem(.separator())
+                menu.addItem(sectionHeader(text("Channel connections", "Conexiones de canales")))
+                for line in connections { menu.addItem(info(line)) }
+            }
         }
 
-        // 5. Everything technical lives in one place.
         menu.addItem(.separator())
+        if let update = latestPackageUpdate {
+            menu.addItem(action(text("Install PostForge \(update.latestVersion)…", "Instalar PostForge \(update.latestVersion)…"),
+                                #selector(downloadLatestPackage), enabled: busy == nil))
+        }
+        menu.addItem(action(text("Check for Updates…", "Buscar actualizaciones…"),
+                            #selector(checkUpdatesFromMenu), enabled: busy == nil))
         let tools = NSMenuItem(title: text("Settings & Tools", "Ajustes y herramientas"), action: nil, keyEquivalent: "")
         tools.submenu = settingsMenu(up: up, canAct: canAct)
         menu.addItem(tools)
         menu.addItem(.separator())
+        menu.addItem(action(text("About PostForge", "Acerca de PostForge"), #selector(showAbout), enabled: true))
         menu.addItem(action(up ? text("Quit PostForge (posting keeps running)", "Salir de PostForge (sigue publicando)") :
                             text("Quit PostForge", "Salir de PostForge"),
                             #selector(quitApp), enabled: true))
@@ -1184,15 +1190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
         menu.addItem(.separator())
         menu.addItem(sectionHeader(text("Maintenance", "Mantenimiento")))
-        if let maintenance = maintenance, maintenance.updatesAvailable {
-            menu.addItem(action(text("Stable Updates Available…", "Actualizaciones estables disponibles…"),
-                                #selector(applyStableUpdates), enabled: canAct))
-        } else {
-            menu.addItem(action(text("Check for Updates…", "Buscar actualizaciones…"),
-                                #selector(checkUpdatesFromMenu), enabled: !maintenanceCheckInFlight && !packageCheckInFlight))
-        }
         menu.addItem(action(text("Saved History: \(retentionDays()) days…", "Historial guardado: \(retentionDays()) días…"), #selector(editRetention), enabled: busy == nil))
-        menu.addItem(action(text("About PostForge", "Acerca de PostForge"), #selector(showAbout), enabled: true))
         menu.addItem(action(text("Restart Everything…", "Reiniciar todo…"), #selector(restartEverything), enabled: canAct))
         menu.addItem(action(text("Backup & Move…", "Respaldo y traslado…"), #selector(openBackupWindow), enabled: true))
         menu.addItem(action(text("Open Log", "Abrir registro"), #selector(openLog), enabled: true))
@@ -1776,7 +1774,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             return text("\(network): reconnect in \(remaining)", "\(network): vuelve a conectar en \(remaining)")
         }
         if channels.contains(where: { $0.renews }) {
-            lines.append(text("Other channels support automatic renewal; reconnection may still be required.", "Los demás canales admiten renovación automática; aun así podrían requerir reconexión."))
+            lines.append(text("Automatic renewal available for other channels", "Otros canales admiten renovación automática"))
         }
         if state.channelsFromCache == true { lines.append(text("Connection dates from saved status", "Fechas de conexión del último estado guardado")) }
         return lines
@@ -3531,7 +3529,7 @@ let uiSpanish: [String: String] = [
     "Open WhatsApp Manager": "Abrir WhatsApp Manager",
     "Open at Login": "Abrir al iniciar sesión",
     "Open the tray menu to review them. Host tools remain manual; the approved action updates the Docker stack.": "Abre el menú de la barra para revisarlas. Las herramientas del sistema se actualizan por separado; esta acción actualiza los componentes de Docker.",
-    "Other channels support automatic renewal; reconnection may still be required.": "Los demás canales admiten renovación automática; aun así podrían requerir reconexión.",
+    "Automatic renewal available for other channels": "Otros canales admiten renovación automática",
     "Partly running: use Turn On to restore all services": "Funcionamiento parcial: usa Encender para restaurar los servicios",
     "Passphrase (at least 12 characters)": "Contraseña (mínimo 12 caracteres)",
     "Passphrase of the backup": "Contraseña del respaldo",
@@ -3693,6 +3691,21 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(delegate.newPost!.instruction.string == "Keep this idea / conserva esta idea")
     precondition(delegate.newPost!.media.count == 1)
     precondition(localizedUI("Restart Now") == "Reiniciar ahora")
+    let trayMenu = NSMenu()
+    trayMenu.autoenablesItems = false
+    for (language, updates, about) in [
+        ("es", "Buscar actualizaciones…", "Acerca de PostForge"),
+        ("en", "Check for Updates…", "About PostForge"),
+    ] {
+        defaults.setVolatileDomain(["uiLanguage": language], forName: UserDefaults.argumentDomain)
+        delegate.menuNeedsUpdate(trayMenu)
+        precondition(trayMenu.items.dropLast().last?.title == about)
+        precondition(trayMenu.items.last?.action == #selector(AppDelegate.quitApp))
+        precondition(trayMenu.items.first(where: { $0.title == updates })?.action == #selector(AppDelegate.checkUpdatesFromMenu))
+        let settings = trayMenu.items.compactMap(\.submenu).last!
+        precondition(settings.items.allSatisfy { $0.title != updates && $0.title != about })
+    }
+
     let fixture = #"{"tag_name":"v9.0.0","html_url":"https://github.com/isaacmateosv/postforge/releases/tag/v9.0.0","draft":false,"prerelease":false,"assets":[{"name":"PostForge-9.0.0.pkg","browser_download_url":"https://github.com/isaacmateosv/postforge/releases/download/v9.0.0/PostForge-9.0.0.pkg"}]}"#
     let release = try! JSONDecoder().decode(PackageRelease.self, from: Data(fixture.utf8))
     precondition(release.tagName == "v9.0.0" && release.assets.first!.browserDownloadUrl != nil)
@@ -3751,7 +3764,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(legalText.string.contains("SPDX-License-Identifier: GPL-3.0-or-later"))
     precondition(!legalText.string.contains(": unavailable"))
     defaults.setVolatileDomain(original, forName: UserDefaults.argumentDomain)
-    print("PASS: live English ↔ Ecuadorian Spanish, preserved idea/media, release decoding, version comparison and update-check completion/retry/action states")
+    print("PASS: English ↔ Ecuadorian Spanish, tray menu placement, preserved idea/media, release decoding and update-check states")
     exit(0)
 }
 app.run()
