@@ -49,6 +49,13 @@ def config(host):
     }
 
 
+def update_hostname(current, host):
+    generated = config(host)
+    current["access_control"]["rules"][0]["domain"] = generated["access_control"]["rules"][0]["domain"]
+    current["session"]["cookies"] = generated["session"]["cookies"]
+    return current
+
+
 def users(directory):
     return json.loads((directory / "users.json").read_text(encoding="utf-8"))["users"]
 
@@ -78,13 +85,9 @@ def main():
         if directory.stat().st_mode & 0o077:
             raise ValueError("The gateway directory must be private (0700 on macOS and Linux).")
         if args.command == "set-hostname":
-            generated = config(args.hostname.lower())
             file = directory / "configuration.yml"
             current = json.loads(file.read_text(encoding="utf-8"))
-            # Keep the users, MFA database, and encryption and session keys.
-            current["access_control"]["rules"][0]["domain"] = generated["access_control"]["rules"][0]["domain"]
-            current["session"]["cookies"] = generated["session"]["cookies"]
-            private_write(file, current)
+            private_write(file, update_hostname(current, args.hostname.lower()))
             print("Hostname saved locally. Check TLS and the new gateway route before applying.")
             return 0
         records = users(directory)

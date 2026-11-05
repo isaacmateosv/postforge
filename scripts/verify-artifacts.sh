@@ -49,11 +49,11 @@ if [ -n "$PKG" ]; then
   python3 - "$WORK/payload.txt" <<'PY'
 import re, sys, unicodedata
 paths = unicodedata.normalize("NFC", open(sys.argv[1]).read()).splitlines()
-blocked = re.compile(r'(^|/)(\.env$|\.git(/|$)|\.checkpoint(/|$)|data(/|$)|exports(/|$)|logs(/|$)|run(/|$)|backups(/|$)|tunnel(/|$)|vip-list\.txt$)')
+blocked = re.compile(r'(^|/)(\.env($|\.(?!example$))|(?:docker-)?compose\.override\.ya?ml$|\.git(/|$)|\.checkpoint(/|$)|data(/|$)|exports(/|$)|logs(/|$)|run(/|$)|backups(/|$)|tunnel(/|$)|vip-list\.txt$)')
 leaks = [path for path in paths if blocked.search(path)]
 if leaks:
     raise SystemExit('Unexpected private/generated payload entries: ' + ', '.join(leaks[:10]))
-for required in ('scripts/component_updates.py', 'scripts/lib/wa_inbox.py', 'scripts/lib/wa-media-stream.mjs', 'docs/help/technical-es.md', 'tray/shortcuts/New post in PostForge.shortcut', 'tray/shortcuts/Nueva publicación en PostForge.shortcut', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
+for required in ('scripts/component_updates.py', 'scripts/gateway_backup.py', 'v2/compose.gateway.yml', 'v2/telegram_worker.py', 'scripts/lib/wa_inbox.py', 'scripts/lib/wa-media-stream.mjs', 'docs/help/technical-es.md', 'tray/shortcuts/New post in PostForge.shortcut', 'tray/shortcuts/Nueva publicación en PostForge.shortcut', 'docs/images/postforge-mark.png', 'tray/assets/PostForgeAppForeground.svg'):
     assert any(path.endswith('/' + required) for path in paths), required
 print('PASS: installer payload contains required assets and excludes private runtime data')
 PY

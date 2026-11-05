@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.1]
+
+- Add an optional Docker-based browser dashboard for local service status and access to Postiz.
+- Add an optional Telegram bot with private status, a refresh button, and a configurable heartbeat.
+- Add separate password and authenticator sign-in in front of Postiz for remote deployments.
+- Preserve gateway users and authenticator enrollment in encrypted migration backups.
+- Verify the gateway separately from the Postiz scheduler when changing a protected tunnel URL, with rollback on failure.
+
 ## [1.0.8]
 
 - Add illustrated flow diagrams and bilingual quick-start and technical guides to the repository and offline app Help.

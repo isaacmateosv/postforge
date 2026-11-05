@@ -13,6 +13,6 @@ backups, retention and safe update checks.
 - External missed-heartbeat monitoring for host or network loss.
 - Later Telegram workflow buttons for reviewing drafts and fixing issues, with explicit authorization and human approval.
 
-See [the v2 development preview](v2/README.md) for setup and verification status.
+See [the v2 release candidate](v2/README.md) for setup and verification status.
 
 Telegram credentials, code and background requests are not part of release 1.

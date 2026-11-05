@@ -104,7 +104,9 @@ sessions stay outside the backup.
 
 Restore with **Backup & Move** on the destination, or run
 `scripts/migrate.sh import BACKUP --skip-installer --stop-first`. Keep the
-gateway stopped during restore. Start it privately and verify password and
+gateway stopped during restore. A fresh destination gets a local Compose
+override that routes ngrok through the gateway. An existing override is
+validated before Postiz data is restored. Start the gateway privately and verify password and
 authenticator sign-in before pointing the public tunnel at the destination.
 Existing passwords and authenticator codes carry over. If the hostname changes
 too, follow the hostname procedure above. Older bundles leave the destination
