@@ -61,6 +61,37 @@ For a fully local deployment, no tunnel is needed. If remote access is required,
 put the authenticated gateway on the network edge. Keep the dashboard,
 database, Redis, Temporal, Ollama, and Evolution management endpoints private.
 
+## Managed access on the existing ngrok hostname
+
+The managed Google policy authenticates every request and then denies email
+addresses outside an exact allowlist. Enable 2-Step Verification on every
+allowed account. The managed policy does not independently require a fresh
+second factor. Use an identity provider with an enforced MFA policy when that
+is required.
+
+Prepare the policy locally and validate the Compose merge:
+
+```text
+python v2/ngrok_policy.py
+docker compose -f docker-compose.yml -f v2/compose.ngrok-access.yml config --quiet
+```
+
+The command takes only email addresses. It does not need a Google password or
+a verification code. Keep the generated file in the private run directory.
+The override keeps the hostname and origin from the existing deployment and
+fails to start if the mounted policy is missing. It makes no change to the
+running tunnel until explicitly applied.
+
+Test the gate on a staging endpoint before installing the override as the
+local Compose override. Confirm signed-out, allowlisted, and denied access,
+then test Postiz login and a provider OAuth round trip. Restart only ngrok
+for this cutover. The Postiz origin and provider callback URLs can stay the
+same because the hostname stays the same.
+
+When moving to a new domain, provision TLS and attach the access gate before
+routing traffic to Postiz. Update the Postiz origin and OAuth callback URLs,
+then disable the old public route after checking the new one.
+
 ## Optional Telegram status and heartbeat
 
 Create a bot with BotFather and obtain your numeric Telegram user ID.

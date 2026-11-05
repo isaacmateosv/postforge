@@ -6,11 +6,23 @@ from urllib.parse import urlsplit
 from unittest.mock import Mock, patch
 
 import check_gateway
+import ngrok_policy
 import postforge_v2 as web
 import telegram_worker as bot
 
 
 class PreviewTests(unittest.TestCase):
+    def test_google_policy_is_fail_closed_and_uses_exact_addresses(self):
+        for values in ([], ["*@example.org"], ['x@example.org" || true']):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                ngrok_policy.make_policy(values)
+        policy = ngrok_policy.make_policy(["Owner@example.org", "owner@example.org"])
+        authenticate, deny = policy["on_http_request"]
+        self.assertEqual(authenticate["actions"][0]["config"]["provider"], "google")
+        self.assertEqual(deny["expressions"],
+                         ['!(actions.ngrok.oauth.identity.email in ["owner@example.org"])'])
+        self.assertEqual(deny["actions"][0]["config"]["status_code"], 403)
+
     def test_postiz_redirect_is_not_an_outer_login(self):
         postiz = "https://postiz.example.org/"
         gate = urlsplit("https://login.example.org/sso")

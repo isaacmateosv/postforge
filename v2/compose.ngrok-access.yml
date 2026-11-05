@@ -1,0 +1,16 @@
+# Include explicitly or install as the local docker-compose.override.yml
+# after validation. Requires the separately generated policy file.
+services:
+  ngrok:
+    command:
+      - "http"
+      - "--url=${NGROK_DOMAIN}"
+      - "--traffic-policy-file=/etc/postforge/access-policy.json"
+      - "postiz:5000"
+    volumes:
+      - type: bind
+        source: ./run/ngrok-access/policy.json
+        target: /etc/postforge/access-policy.json
+        read_only: true
+        bind:
+          create_host_path: false
