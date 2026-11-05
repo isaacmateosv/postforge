@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254">
+<title>PostForge — calendar and orbital paper plane</title>
+<defs>
+<linearGradient id="back" x2="1" y2="1"><stop stop-color="#092976"/><stop offset=".6" stop-color="#071d63"/><stop offset="1" stop-color="#1d0b62"/></linearGradient>
+<radialGradient id="backLight"><stop stop-color="#1531a1" stop-opacity=".32"/><stop offset="1" stop-color="#00103c" stop-opacity=".1"/></radialGradient>
+<linearGradient id="tile" x1="0" x2=".92" y2="1"><stop stop-color="#28e5ff"/><stop offset=".21" stop-color="#008dfc"/><stop offset=".52" stop-color="#0044d5"/><stop offset=".76" stop-color="#0637c7"/><stop offset="1" stop-color="#4314f4"/></linearGradient>
+<radialGradient id="tAqua" cx=".06" cy=".04" r=".8"><stop stop-color="#7ffaff" stop-opacity=".67"/><stop offset=".4" stop-color="#00baff" stop-opacity=".3"/><stop offset="1" stop-color="#0087fc" stop-opacity="0"/></radialGradient>
+<radialGradient id="tViolet" cx=".95" cy=".92" r=".65"><stop stop-color="#6718fa" stop-opacity=".8"/><stop offset="1" stop-color="#3710e8" stop-opacity="0"/></radialGradient>
+<linearGradient id="calendarBack" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f9fcff"/><stop offset=".35" stop-color="#9dc1fa"/><stop offset="1" stop-color="#82a2f5"/></linearGradient>
+<linearGradient id="calendar" x1="0" y1="0" x2=".86" y2="1"><stop stop-color="#ffffff"/><stop offset=".45" stop-color="#f9faff"/><stop offset=".75" stop-color="#ebeefe"/><stop offset="1" stop-color="#c6cbff"/></linearGradient>
+<linearGradient id="binder" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".5" stop-color="#fcfdff"/><stop offset="1" stop-color="#d8e3ff"/></linearGradient>
+<linearGradient id="rows"><stop stop-color="#8eb8ff"/><stop offset="1" stop-color="#74a5fa"/></linearGradient>
+<linearGradient id="plane" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#08c7fc"/><stop offset=".4" stop-color="#0287ef"/><stop offset=".7" stop-color="#0545e4"/><stop offset="1" stop-color="#0819a9"/></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b69fb"/><stop offset=".6" stop-color="#034ad7"/><stop offset="1" stop-color="#0a189b"/></linearGradient>
+<linearGradient id="trail" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#9bcaff" stop-opacity=".2"/><stop offset=".4" stop-color="#32bfff"/><stop offset=".85" stop-color="#1687ef"/><stop offset="1" stop-color="#fff"/></linearGradient>
+<linearGradient id="comet" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".55" stop-color="#ffe9a5"/><stop offset=".86" stop-color="#ffa842"/><stop offset="1" stop-color="#fff1c2"/></linearGradient>
+<radialGradient id="glowBlue"><stop stop-color="#2f81f6" stop-opacity=".62"/><stop offset="1" stop-color="#278ef9" stop-opacity="0"/></radialGradient>
+<radialGradient id="glowGold"><stop stop-color="#ffe89d" stop-opacity=".9"/><stop offset=".45" stop-color="#ffa93e" stop-opacity=".36"/><stop offset="1" stop-color="#ffad3c" stop-opacity="0"/></radialGradient>
+<linearGradient id="star" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffde8"/><stop offset=".46" stop-color="#fff5bf"/><stop offset="1" stop-color="#f99d29"/></linearGradient>
+<filter id="shadow"><feGaussianBlur stdDeviation="24"/></filter>
+<filter id="drop" x="-.3" y="-.3" width="1.6" height="1.7"><feDropShadow dx="0" dy="15" stdDeviation="20" flood-color="#001257" flood-opacity=".38"/></filter>
+<filter id="small" x="-.4" y="-.4" width="1.8" height="1.8"><feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#1641b4" flood-opacity=".35"/></filter>
+<filter id="glow"><feGaussianBlur stdDeviation="11"/></filter>
+<clipPath id="tileClip"><rect x="91" y="80" width="1064" height="1075" rx="274"/></clipPath>
+<clipPath id="calClip"><rect x="276" y="442" width="694" height="513" rx="115"/></clipPath>
+<filter id="floatingShadow" x="-.3" y="-.3" width="1.6" height="1.8"><feGaussianBlur stdDeviation="27"/></filter>
+<radialGradient id="shadowWash"><stop stop-color="#0a35bd" stop-opacity=".38"/><stop offset=".7" stop-color="#2672ea" stop-opacity=".14"/><stop offset="1" stop-color="#399aff" stop-opacity="0"/></radialGradient>
+</defs>
+
+<!-- All outer canvas pixels are transparent. macOS applies any mask. -->
+<g transform="translate(-218 -214) scale(1.35)">
+<rect x="280" y="333" width="688" height="610" rx="140" fill="#0e3c9a" opacity=".21" filter="url(#floatingShadow)"/>
+<!-- Calendar back and front sheets -->
+<rect x="276" y="322" width="694" height="546" rx="135" fill="url(#calendarBack)" stroke="#f0f6ff" stroke-width="2"/>
+<rect x="276" y="442" width="694" height="513" rx="115" fill="url(#calendar)" stroke="#fff" stroke-width="2"/>
+<g clip-path="url(#calClip)">
+ <ellipse cx="896" cy="555" rx="146" ry="129" fill="url(#glowBlue)"/>
+ <path d="M270 857C401 886 531 819 627 757C613 823 466 922 277 914Z" fill="#7db6fb" opacity=".33"/>
+</g>
+<!-- Binding tabs -->
+<g><rect x="440" y="265" width="62" height="124" rx="31" fill="url(#binder)"/><rect x="749" y="265" width="62" height="124" rx="31" fill="url(#binder)"/></g>
+<!-- Three scheduled posts -->
+<circle cx="371" cy="538" r="26" fill="#0751f1"/><rect x="417" y="518" width="197" height="40" rx="20" fill="url(#rows)"/>
+<circle cx="371" cy="620" r="24" fill="#5caafb"/><rect x="412" y="602" width="142" height="36" rx="18" fill="#a1c2fd"/>
+<circle cx="371" cy="699" r="23" fill="#accffd"/><rect x="413" y="681" width="100" height="36" rx="18" fill="#b0cefb"/>
+<!-- Sky-blue velocity streaks -->
+<path d="M292 859C424 867 535 819 627 760C613 825 494 909 296 884Z" fill="url(#trail)" opacity=".42"/>
+<path d="M302 869C429 876 506 842 604 786" fill="none" stroke="#148df7" stroke-width="15" opacity=".7" filter="url(#glow)"/>
+<path d="M304 873C428 883 521 840 603 785" fill="none" stroke="url(#trail)" stroke-width="9" stroke-linecap="round"/>
+<path d="M305 888C427 892 512 845 596 799" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".85"/>
+<!-- Orbit and comet in upper right -->
+<path d="M693 623C791 550 847 515 897 525C951 541 939 616 813 696" fill="none" stroke="#ffa43d" stroke-width="22" opacity=".56" filter="url(#glow)"/>
+<path d="M691 615C773 555 850 518 896 525C934 530 950 583 819 697" fill="none" stroke="url(#comet)" stroke-width="7" stroke-linecap="round"/>
+<path d="M698 607C783 553 843 524 894 525" fill="none" stroke="#fffae5" stroke-opacity=".94" stroke-width="2" stroke-linecap="round"/>
+<!-- Launched plane: hand-drawn editable blue shape -->
+<path d="M548 677L832 588Q857 579 852 601L753 826Q744 846 729 833L685 789L648 830Q630 839 612 820L606 781L548 708Q536 692 548 677Z" fill="#0f3dbe" opacity=".44"/>
+<path d="M549 675L832 590Q861 578 850 609L754 827Q743 850 729 833L685 790L648 829Q630 840 613 819L605 781L549 709Q536 691 549 675Z" fill="url(#plane)"/>
+<path d="M606 783L818 621L628 811L602 820Z" fill="#ffffff"/>
+<path d="M628 811L818 621L686 790L650 829Q635 840 628 811Z" fill="url(#fold)"/>
+<path d="M547 687Q548 678 559 674L832 592L817 620L605 737Z" fill="#01cbff" opacity=".21"/>
+<!-- Radiating 8+ spike stellar burst: intentionally NOT a Gemini diamond -->
+<circle cx="899" cy="520" r="92" fill="url(#glowGold)"/>
+<path d="M903 459L911 500L930 479L918 509L955 504L920 520L958 535L918 532L909 562L898 539L879 576L887 536L849 543L883 520L842 505L891 511L873 481L895 499Z" fill="#ffab40" opacity=".66" filter="url(#glow)"/>
+<path d="M904 457L910 503L930 484L918 510L946 507L917 520L957 535L913 531L907 559L899 537L879 570L887 533L851 543L886 520L840 506L890 512L875 484L895 503Z" fill="url(#star)"/>
+<path d="M903 485L908 513L924 512L911 521L928 528L908 528L903 546L899 528L878 526L895 520L890 508L900 515Z" fill="#fffdf6"/>
+<circle cx="799" cy="521" r="5.6" fill="#fff6bf"/><circle cx="747" cy="552" r="5.1" fill="#fff8cb"/><circle cx="786" cy="533" r="2.6" fill="#ffe9b4"/>
+</g>
+</svg>

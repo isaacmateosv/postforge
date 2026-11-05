@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="56" viewBox="0 0 240 56" role="img" aria-label="Evolution API">
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="26" cy="28" r="16"/>
+    <path d="M18 28h16M26 20v16"/>
+  </g>
+  <text x="54" y="35" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="24" font-weight="600" fill="#ffffff">Evolution API</text>
+</svg>

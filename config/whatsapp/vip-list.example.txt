@@ -1,0 +1,4 @@
+# Copy this file to vip-list.txt and replace the example with approved recipients.
+# One number per line, international format (country code, no +).
+# Numbers starting with 0 get WA_DEFAULT_COUNTRY_CODE (default 593) prepended.
+593000000000  # example only; do not send until replaced

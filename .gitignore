@@ -1,0 +1,25 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+exports/
+
+# Runtime state, credentials, media, databases, and logs
+data/
+logs/
+run/
+backups/
+tunnel/
+dist/
+config/whatsapp/vip-list.txt
+docs/site/
+__PROJECT_DIR__/
+
+# Build and editor artifacts
+tray/build/
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Session notes kept out of the repository
+.checkpoint/
