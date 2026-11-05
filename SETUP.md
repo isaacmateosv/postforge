@@ -65,9 +65,14 @@ PostForge after the wake event. Keep **Open at Login** enabled; otherwise no con
 will be available after a reboot. The lead time can be changed with `PM_WAKE_LEAD_MINUTES` in
 the private `.env`.
 
-When there is no pending work and no tray interaction for one hour, the tray stops the Publish
-Machine containers and evicts loaded Ollama models. Docker Desktop and the Ollama daemon remain
-running. The automatic stop is enabled by default.
+After one continuous hour without pending work or app interaction, PostForge verifies the live queue
+again and stops its containers. While the tray shows **Idle · services off**, WhatsApp intake is paused
+until you choose **Turn On**. Turn off **Settings & Tools → Turn Off When Idle** if you want WhatsApp
+intake to stay available while the Mac is awake. The automatic stop is enabled by default.
+
+PostForge unloads its own caption model after each request. Idle stop leaves Docker Desktop and the
+Ollama daemon available to other apps. If no containers are running, Docker Desktop’s
+[Resource Saver](https://docs.docker.com/desktop/use-desktop/resource-saver/) can stop its Linux VM.
 
 ## Requirements before installing
 

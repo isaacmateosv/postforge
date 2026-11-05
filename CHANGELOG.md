@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6]
+
+- Require a continuous idle period and recheck the live queue before automatically stopping services.
+- Show idle status in the window and tray and expose an idle-stop toggle for operators who need continuous WhatsApp intake.
+- Reduce polling while stopped and avoid repeat macOS wake requests for the same post.
+- Keep shared Docker and Ollama resources available during an automatic stop.
+
 ## [1.0.5]
 
 - Refresh running PostForge services and reload WhatsApp intake after package updates while preserving runtime data.
