@@ -33,6 +33,30 @@ verify delivery before enabling that flow. The generated file notifier is for
 isolated setup and testing. Review Authelia’s production notifier guidance
 before exposing the gateway. [Notifier documentation](https://www.authelia.com/configuration/notifications/introduction/)
 
+## Postiz accounts and team membership
+
+Keep `DISABLE_REGISTRATION=true` for routine operation. The gateway allowlist
+controls who can reach Postiz. Postiz team membership controls what each person
+can do inside the workspace. They are separate settings.
+
+- **Existing Postiz account:** provision the separate gateway login and its
+  authenticator. If the person needs access to a workspace they have not joined,
+  use Postiz’s team settings to add the existing account by email and select
+  the least privileged role that fits their work.
+- **First owner on an empty deployment:** create the first local Postiz account
+  through the protected gateway. The currently pinned build allows this with
+  registration disabled when there are no organizations.
+- **Additional account on an existing deployment:** provision the gateway user
+  first. Use a short, operator-controlled signup window only after verifying the
+  gateway, then confirm the new user joined the intended workspace and turn
+  registration back off. The currently pinned build checks the local signup
+  switch before applying an invitation, so an invite alone cannot create a new
+  email/password account while registration is disabled.
+
+For a person who leaves, revoke gateway access and remove their Postiz workspace
+membership separately. Postiz invitation delivery is independent of how the
+gateway provisions authenticators.
+
 ## Validate and activate
 
 Validate the generated configuration and test with an isolated endpoint. Check
