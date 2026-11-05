@@ -110,3 +110,35 @@ app, OAuth scopes, or Meta Business admin role. The Evolution global key is
 an administrative credential for the local API. Keep the Manager on loopback
 and keep the key private. Use only the WhatsApp account you are authorized
 to link. [WhatsApp reconnection](whatsapp.md)
+
+## API options and request attributes
+
+Enable the products and APIs listed above in the provider console. Postiz
+sets the query parameters, response field selectors, and publish payloads
+below. Use these names to inspect a request or reproduce a failure in an API
+explorer. They are not additional permission checkboxes. These are the main
+publishing attributes in the pinned build. Optional features add fields.
+
+| Channel | Calls and attributes Postiz supplies |
+| --- | --- |
+| Facebook Page | Page discovery uses `/me/accounts` with `fields=id,username,name,access_token,picture.type(large)`. A feed post uses `/{page-id}/feed` with `message` and `published`. Photos go to `/photos` with `url` and `published=false`, then into `attached_media` as `media_fbid`. A regular video uses `/videos` with `file_url`, `description`, `published`, and optional `title`. Stories use a separate flow. |
+| Instagram, both login methods | Create a container at `/{ig-id}/media` with `image_url` or `video_url` and a `caption` where applicable. Reels and Stories set `media_type=REELS` or `STORIES`. Carousel items set `is_carousel_item=true` and the parent uses `media_type=CAROUSEL` and `children`. Postiz checks `fields=status_code,status`, then calls `/media_publish` with `creation_id`. |
+| Threads | Create at `/{user-id}/threads` with `media_type` set to `TEXT`, `IMAGE`, `VIDEO`, or `CAROUSEL`, and send `text`, `image_url`, `video_url`, or `children` as applicable. Publish via `/threads_publish` with `creation_id`. |
+| TikTok | Video uses `source_info.source=FILE_UPLOAD` with `video_size`, `chunk_size`, and `total_chunk_count`. Photos use `media_type=PHOTO` and `PULL_FROM_URL` with `photo_images` from a verified URL prefix or domain. For Direct Post, `post_info` carries `privacy_level` and the applicable interaction and disclosure options. For inbox uploads, set those options when finishing the post in TikTok. [TikTok upload options](https://developers.tiktok.com/docs/en/content-posting-api-get-started-upload-content) |
+| YouTube | Resumable upload uses `uploadType=resumable`, `part=id,snippet,status`, and `notifySubscribers=true`. The body contains `snippet.title`, `snippet.description`, optional `snippet.tags`, `status.privacyStatus`, and `status.selfDeclaredMadeForKids`. [YouTube upload parameters](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert) |
+
+For Evolution, PostForge creates the instance with `instanceName`,
+`integration=WHATSAPP-BAILEYS`, and `qrcode=true`. Status publishing uses
+`POST /message/sendStatus/{instance}` with `type`, `content`, and an explicit
+`statusJidList` of full WhatsApp JIDs. Media can carry `caption`. Text can
+carry `backgroundColor` and `font`. The current self-chat listener reads
+Evolution's local database, so it requires no webhook event selection.
+PostForge manages `readStatus` for receipt tracking when both receipt patches
+are present.
+
+**Gateway and media URLs.** A provider fetching `image_url`, `video_url`,
+`file_url`, or `photo_images` from the public host has no browser MFA session.
+The current gateway protects `/uploads/`. If Postiz gives the provider a
+URL there, the provider cannot fetch it. Verify URL-based publishing
+separately from OAuth and draft creation before relying on those formats.
+Keep the dashboard, API, and general upload directory gated.

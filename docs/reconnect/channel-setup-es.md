@@ -96,3 +96,37 @@ una aplicación de desarrollador, permisos de OAuth ni un rol de administrador
 en Meta Business. La clave global sí da acceso administrativo a la API local
 de Evolution. Mantén el gestor accesible solo desde el equipo y protege la clave.
 [Guía de reconexión](whatsapp.md)
+
+## Opciones de API y atributos de las solicitudes
+
+Activa en la consola del proveedor los productos y las API indicados arriba.
+Postiz envía los parámetros, los campos de respuesta y los datos de publicación
+de esta tabla. Usa estos nombres para revisar una solicitud o reproducir un
+error en el explorador de la API. Los campos opcionales dependen del formato.
+
+| Canal | Solicitudes y atributos que envía Postiz |
+| --- | --- |
+| Página de Facebook | `/me/accounts` usa `fields=id,username,name,access_token,picture.type(large)`. `/{page-id}/feed` usa `message` y `published`. Las fotos pasan por `/photos` con `url` y `published=false`, y luego se agregan a `attached_media` como `media_fbid`. El video normal usa `/videos` con `file_url`, `description`, `published` y, si corresponde, `title`. Las historias usan otro flujo. |
+| Instagram, ambos inicios de sesión | `/{ig-id}/media` recibe `image_url` o `video_url` y `caption` cuando corresponde. Reels e historias usan `media_type=REELS` o `STORIES`. Cada elemento de un carrusel usa `is_carousel_item=true`. El carrusel usa `media_type=CAROUSEL` y `children`. Postiz revisa `fields=status_code,status` y llama a `/media_publish` con `creation_id`. |
+| Threads | `/{user-id}/threads` recibe `media_type` con `TEXT`, `IMAGE`, `VIDEO` o `CAROUSEL`, junto con `text`, `image_url`, `video_url` o `children`, según corresponda. Publica con `/threads_publish` y `creation_id`. |
+| TikTok | El video usa `source_info.source=FILE_UPLOAD` con `video_size`, `chunk_size` y `total_chunk_count`. Las fotos usan `media_type=PHOTO` y `PULL_FROM_URL` con `photo_images` de un dominio o prefijo verificado. En publicación directa, `post_info` incluye `privacy_level` y las opciones de interacción y divulgación que correspondan. En la bandeja de TikTok, eliges esas opciones al terminar la publicación. [Opciones de carga de TikTok](https://developers.tiktok.com/docs/en/content-posting-api-get-started-upload-content) |
+| YouTube | La carga reanudable usa `uploadType=resumable`, `part=id,snippet,status` y `notifySubscribers=true`. Envía `snippet.title`, `snippet.description`, `snippet.tags` si corresponde, `status.privacyStatus` y `status.selfDeclaredMadeForKids`. [Parámetros de carga de YouTube](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert) |
+
+Para Evolution, PostForge crea la instancia con `instanceName`,
+`integration=WHATSAPP-BAILEYS` y `qrcode=true`. Para publicar un Estado usa
+`POST /message/sendStatus/{instance}` con `type`, `content` y
+`statusJidList`, una lista explícita de identificadores completos de
+WhatsApp. Los archivos pueden llevar `caption`. Los estados de texto pueden
+llevar `backgroundColor` y `font`. El lector del chat propio consulta la
+base local de Evolution, así que no requiere activar eventos de webhook.
+PostForge gestiona `readStatus` cuando están instalados ambos ajustes para
+registrar las confirmaciones.
+
+**Acceso seguro y archivos por URL.** Un proveedor que descarga
+`image_url`, `video_url`, `file_url` o `photo_images` desde el servidor
+público no tiene una sesión de navegador con autenticación de dos factores.
+El acceso seguro actual protege `/uploads/`. Si Postiz le entrega al
+proveedor una URL en esa ruta, el proveedor no puede descargar el archivo.
+Verifica la publicación por URL por separado del inicio de sesión OAuth y
+de la creación de borradores. Mantén protegidos el panel, la API y la carpeta
+general de archivos subidos.
