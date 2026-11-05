@@ -1,0 +1,35 @@
+# Add to the base Compose file. No gateway or identity-service ports are published.
+services:
+  postforge-gateway:
+    image: caddy:2-alpine@sha256:f6228111e5fafa1a5238258d0858e103f10599b8d1659a146e7726681a002bb9
+    restart: unless-stopped
+    environment:
+      POSTFORGE_GATEWAY_HOST: ${POSTFORGE_GATEWAY_HOST:-${NGROK_DOMAIN}}
+    volumes:
+      - ./v2/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      - postforge-auth
+
+  postforge-auth:
+    image: authelia/authelia:4.39@sha256:bd97cff4fcbf715b5ff1f9ae286afbe6033afce385302520b0368122d43a6f54
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+    volumes:
+      - type: bind
+        source: ./data/gateway
+        target: /config
+        bind:
+          create_host_path: false
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+
+  ngrok:
+    command:
+      - "http"
+      - "--url=${NGROK_DOMAIN}"
+      - "postforge-gateway:8080"
+    depends_on:
+      - postforge-gateway

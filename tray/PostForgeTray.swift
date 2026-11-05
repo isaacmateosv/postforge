@@ -1256,6 +1256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.addItem(action(text("WhatsApp Plans & Receipts…", "Planes y confirmaciones de WhatsApp…"), #selector(reviewWhatsAppPlans), enabled: true))
         menu.addItem(action(text("Open WhatsApp Manager", "Abrir WhatsApp Manager"), #selector(openEvolution), enabled: up))
         menu.addItem(action(text("Tunnel URL…", "URL del túnel…"), #selector(editTunnelURL), enabled: busy == nil))
+        menu.addItem(action(text("Gateway Access…", "Acceso a la puerta de enlace…"), #selector(editGatewayAccess), enabled: busy == nil))
 
         menu.addItem(.separator())
         menu.addItem(sectionHeader(text("Maintenance", "Mantenimiento")))
@@ -1586,6 +1587,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 self.updateNoticeShown = false
                 self.notify("PostForge updated", "The Docker stack was refreshed and health was checked.")
             }
+        }
+    }
+
+    @objc func editGatewayAccess() {
+        let command = ["/usr/bin/python3", project + "/v2/gateway_setup.py"]
+        let (code, output) = runCommand(command + ["list-users"], in: project, timeout: 5, quietErrors: true)
+        guard code == 0, let data = output.data(using: .utf8),
+              let users = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              !users.isEmpty else {
+            alert(text("Set up gateway users first", "Primero configura los usuarios de acceso"),
+                  text("Provision users and authenticator codes locally using the gateway setup guide.",
+                       "Configura los usuarios y sus códigos de autenticación en el equipo según la guía de acceso."))
+            return
+        }
+        let choices = users.compactMap { user -> (String, Bool)? in
+            guard let email = user["email"] as? String, let allowed = user["allowed"] as? Bool else { return nil }
+            return (email, allowed)
+        }
+        guard !choices.isEmpty else { return }
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 28), pullsDown: false)
+        popup.addItems(withTitles: choices.map { email, allowed in
+            email + (allowed ? text(" · Allowed", " · Permitido") : text(" · Blocked", " · Bloqueado"))
+        })
+        let dialog = NSAlert()
+        dialog.messageText = text("Gateway allowlist", "Lista de acceso")
+        dialog.informativeText = text("Select a user and choose whether to allow or block them. Restart the identity service to apply the change and clear existing gateway sessions.",
+                                      "Elige un usuario y decide si permitir o bloquear su acceso. Reinicia el servicio de identidad para aplicar el cambio y cerrar las sesiones de acceso actuales.")
+        dialog.accessoryView = popup
+        dialog.addButton(withTitle: text("Cancel", "Cancelar"))
+        dialog.addButton(withTitle: text("Allow", "Permitir"))
+        dialog.addButton(withTitle: text("Block", "Bloquear"))
+        NSApp.activate(ignoringOtherApps: true)
+        let answer = dialog.runModal()
+        guard answer == .alertSecondButtonReturn || answer == .alertThirdButtonReturn,
+              choices.indices.contains(popup.indexOfSelectedItem) else { return }
+        let email = choices[popup.indexOfSelectedItem].0
+        let (result, _) = runCommand(command + ["set-allowed", email, answer == .alertSecondButtonReturn ? "allow" : "deny"],
+                                     in: project, timeout: 5, quietErrors: true)
+        if result == 0 {
+            alert(text("Gateway access saved", "Acceso guardado"),
+                  text("Restart the identity service from the gateway setup to apply it.", "Reinicia el servicio de identidad según la guía de acceso para aplicarlo."))
+        } else {
+            alert(text("Couldn't change gateway access", "No se pudo cambiar el acceso"),
+                  text("Keep at least one user allowed and verify the gateway configuration.", "Mantén al menos un usuario permitido y verifica la configuración de acceso."))
         }
     }
 

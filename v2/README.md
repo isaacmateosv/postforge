@@ -61,6 +61,12 @@ For a fully local deployment, no tunnel is needed. If remote access is required,
 put the authenticated gateway on the network edge. Keep the dashboard,
 database, Redis, Temporal, Ollama, and Evolution management endpoints private.
 
+## Separate gateway sign-in
+
+The [Caddy and Authelia setup guide](gateway/README.md) covers a separate
+allowlisted password and authenticator login. The gateway is independent of
+Postiz credentials and can use the existing ngrok hostname.
+
 ## Managed access on the existing ngrok hostname
 
 The managed Google policy authenticates every request and then denies email
