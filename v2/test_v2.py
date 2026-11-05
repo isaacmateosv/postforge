@@ -2,13 +2,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import unittest
+from urllib.parse import urlsplit
 from unittest.mock import Mock, patch
 
+import check_gateway
 import postforge_v2 as web
 import telegram_worker as bot
 
 
 class PreviewTests(unittest.TestCase):
+    def test_postiz_redirect_is_not_an_outer_login(self):
+        postiz = "https://postiz.example.org/"
+        gate = urlsplit("https://login.example.org/sso")
+        self.assertFalse(check_gateway.gate_response(307, "/auth/login", postiz, gate))
+        self.assertFalse(check_gateway.gate_response(200, "", postiz, gate))
+        self.assertFalse(check_gateway.gate_response(302, "https://login.example.org/sso-evil", postiz, gate))
+        self.assertTrue(check_gateway.gate_response(302, "https://login.example.org/sso/start", postiz, gate))
+        self.assertTrue(check_gateway.gate_response(401, "", postiz, gate))
+
     def test_postiz_link_rejects_unsafe_urls(self):
         for url in ("javascript:alert(1)", "http://example.org", "https://a:b@example.org",
                     "https://example.org/path", "https://example.org/?redirect=1"):
