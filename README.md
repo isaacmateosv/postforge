@@ -41,6 +41,15 @@ silently publish content.
 - [Contributors and acknowledgements](#contributors-and-acknowledgements)
 - [License and third-party components](#license-and-third-party-components)
 
+## User guides
+
+| Guide | English | Español (Ecuador) |
+| --- | --- | --- |
+| Quick start | [Start here](docs/help/quick-en.md) | [Inicio rápido](docs/help/quick-es.md) |
+| Technical | [Setup and operation](docs/help/technical-en.md) | [Instalación y operación](docs/help/technical-es.md) |
+
+Open **Help → PostForge Help** in the Mac app to read either guide offline in the selected app language.
+
 ## What it provides
 
 - **Approval-safe drafting:** media and one-sentence instructions become
@@ -108,7 +117,7 @@ flowchart LR
 - **Reconnection timer:** the tray and main window show days, hours, and minutes until the next nonrenewable social token expires. The tray lists every affected connection. Facebook and Instagram require reconnection; renewable channels show that they renew automatically. This is a social-channel token timer, separate from the Postiz web login. Dates saved while offline are labeled as cached; no precise expiry is invented for WhatsApp or an unknown token. The display refreshes with the existing status poll, about once a minute while on.
 - **Saved history defaults to 30 days.** Change it through **Settings & Tools → Maintenance → Saved History…** (`PM_RETENTION_DAYS`). The age applies to logs and unused uploaded media. Review `./postforge.sh retention` before applying `./postforge.sh retention --apply`; changing the setting alone deletes nothing. PostForge automatically cleans expired WhatsApp staging while the listener runs. Future confirmations, approved pending sends, media referenced by Postiz, databases, credentials, and backups are preserved. If Postiz cannot be checked, uploads are retained. `--days N` overrides the setting for one cleanup.
 - **App updates:** stable releases are checked on launch and hourly. Available updates appear in the main window and tray and can trigger a macOS notification. Installation is an explicit action. PostForge downloads the package, verifies its published SHA-256 checksum, and invokes the macOS installer, which may request administrator authentication. Package updates recreate running PostForge services and reload WhatsApp intake. Runtime data is retained. Prereleases are excluded. Both the main window's **Updates** button and the tray’s **Check for Updates…** item show explicit app/component results, hide the progress bar when finished, and offer **Done**, **Try Again**, or a direct update action. App and component checks run concurrently with bounded timeouts.
-- **Idle mode:** after an hour with a verified empty queue and no app interaction, PostForge stops its containers. WhatsApp intake resumes when you turn it back on. You can enable **Notify My WhatsApp Before Idle** for a notice in your self-chat. Use the **New post** Siri shortcut on your Mac to open the composer and turn it on. Use **Settings & Tools → Turn Off When Idle** to keep intake available.
+- **Idle mode:** after an hour with a verified empty queue and no app interaction, PostForge stops its containers. WhatsApp intake resumes when you turn it back on. You can enable **Notify My WhatsApp Before Idle** for a notice in your self-chat. Use the **New post in PostForge** Siri shortcut on your Mac to open the composer and turn it on. Use **Settings & Tools → Turn Off When Idle** to keep intake available.
 - **Video checks:** a Facebook clip of at least one minute gets an editorial advisory. Explicit YouTube Shorts requests require an eligible vertical or square video of up to three minutes. WhatsApp Status previews show how many clips of up to 60 seconds an approved video will become.
 - **Activity badges:** the Dock shows a red count for active work. The tray shows the count and a separate update dot beside the logo.
 - **Component updates:** checks compare local Docker image digests with the declared tags, separately from Homebrew. Approved updates save code and local image IDs, download before stopping services, restart, and run the live watchdog. Progress shows each stage and reports failure. A rollback restores code and image tags; it does not reverse database migrations. The checker reports stable upstream releases for Evolution API and its bundled Manager separately. A new upstream version needs a compatible PostForge release.

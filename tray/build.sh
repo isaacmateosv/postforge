@@ -44,6 +44,10 @@ iconutil -c icns "$iconset" -o "$APP/Contents/Resources/PostForge.icns"
 cp "$PROJECT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 cp "$PROJECT/COPYRIGHT" "$APP/Contents/Resources/COPYRIGHT.txt"
 cp "$PROJECT/NOTICE.md" "$APP/Contents/Resources/NOTICE.txt"
+mkdir -p "$APP/Contents/Resources/Help"
+cp "$PROJECT"/docs/help/*.md "$APP/Contents/Resources/Help/"
+mkdir -p "$APP/Contents/Resources/Shortcuts"
+cp "$HERE"/shortcuts/*.shortcut "$APP/Contents/Resources/Shortcuts/"
 
 # Menu bar glyph: the black template mask at 54px for a crisp 21pt item; the app tints it for light and dark bars.
 cp "$ASSETS/PostForgeTrayTemplate-Tight-54.png" "$APP/Contents/Resources/PostForgeTray.png"
