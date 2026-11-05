@@ -23,6 +23,13 @@ docker compose -f docker-compose.yml -f v2/compose.gateway.yml run --rm --no-dep
 docker compose -f docker-compose.yml -f v2/compose.gateway.yml run --rm --no-deps postforge-auth   authelia storage user totp generate USER_EMAIL --config /config/configuration.yml   --issuer PostForge --path /config/enrollment.png
 ```
 
+On the Mac, after running the storage migration once, the local helper combines
+the hash and QR steps for each person:
+
+```bash
+./v2/gateway/enroll-local.sh "$HOME/postforge/data/gateway" USER_EMAIL
+```
+
 Have each person scan the QR code from the Mac with their authenticator app.
 Delete that image after enrollment, then generate a new one for the next person.
 Treat the QR and enrollment output as secrets. If a phone is lost, an operator
