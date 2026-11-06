@@ -40,6 +40,8 @@ Send a file and instruction to your own WhatsApp chat while PostForge is on. Rev
 
 On your Mac, import **New post in PostForge** using **Siri Shortcuts…** in Help and say its name to Siri. The shortcut opens the composer. Choose **Turn On** there if services are idle.
 
+After creating drafts in the Mac composer, approve any queued WhatsApp Status separately. Use **Approve Status…** in the plan or **Approve WhatsApp Status…** in the menu bar. Check the confirmation in your WhatsApp self-chat. Overdue statuses can send as soon as approved.
+
 ## Free up your Mac for editing
 
 PostForge turns off its services after an hour without activity or queued work. While idle, incoming WhatsApp commands wait. Enable **Notify My WhatsApp Before Idle** if you want a note in your self-chat before shutdown. Turn off **Turn Off When Idle** if you need continuous intake while your Mac is awake.

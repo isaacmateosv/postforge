@@ -27,15 +27,17 @@ NEEDS_MEDIA = {"instagram": "Instagram", "instagram-standalone": "Instagram", "t
                "youtube": "YouTube"}
 
 PROMPT = """Write one social media caption in {lang} about: {topic}
-- Use one or two short sentences and at most two relevant emojis.
+- Write like a person talking to their audience. Use one or two short sentences with a specific hook or an easy question. Avoid stock openings such as “Enjoy our delicious”.
+- Use zero to two emojis only if they fit the subject. Put them after a complete sentence.
 - Use only the facts in the topic. Do not invent a business name, prices, dates, locations or contact details.
-- Add 3 to 5 relevant hashtags on the next line.
+- Leave one blank line, then add 2 to 4 specific hashtags on one line. Every tag starts with # and contains no spaces, for example #WeekendHike. Skip generic tags and locations not given.
 Return only the caption."""
 
 PROMPT_ES = """Escribe una publicación en español de Ecuador sobre: {topic}
-- Usa una o dos frases cortas y hasta dos emojis pertinentes.
+- Escribe como si conversaras con tu comunidad. Usa una o dos frases cortas con un detalle del tema o una pregunta sencilla. Evita frases de cajón como «Disfruta de nuestros deliciosos». Cuida la concordancia.
+- Usa hasta dos emojis solo si aportan al texto. Ponlos al final de una frase completa.
 - Usa solo los datos del tema. Evita inventar nombres de negocios, precios, fechas, lugares o datos de contacto.
-- Agrega de 3 a 5 hashtags pertinentes en la siguiente línea.
+- Deja una línea en blanco y añade de 2 a 4 hashtags concretos en una sola línea. Cada etiqueta empieza con # y va sin espacios, por ejemplo #RutaDeMontaña. Evita etiquetas genéricas y lugares que no se mencionaron.
 Devuelve solo la publicación."""
 
 PREAMBLE = re.compile(r"^¡?(here(?:'s| is)|sure|caption|aquí (?:tienes|está)|claro|por supuesto)\b[^\n]*:\s*\n+",
@@ -92,6 +94,9 @@ def split_hashtags(text):
     for line in text.splitlines():
         if SEPARATOR.fullmatch(line):
             continue
+        # Repair a split CamelCase tag only on tag-led lines, preserving inline prose.
+        if line.lstrip().startswith("#"):
+            line = re.sub(r"(#\w+)[ \t]+([A-ZÁÉÍÓÚÜÑ]\w*)(?=[ \t]*(?:#|$))", r"\1\2", line)
         if HASHTAG.search(line) and not HASHTAG.sub("", line).strip(" \t.,;·|-"):
             tags += HASHTAG.findall(line)
         else:
@@ -108,13 +113,13 @@ def split_hashtags(text):
 
 def fitting_emojis(text, topic=""):
     """Swap or drop emojis that don't fit (EMOJI_* above); keep at most 2."""
-    words = (topic + " " + text).lower()
+    words = (topic or text).lower()
     kept = []
 
     def judge(match):
         emoji = EMOJI_SWAP.get(match.group(0), match.group(0))
         base = emoji.replace("\uFE0F", "")
-        fits = base in EMOJI_ALWAYS or any(w in words for w in EMOJI_IF.get(base, ()))
+        fits = base in EMOJI_ALWAYS or any(re.search(r"(?<!\w)" + re.escape(w), words) for w in EMOJI_IF.get(base, ()))
         if not fits or len(kept) >= 2:
             return ""
         kept.append(emoji)
@@ -144,7 +149,7 @@ def finish(text, lang="English", env=None, topic=""):
     """Clean generated copy and append the operator's optional call to action."""
     body, tags = split_hashtags(PREAMBLE.sub("", text.strip()).strip().strip('"').strip())
     body = re.sub(r"[ \t]{2,}", " ", fitting_emojis(body, topic)).strip()
-    body = drop_repeats(body, topic)
+    body = drop_repeats(re.sub(r"[ \t]+([,.!?;:])", r"\1", body), topic)
     if not re.search(r"\w", body):
         return ""  # nothing but emojis or punctuation survived
     lang = language(lang)
@@ -157,11 +162,11 @@ def finish(text, lang="English", env=None, topic=""):
         else:
             cta = ""
     unique = []
-    for tag in tags[:5]:
+    for tag in tags:
         if tag.lower() not in {t.lower() for t in unique}:
             unique.append(tag)
     caption = body + ("\n" + cta if cta else "")
-    return caption + ("\n\n" + " ".join(unique[:8]) if unique else "")
+    return caption + ("\n\n" + " ".join(unique[:5]) if unique else "")
 
 
 def ollama_caption(env, topic, lang):
