@@ -627,6 +627,10 @@ def main():
     env = pmlib.load_env()
     state = load_state()
     log("listening to your own chat (dry run)" if args.dry_run else "listening to your own chat")
+    if not args.dry_run:
+        interrupted = whatsapp_pending.recover_interrupted()
+        if interrupted:
+            log("%d interrupted WhatsApp Status send(s) held for review" % interrupted)
     next_cleanup = 0
     while True:
         try:

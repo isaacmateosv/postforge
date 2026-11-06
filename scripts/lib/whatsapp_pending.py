@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
 """Approval-gated WhatsApp Status queue used by the WhatsApp door."""
+import fcntl
 import json
 import math
 import os
@@ -9,6 +10,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import pmlib
@@ -34,6 +36,14 @@ def _write(items):
     os.replace(tmp, QUEUE_FILE)
 
 
+@contextmanager
+def _queue_lock():
+    os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
+    with open(QUEUE_FILE + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def enqueue(caption, media_paths, post_ids, when):
     media = []
     for path in media_paths:
@@ -50,31 +60,33 @@ def enqueue(caption, media_paths, post_ids, when):
         "approval_source": None,
         "status": "pending",
     }
-    items = _read()
-    items.append(item)
-    _write(items)
+    with _queue_lock():
+        items = _read()
+        items.append(item)
+        _write(items)
     return item["id"]
 
 
 def approve(item_id=None):
-    items = _read()
-    candidates = [i for i in items if i.get("status") == "pending"]
-    if item_id:
-        candidates = [i for i in candidates if i.get("id") == item_id]
-    if not candidates:
-        return None
-    item = candidates[-1]
-    item["approved"] = True
-    item["approval_source"] = "explicit-whatsapp-command"
-    item["approved_at"] = int(time.time())
-    _write(items)
-    return item["id"]
+    with _queue_lock():
+        items = _read()
+        candidates = [i for i in items if i.get("status") == "pending"]
+        if item_id:
+            candidates = [i for i in candidates if i.get("id") == item_id]
+        if not candidates:
+            return None
+        item = candidates[-1]
+        item["approved"] = True
+        item["approval_source"] = "explicit-whatsapp-command"
+        item["approved_at"] = int(time.time())
+        _write(items)
+        return item["id"]
 
 
 def _due(item):
     try:
-        when = datetime.fromisoformat(item["when"])
-    except (KeyError, TypeError, ValueError):
+        when = datetime.fromisoformat(item["when"].replace("Z", "+00:00"))
+    except (AttributeError, KeyError, TypeError, ValueError):
         return False
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
@@ -120,22 +132,61 @@ def _send_item(item):
             subprocess.run(args, check=True)
 
 
+def _ready(item):
+    return (item.get("status") == "pending" and item.get("approved")
+            and item.get("approval_source") == "explicit-whatsapp-command" and _due(item))
+
+
+def _claim(item_id):
+    with _queue_lock():
+        items = _read()
+        for item in items:
+            if item["id"] == item_id and _ready(item):
+                # A disconnect can happen after WhatsApp accepted a relay. Record
+                # the attempt before sending, including across worker restarts.
+                item.update(status="sending", attempt_at=int(time.time()))
+                _write(items)
+                return item
+    return None
+
+
+def _finish(item_id, **outcome):
+    with _queue_lock():
+        items = _read()
+        for item in items:
+            if item["id"] == item_id and item.get("status") == "sending":
+                item.update(outcome)
+                _write(items)
+                return
+
+
+def recover_interrupted():
+    """Called after acquiring the exclusive WhatsApp worker lock."""
+    with _queue_lock():
+        items = _read()
+        interrupted = [item for item in items if item.get("status") == "sending"]
+        for item in interrupted:
+            item.update(status="needs_review", review_reason="send_interrupted", review_at=int(time.time()))
+        if interrupted:
+            _write(items)
+        return len(interrupted)
+
+
 def process(env, dry_run=False):
-    items = _read()
-    changed = False
-    for item in items:
-        if item.get("status") != "pending":
-            continue
-        if not item.get("approved") or item.get("approval_source") != "explicit-whatsapp-command":
-            continue
-        if not _due(item):
-            continue
-        if dry_run:
-            continue
-        _send_item(item)
-        item["status"] = "sent"
-        item["sent_at"] = int(time.time())
-        changed = True
-    if changed:
-        _write(items)
-    return [i for i in items if i.get("status") == "pending"]
+    if not dry_run:
+        for candidate in _read():
+            if not _ready(candidate):
+                continue
+            item = _claim(candidate["id"])
+            if item is None:
+                continue
+            try:
+                _send_item(item)
+            except Exception as error:
+                _finish(item["id"], status="needs_review", review_reason="delivery_unconfirmed",
+                        review_at=int(time.time()))
+                print("WhatsApp Status %s needs review after an unconfirmed send (%s)."
+                      % (item["id"], type(error).__name__), flush=True)
+            else:
+                _finish(item["id"], status="sent", sent_at=int(time.time()))
+    return [item for item in _read() if item.get("status") == "pending"]
