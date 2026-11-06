@@ -205,17 +205,17 @@ func plural(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "
 
 func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { ($0 << 8) | UInt32($1) } }
 
-func postForgeImage(active: Bool) -> NSImage {
-    let size = 21.0
+func postForgeImage() -> NSImage {
+    let size = 18.0
     if let path = Bundle.main.path(forResource: "PostForgeTray", ofType: "png"),
        let image = NSImage(contentsOfFile: path) {
-        // The tightly cropped 54px mask renders at 21pt, with enough pixels for Retina displays.
-        image.size = NSSize(width: 21 * image.size.width / image.size.height, height: 21)
+        // Use the Retina mask at a fixed menu bar size.
+        image.size = NSSize(width: size * image.size.width / image.size.height, height: size)
         image.isTemplate = true  // black template mask: macOS tints it for light and dark menu bars
         return image
     }
 
-    let image = NSImage(size: NSSize(width: size, height: size))
+    let image = NSImage(size: NSSize(width: 24, height: 24))
     image.lockFocus()
     let plane = NSBezierPath()
     plane.move(to: NSPoint(x: 3, y: 12))
@@ -223,7 +223,7 @@ func postForgeImage(active: Bool) -> NSImage {
     plane.line(to: NSPoint(x: 15, y: 5))
     plane.line(to: NSPoint(x: 11, y: 11))
     plane.close()
-    (active ? NSColor.labelColor : NSColor.secondaryLabelColor).setFill()
+    NSColor.black.setFill()
     plane.fill()
     let spark = NSBezierPath()
     spark.move(to: NSPoint(x: 19, y: 22))
@@ -235,10 +235,10 @@ func postForgeImage(active: Bool) -> NSImage {
     spark.line(to: NSPoint(x: 15, y: 18))
     spark.line(to: NSPoint(x: 18, y: 19))
     spark.close()
-    NSColor.systemOrange.setFill()
     spark.fill()
     image.unlockFocus()
-    image.isTemplate = false
+    image.size = NSSize(width: size, height: size)
+    image.isTemplate = true
     return image
 }
 
@@ -403,10 +403,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self
-        statusItem.length = 29
         statusItem.button?.title = ""
         statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.imageScaling = .scaleProportionallyUpOrDown
+        statusItem.button?.imageScaling = .scaleNone
         statusItem.button?.target = self
         statusItem.button?.action = #selector(showStatusMenu)
         statusItem.menu = menu
@@ -1040,7 +1039,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         let image: NSImage?
         if symbol == "paperplane" || symbol == "paperplane.fill" {
-            image = postForgeImage(active: symbol == "paperplane.fill")
+            image = postForgeImage()
         } else {
             let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
             image = NSImage(systemSymbolName: symbol, accessibilityDescription: "PostForge")?.withSymbolConfiguration(config)
@@ -1049,7 +1048,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         button.image = image
         button.alphaValue = symbol == "paperplane" ? 0.5 : 1  // the glyph is dimmed while the stack is off
         button.imagePosition = .imageLeading
-        button.imageScaling = .scaleProportionallyUpOrDown
+        button.imageScaling = .scaleNone
         button.title = (active > 0 ? " \(active)" : "") + (updatesAvailable ? " •" : "")
         if active > 0 { tip += text(" · \(active) running", " · \(active) en curso") }
         if updatesAvailable { tip += text(" · Updates available", " · Hay actualizaciones disponibles") }
@@ -2076,7 +2075,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 if !label.isEditable { label.stringValue = localizedUI(label.stringValue) }
                 if let placeholder = label.placeholderString { label.placeholderString = localizedUI(placeholder) }
             }
-            if let button = view as? NSButton { button.title = localizedUI(button.title) }
+            if let button = view as? NSButton, !(button is NSPopUpButton) {
+                button.title = localizedUI(button.title)
+            }
             if let tip = view.toolTip { view.toolTip = localizedUI(tip) }
             for child in view.subviews { walk(child) }
         }
@@ -2088,6 +2089,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         if operationIsUpdateCheck { finishUpdateCheckIfReady() }
         updateButton()
         newPost?.refreshState(state)
+        newPost?.refreshPlacementLabels()
         if let report = newPost?.lastReport { newPost?.report(report.0, dryRun: report.1, exitCode: report.2) }
         if let state = state { whatsappWindow?.refresh(state) }
         if aboutWindow?.isVisible == true { showAbout() }
@@ -2459,7 +2461,7 @@ final class UserGuideWindow: NSObject {
 /// "New Post…": files plus one sentence (typed or dictated) become one Postiz draft per network at
 /// that time. Preview shows the plan; Create Drafts makes them. Nothing publishes until approved in
 /// Postiz (HITL). The work is done by scripts/plan-post.sh --json.
-final class NewPostWindow: NSObject, NSTextViewDelegate {
+final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let project: String
     let window: NSWindow
     let files = NSTextField(labelWithString: "")
@@ -2479,13 +2481,18 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     var statsDrafts = NSTextField(labelWithString: "0")
     var statsNext = NSTextField(labelWithString: "")
     var media: [URL] = []
+    let placementMenu = NSPopUpButton()
+    let coverSecond = NSTextField()
+    let coverFile = NSTextField(labelWithString: "")
+    var coverURL: URL?
+    var inputRevision = 0
     var reviewURL: URL?
     var previewed = false
     var lastReport: (String, Bool, Int32)?
 
     init(project: String) {
         self.project = project
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 720),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 790),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
@@ -2495,7 +2502,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         window.appearance = NSAppearance(named: .darkAqua)  // one look: the controls are drawn for dark
         window.backgroundColor = BackgroundView.color
         window.isMovableByWindowBackground = true
-        window.contentMinSize = NSSize(width: 520, height: 660)
+        window.contentMinSize = NSSize(width: 520, height: 730)
         window.isReleasedWhenClosed = false
         build()
         refreshState(nil)
@@ -2674,6 +2681,25 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
             dropRow.centerYAnchor.constraint(equalTo: drop.centerYAnchor),
         ])
 
+        let placementLabel = caption(t("Create drafts for", "Crear borradores de"))
+        refreshPlacementLabels()
+        placementMenu.target = self
+        placementMenu.action = #selector(draftOptionsChanged)
+        let placements = NSStackView(views: [placementLabel, placementMenu])
+        placements.spacing = 8
+
+        let chooseCover = NSButton(title: t("Choose image…", "Elegir imagen…"), target: self, action: #selector(chooseCoverImage))
+        let clearCover = NSButton(title: t("Clear", "Limpiar"), target: self, action: #selector(clearCoverImage))
+        let coverLabel = caption(t("Video cover", "Portada del video"))
+        coverSecond.placeholderString = t("Second", "Segundo")
+        coverSecond.toolTip = t("Enter a second in the video, such as 12.5.", "Ingresa un segundo del video, por ejemplo 12,5.")
+        coverSecond.delegate = self
+        coverSecond.widthAnchor.constraint(equalToConstant: 72).isActive = true
+        coverFile.lineBreakMode = .byTruncatingMiddle
+        coverFile.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let coverControls = NSStackView(views: [coverLabel, chooseCover, coverSecond, clearCover, coverFile])
+        coverControls.spacing = 6
+
         // Idea
         instruction.delegate = self
         let ideaPanel = Panel(scroll(instruction, editable: true), insets: NSEdgeInsets(), style: .input)
@@ -2781,7 +2807,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         planHeader.alignment = .centerY
         connections.font = .systemFont(ofSize: 11)
         connections.textColor = .secondaryLabelColor
-        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
+        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
         main.orientation = .vertical
         main.alignment = .leading
         main.spacing = 12
@@ -2793,7 +2819,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         main.setCustomSpacing(16, after: planPanel)
         main.setCustomSpacing(6, after: planHeader)
         main.translatesAutoresizingMaskIntoConstraints = false
-        for view in [header, stats, drop, ideaPanel, actions, planHeader, planPanel, footer] {
+        for view in [header, stats, drop, coverControls, ideaPanel, actions, planHeader, planPanel, footer] {
             view.widthAnchor.constraint(equalTo: main.widthAnchor, constant: -2 * inset).isActive = true
         }
 
@@ -2811,8 +2837,52 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         media += urls.filter { !media.contains($0) }
         files.stringValue = media.isEmpty ? t("No files yet", "Sin archivos")
             : "\(media.count) · " + media.map { $0.lastPathComponent }.joined(separator: ", ")
+        draftOptionsChanged()
+    }
+
+    func refreshPlacementLabels() {
+        let selected = max(0, placementMenu.indexOfSelectedItem)
+        placementMenu.removeAllItems()
+        placementMenu.addItems(withTitles: [
+            t("Automatic (posts and stories)", "Automático (publicaciones e historias)"),
+            t("Posts only", "Solo publicaciones"),
+            t("Stories only", "Solo historias"),
+            t("Posts and stories", "Publicaciones e historias"),
+        ])
+        placementMenu.toolTip = t("Automatic follows your instruction and includes both formats where supported.",
+                                  "Automático sigue tu instrucción e incluye ambos formatos donde se admiten.")
+        placementMenu.selectItem(at: selected)
+    }
+
+    @objc func draftOptionsChanged() {
+        inputRevision += 1
+        lastReport = nil
         previewed = false
         create.isEnabled = false
+    }
+
+    @objc func chooseCoverImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        if panel.runModal() == .OK, let url = panel.url {
+            coverURL = url
+            coverSecond.stringValue = ""
+            coverFile.stringValue = url.lastPathComponent
+            draftOptionsChanged()
+        }
+    }
+
+    @objc func clearCoverImage() {
+        coverURL = nil
+        coverSecond.stringValue = ""
+        coverFile.stringValue = ""
+        draftOptionsChanged()
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        coverURL = nil
+        coverFile.stringValue = ""
+        draftOptionsChanged()
     }
 
     @objc func chooseFiles() {
@@ -2824,13 +2894,13 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
 
     @objc func clearFiles() {
         media = []
+        clearCoverImage()
         add([])
     }
 
     func textDidChange(_ notification: Notification) {
         placeholder.isHidden = !instruction.string.isEmpty
-        previewed = false
-        create.isEnabled = false
+        draftOptionsChanged()
     }
 
     @objc func startDictation() {
@@ -2879,13 +2949,23 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         }
         let text = instruction.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return show("Say where, when, and your idea first.") }
-        var args = [project + "/scripts/plan-post.sh", "--json"]
+        let revision = inputRevision
+        var args = [project + "/scripts/plan-post.sh", "--json", "--ui-lang", t("English", "Spanish")]
+        switch placementMenu.indexOfSelectedItem {
+        case 1: args += ["--placement", "feed"]
+        case 2: args += ["--placement", "story"]
+        case 3: args += ["--placement", "both"]
+        default: break
+        }
+        if let url = coverURL { args += ["--cover-image", url.path] }
+        let second = coverSecond.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !second.isEmpty { args += ["--cover-second=\(second)"] }
         if dryRun { args.append("--dry-run") }
         for url in media { args += ["--media", url.path] }
         args.append(text)
         preview.isEnabled = false
         create.isEnabled = false
-        if dryRun { previewed = false }
+        previewed = false
         spinner.startAnimation(nil)
         (NSApp.delegate as? AppDelegate)?.planningWork += 1
         show(dryRun ? t("Reading your plan and writing the caption…", "Leyendo tu plan y redactando el texto…") : t("Creating drafts…", "Creando borradores…"))
@@ -2898,8 +2978,14 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
                     delegate.poll()
                 }
                 self.preview.isEnabled = true
-                self.create.isEnabled = true
                 self.report(output, dryRun: dryRun, exitCode: code)
+                if revision != self.inputRevision {
+                    self.draftOptionsChanged()
+                    if dryRun {
+                        self.show(self.t("The draft options changed. Bake the idea again to review them.",
+                                         "Cambiaste las opciones del borrador. Vuelve a hornear la idea para revisarlas."))
+                    }
+                }
             }
         }
     }
@@ -2921,7 +3007,18 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         for target in json["targets"] as? [[String: Any]] ?? [] {
             let network = target["network"] as? String ?? ""
             let short = network == "youtube" && (json["short"] as? Bool ?? false) ? " (Short)" : ""
-            lines.append("  • \(names[network] ?? network): \(target["channel"] as? String ?? "")\(short)")
+            let placementLabels = ["feed": t("Post", "Publicación"), "story": t("Story", "Historia"),
+                                   "status": t("Status", "Estado")]
+            let label = placementLabels[target["placement"] as? String ?? ""].map { " · " + $0 } ?? ""
+            let cover: String
+            if let seconds = target["cover_second"] as? Double {
+                let timestamp = seconds.formatted(.number.locale(Locale(identifier: t("en_US", "es_EC"))))
+                cover = t(" · Cover at \(timestamp) s", " · Portada en el segundo \(timestamp)")
+            } else if target["cover"] as? String == "image" {
+                cover = t(" · Cover image", " · Imagen de portada")
+            } else { cover = "" }
+            let channel = network == "whatsapp" ? t("WhatsApp Status", "Estado de WhatsApp") : target["channel"] as? String ?? ""
+            lines.append("  • \(names[network] ?? network): \(channel)\(short)\(label)\(cover)")
         }
         if let caption = json["caption"] as? String {
             var source = json["caption_source"] as? String ?? ""
@@ -3748,6 +3845,11 @@ let uiSpanish: [String: String] = [
     "Couldn't save your caption.": "No se pudo guardar tu texto.",
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
+    "Create drafts for": "Crear borradores de",
+    "Video cover": "Portada del video",
+    "Choose image…": "Elegir imagen…",
+    "Second": "Segundo",
+    "Enter a second in the video, such as 12.5.": "Ingresa un segundo del video, por ejemplo 12,5.",
     "Create Drafts": "Crear borradores",
     "Saves encrypted credentials, gateway access settings if configured, and a verified Postiz export. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas, los ajustes de acceso seguro si están configurados y un respaldo verificado de Postiz. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
     "Cut": "Cortar",
@@ -4016,6 +4118,14 @@ if CommandLine.arguments.contains("--verify-ui") {
     defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
     precondition(delegate.newPost!.preview.title == "👨‍🍳 Bake idea")
+    delegate.newPost!.placementMenu.selectItem(at: 2)
+    defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Solo historias")
+    defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Stories only")
+    delegate.newPost!.placementMenu.selectItem(at: 0)
     delegate.application(app, open: [URL(string: "postforge://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
     delegate.newPost!.window.orderOut(nil)
@@ -4060,6 +4170,8 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.windowWork = 2
     precondition(NSApp.dockTile.badgeLabel == "2")
     precondition(delegate.statusItem.button?.title == " 2 •")
+    precondition(delegate.statusItem.button?.image?.size.height == 18)
+    precondition(delegate.statusItem.button?.imageScaling == .scaleNone)
     delegate.windowWork = 0
     precondition(NSApp.dockTile.badgeLabel == nil)
 

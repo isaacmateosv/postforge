@@ -19,9 +19,23 @@ YouTube Shorts mañana a las 9 a. m. Texto: «Esto es lo que hicimos esta semana
 4. Pulsa **👨‍🍳 Hornea la idea**. Revisa la hora, los canales, el texto y los avisos sobre el video.
 5. Pulsa **Crear borradores** y abre el **calendario de Postiz**. Revisa el borrador y aprueba la programación ahí.
 
+## Elige los formatos y la portada
+
+En la ventana de publicación, usa **Crear borradores de** para elegir publicaciones,
+historias o ambos formatos. **Automático** sigue tu instrucción. «Publica en todas
+las redes» incluye publicaciones e historias donde se admiten. Las historias
+requieren fotos o videos. WhatsApp usa su propio formato de Estado.
+
+Si adjuntas un solo video, en **Portada del video** puedes elegir una imagen aparte
+o ingresar un segundo, por ejemplo `12,5`. El plan muestra qué borradores pueden
+usar la portada. Los reels de Instagram admiten ambas opciones. En los videos
+normales de YouTube puedes usar una imagen o un fotograma extraído del video.
+En publicación directa de TikTok puedes indicar el segundo. Para los envíos a
+la bandeja de TikTok y YouTube Shorts, elige la portada en la plataforma.
+
 ## Usa WhatsApp o Siri
 
-Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras PostForge esté encendido. Revisa el plan que te devuelve. Al confirmarlo, se preparan los borradores. Revisa los borradores de redes sociales en Postiz.
+Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras PostForge esté encendido. Revisa el plan que te devuelve. Al confirmarlo, se preparan los borradores. Revisa los borradores de redes sociales en Postiz. Antes del texto, escribe «solo publicaciones», «solo historias», «publicaciones e historias» o «portada en el segundo 12,5». Para usar una imagen aparte, adjunta un video y una foto y escribe «imagen de portada». La respuesta muestra el plan y los comandos para aprobarlo o rechazarlo y reenviar tu pedido.
 
 En tu Mac, importa **Nueva publicación en PostForge** con **Atajos de Siri…** en Ayuda y dile ese nombre a Siri. El atajo abre la ventana de publicación. Elige **Encender** ahí si los servicios están inactivos.
 
