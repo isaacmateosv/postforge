@@ -2131,6 +2131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         updateButton()
         newPost?.refreshState(state)
         newPost?.refreshPlacementLabels()
+        newPost?.refreshStepLabels()
         newPost?.updateCaptionVersions()
         if let report = newPost?.lastReport { newPost?.report(report.0, dryRun: report.1, exitCode: report.2) }
         if let state = state { whatsappWindow?.refresh(state) }
@@ -2563,6 +2564,80 @@ final class UserGuideWindow: NSObject {
 /// "New Post…": files plus one sentence (typed or dictated) become one Postiz draft per network at
 /// that time. Preview shows the plan; Create Drafts makes them. Nothing publishes until approved in
 /// Postiz (HITL). The work is done by scripts/plan-post.sh --json.
+private final class ComposerSteps: NSTextField {
+    private let accent = NSColor(srgbRed: 0.55, green: 0.79, blue: 1, alpha: 1)
+    private var text = ""
+    private var timer: Timer?
+    private var interactionMonitor: Any?
+    var isAnimating: Bool { timer != nil }
+
+    func updateText(_ text: String) {
+        self.text = text
+        setAccessibilityLabel(text)
+        render()
+    }
+
+    func startSweep(in window: NSWindow) {
+        stopSweep()
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let start = ProcessInfo.processInfo.systemUptime
+        interactionMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown, .scrollWheel]
+        ) { [weak self, weak window] event in
+            if event.window === window { self?.stopSweep() }
+            return event
+        }
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24, repeats: true) { [weak self, weak window] _ in
+            guard let self else { return }
+            let progress = (ProcessInfo.processInfo.systemUptime - start) / 1.8
+            guard progress < 1, window?.isVisible == true else {
+                self.stopSweep()
+                return
+            }
+            self.render(progress: progress)
+        }
+    }
+
+    func stopSweep() {
+        timer?.invalidate()
+        timer = nil
+        if let interactionMonitor {
+            NSEvent.removeMonitor(interactionMonitor)
+            self.interactionMonitor = nil
+        }
+        render()
+    }
+
+    deinit {
+        timer?.invalidate()
+        if let interactionMonitor { NSEvent.removeMonitor(interactionMonitor) }
+    }
+
+    private func render(progress: Double? = nil) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byWordWrapping
+        let line = NSMutableAttributedString(string: text, attributes: [
+            .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: accent, .paragraphStyle: style,
+        ])
+        if let progress {
+            let width = 10.0
+            let center = progress * (Double(line.length) + 2 * width) - width
+            let start = max(0, Int(center - width))
+            let end = min(line.length, Int(center + width) + 1)
+            if start < end {
+                for index in start..<end {
+                    let strength = max(0, 1 - abs(Double(index) - center) / width)
+                    if let color = accent.blended(withFraction: strength, of: .white) {
+                        line.addAttribute(.foregroundColor, value: color, range: NSRange(location: index, length: 1))
+                    }
+                }
+            }
+        }
+        attributedStringValue = line
+    }
+}
+
 private final class MixingIndicator: NSView {
     private var timer: Timer?
     private var phase = 0.0
@@ -2620,6 +2695,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let turnOnButton = NSButton(title: "", target: nil, action: nil)
     let connections = NSTextField(wrappingLabelWithString: "")
     let instruction = NSTextView()
+    private let steps = ComposerSteps()
     let result = NSTextView()
     let preview = NSButton(title: "Preview", target: nil, action: nil)
     let create = NSButton(title: "Create Drafts", target: nil, action: nil)
@@ -2678,9 +2754,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     func show() {
+        let opening = !window.isVisible
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(instruction)
         NSApp.activate(ignoringOtherApps: true)
+        if opening { steps.startSweep(in: window) }
+    }
+
+    func refreshStepLabels() {
+        steps.updateText(t("1. Bake your idea  →  2. Review the plan  →  3. Create drafts",
+                           "1. Hornea la idea  →  2. Revisa el plan  →  3. Crea los borradores"))
     }
 
     func t(_ english: String, _ spanish: String) -> String {
@@ -2922,9 +3005,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         actions.spacing = 10
         actions.alignment = .centerY
 
-        let steps = caption(t("1. Bake your idea     →     2. Review the plan     →     3. Create drafts",
-                              "1. Hornea la idea     →     2. Revisa el plan     →     3. Crea los borradores"))
-        steps.font = .systemFont(ofSize: 11, weight: .medium)
+        steps.isEditable = false
+        steps.isSelectable = false
+        steps.isBordered = false
+        steps.drawsBackground = false
+        steps.maximumNumberOfLines = 2
+        refreshStepLabels()
 
         // Plan: a read-only result. Until there is one, an empty state explains what happens next.
         result.string = ""
@@ -3011,7 +3097,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         planHeader.alignment = .centerY
         connections.font = .systemFont(ofSize: 11)
         connections.textColor = .secondaryLabelColor
-        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, steps, actions, planHeader, planPanel, footer])
+        let main = NSStackView(views: [header, steps, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
         main.orientation = .vertical
         main.alignment = .leading
         main.spacing = 9
@@ -3023,7 +3109,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         main.setCustomSpacing(12, after: planPanel)
         main.setCustomSpacing(6, after: planHeader)
         main.translatesAutoresizingMaskIntoConstraints = false
-        for view in [header, stats, drop, coverControls, ideaPanel, actions, planHeader, planPanel, footer] {
+        for view in [header, steps, stats, drop, coverControls, ideaPanel, actions, planHeader, planPanel, footer] {
             view.widthAnchor.constraint(equalTo: main.widthAnchor, constant: -2 * inset).isActive = true
         }
 
@@ -4230,7 +4316,6 @@ let uiSpanish: [String: String] = [
     "Couldn't save your caption.": "No se pudo guardar tu texto.",
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
-    "1. Bake your idea     →     2. Review the plan     →     3. Create drafts": "1. Hornea la idea     →     2. Revisa el plan     →     3. Crea los borradores",
     "Approve Status…": "Aprobar Estado…",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
@@ -4526,6 +4611,18 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Stories only")
     delegate.newPost!.placementMenu.selectItem(at: 0)
     let composer = delegate.newPost!
+    let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
+    let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
+    precondition(steps.stringValue.hasPrefix("1. Bake your idea"))
+    defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(steps.stringValue.hasPrefix("1. Hornea la idea"))
+    defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    steps.startSweep(in: composer.window)
+    precondition(steps.isAnimating != NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    steps.stopSweep()
+    precondition(!steps.isAnimating)
     precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
     let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","video_cover_available":true,"warnings":["Sample warning"]}"#
     composer.report(planFixture, dryRun: true, exitCode: 0)
