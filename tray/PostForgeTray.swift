@@ -1174,6 +1174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         optionsItem.isEnabled = up
         menu.addItem(optionsItem)
         menu.addItem(action(text("Open Postiz Calendar", "Abrir calendario de Postiz"), #selector(openPostiz), enabled: up))
+        menu.addItem(action(text("WhatsApp Plans & Receipts…", "Planes y confirmaciones de WhatsApp…"), #selector(reviewWhatsAppPlans), enabled: true))
         if isOff {
             menu.addItem(action(st?.state == "partial" ? text("Restore All Services", "Restaurar todos los servicios") :
                                 text("Turn On", "Encender"),
@@ -1275,7 +1276,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                       action: nil, keyEquivalent: "")
         audienceItem.submenu = audienceMenu
         menu.addItem(audienceItem)
-        menu.addItem(action(text("WhatsApp Plans & Receipts…", "Planes y confirmaciones de WhatsApp…"), #selector(reviewWhatsAppPlans), enabled: true))
         menu.addItem(action(text("Open WhatsApp Manager", "Abrir WhatsApp Manager"), #selector(openEvolution), enabled: up))
         menu.addItem(action(text("Tunnel URL…", "URL del túnel…"), #selector(editTunnelURL), enabled: busy == nil))
         menu.addItem(action(text("Gateway Access…", "Acceso a la puerta de enlace…"), #selector(editGatewayAccess), enabled: busy == nil))
@@ -4271,6 +4271,10 @@ if CommandLine.arguments.contains("--verify-ui") {
         }?.submenu
         precondition(draftOptions?.items.filter { $0.action == #selector(AppDelegate.openDraftOption(_:)) }.map(\.tag) == [1, 2, 3, 4, 5])
         let settings = trayMenu.items.compactMap(\.submenu).last!
+        let reviewTitle = language == "es" ? "Planes y confirmaciones de WhatsApp…" : "WhatsApp Plans & Receipts…"
+        let review = trayMenu.items.first { $0.title == reviewTitle }
+        precondition(review?.action == #selector(AppDelegate.reviewWhatsAppPlans) && review?.isEnabled == true)
+        precondition(settings.items.allSatisfy { $0.action != #selector(AppDelegate.reviewWhatsAppPlans) })
         precondition(settings.items.allSatisfy { $0.title != updates && $0.title != about })
     }
 
