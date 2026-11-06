@@ -125,6 +125,8 @@ class Operations(unittest.TestCase):
                 plan = plan_post.plan({}, text, ["clip.mp4"], None, now)
                 result = plan_post.run({}, plan, True)
                 self.assertEqual({(t["network"], t["placement"]) for t in result["targets"]}, expected)
+                self.assertEqual(result["video_without_cover"], any(
+                    network == "instagram" and placement == "feed" for network, placement in expected))
             postiz.create_draft.assert_not_called()
             postiz.upload.assert_not_called()
 

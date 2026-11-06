@@ -490,7 +490,11 @@ def run(env, p, dry_run):
         thread_caption = caption
         if any(network == "threads" for network, _, _ in usable):
             thread_caption = p.get("reviewed_threads_caption") or threads_caption(env, caption, p["lang"])
+        cover_available = kinds == ["video"] and any(
+            cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
+                       "video_cover_available": cover_available,
+                       "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
                                     "placement": place, "cover": mode, "cover_second": second if mode else None}
