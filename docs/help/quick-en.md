@@ -21,6 +21,7 @@ YouTube Shorts tomorrow at 9 a.m. Caption: “Here’s what we made this week.�
 
 ## Choose formats and a cover
 
+Use **Draft Options** in the menu bar for shortcuts to the formats and cover controls.
 In the composer, use **Create drafts for** to choose posts, stories, or both.
 **Automatic** follows your instruction. “Post everywhere” includes posts and
 stories where supported. Stories need media. WhatsApp uses its own Status format.

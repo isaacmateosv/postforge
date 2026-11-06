@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.3]
+
+- Add menu bar shortcuts for draft formats, cover images, and cover timestamps.
+
 ## [2.0.0-rc.2]
 
 - Choose posts, stories, or both in the Mac composer and WhatsApp plans.
