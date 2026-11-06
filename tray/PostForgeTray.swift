@@ -3368,6 +3368,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             if !source.isEmpty { line(source, size: 11, color: .secondaryLabelColor) }
             line(caption)
         }
+        if let title = json["youtube_title"] as? String {
+            let length = title.utf16.count
+            line(t("▶  YouTube title · \(length)/100", "▶  Título de YouTube · \(length)/100"),
+                 weight: .semibold, before: 9)
+            line(title)
+        }
         if let threadsCaption = json["threads_caption"] as? String {
             line(t("✍️  Threads caption", "✍️  Texto para Threads"), weight: .semibold, before: 9)
             line(threadsCaption)

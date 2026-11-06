@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.10]
+
+- Preview the YouTube title and enforce its 100-character limit separately from the caption.
+
 ## [2.0.0-rc.9]
 
 - Confirm missing video covers before review and require an explicit edit to change a reviewed cover.
