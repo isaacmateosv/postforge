@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.6]
+
+- Move WhatsApp Plans & Receipts to the top-level menu bar menu.
+- Hold WhatsApp Status sends for review after uncertain delivery, and prepare smaller clips for Evolution.
+
 ## [2.0.0-rc.5]
 
 - Improve generated caption tone, hashtag layout, and contextual emoji filtering.
