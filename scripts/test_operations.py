@@ -78,6 +78,19 @@ class Operations(unittest.TestCase):
             self.assertEqual([call.args[1] for call in postiz.create_draft.call_args_list],
                              ["Reviewed Threads text", "Reviewed caption", "Reviewed caption"])
 
+    def test_caption_intent_distinguishes_brief_from_exact_text(self):
+        instruction = 'post everywhere today at 6:40 pm; escribe sobre una torta para “Liga Deportiva Universitaria”'
+        command, exact, idea = plan_post.split_instruction(instruction)
+        self.assertEqual(command.strip(" ;"), "post everywhere today at 6:40 pm")
+        self.assertIsNone(exact)
+        self.assertEqual(idea, 'una torta para “Liga Deportiva Universitaria”')
+        _, exact, idea = plan_post.split_instruction('Instagram hoy 6pm; texto: “Frutillas y chantilly 🍓”')
+        self.assertEqual(exact, "Frutillas y chantilly 🍓")
+        self.assertIsNone(idea)
+        self.assertEqual(create_draft.fitting_emojis("Una torta 🎂", "torta de frutillas"), "Una torta 🍓")
+        self.assertEqual(create_draft.finish("Torta de frutillas 🍓.", "Spanish", topic="torta de frutillas"),
+                         "Torta de frutillas. 🍓")
+
     def test_topic_first_colloquial_post_everywhere(self):
         now = datetime(2026, 11, 5, 12, tzinfo=plan_post.ZoneInfo("America/Guayaquil"))
         text = "galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias"

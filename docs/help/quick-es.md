@@ -21,6 +21,8 @@ También puedes poner primero la idea y separarla con punto y coma. Por ejemplo,
 4. Pulsa **👨‍🍳 Hornea la idea**. Revisa la hora, los canales, el texto y los avisos sobre el video.
 5. Pulsa **Crear borradores** y abre el **calendario de Postiz**. Revisa el borrador y aprueba la programación ahí.
 
+Usa `idea:` o `escribe sobre` para pedir que PostForge redacte el texto. Usa `texto:` para que conserve tus palabras tal cual. Si el texto fue generado, pulsa **Otra versión del texto…** para probar una alternativa. **Versiones anteriores…** recupera el pedido y su vista previa. Las versiones se guardan mientras trabajas con los mismos archivos y opciones. Al crear borradores se usa la versión seleccionada.
+
 ## Elige los formatos y la portada
 
 Abre **Opciones de borrador** en la barra de menús para acceder a los formatos y la portada.

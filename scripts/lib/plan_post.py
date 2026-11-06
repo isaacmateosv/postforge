@@ -68,7 +68,7 @@ PERIOD = r"(?:de|en|por) la (manana|tarde|noche)|in the (morning|afternoon|eveni
 PERIOD_HOUR = {"manana": 9, "morning": 9, "tarde": 15, "afternoon": 15, "noche": 19, "evening": 19, "night": 19}
 EXACT_MARK = re.compile(r"\b(?:texto|text|caption|copy|que diga)\s*:\s*", re.IGNORECASE)
 # "idea:" typed, or "Idea, …" / "Idea. …" as speech transcribes it.
-IDEA_MARK = re.compile(r"\b(?:la idea es(?: que)?|con la idea de(?: que)?|sobre|about|saying|diciendo)\b\s*"
+IDEA_MARK = re.compile(r"\b(?:la idea es(?: que)?|con la idea de(?: que)?|escribe sobre|redacta sobre|write about|sobre|about|saying|diciendo)\b\s*"
                        r"|\b(?:idea|tema)\b\s*[:,.\-–—]\s*", re.IGNORECASE)
 QUOTED = re.compile(r"[\"“”«»]([^\"“”«»]{3,})[\"“”«»]")
 DEFAULT_HOUR = 18  # a day without a time: 18:00, said in the plan so you can change it while reviewing
@@ -89,6 +89,9 @@ def split_instruction(text):
     quoted = QUOTED.search(text)
     exact_mark = EXACT_MARK.search(text)
     idea_mark = IDEA_MARK.search(text)
+    if (idea_mark and (not exact_mark or idea_mark.start() < exact_mark.start())
+            and (not quoted or idea_mark.start() < quoted.start())):
+        return text[:idea_mark.start()], None, text[idea_mark.end():].strip(" ;,.:") or None
     if quoted and (not exact_mark or quoted.start() < exact_mark.start()):
         return text[:quoted.start()] + " " + text[quoted.end():], quoted.group(1).strip(), None
     if exact_mark:
@@ -459,7 +462,11 @@ def run(env, p, dry_run):
         elif p["exact"]:
             caption, source = p["exact"], "your text"
         elif p["idea"]:
-            caption, model, _ = ollama_caption(env, p["idea"], p["lang"])
+            previous = p.get("alternate_caption")
+            if previous:
+                caption, model, _ = ollama_caption(env, p["idea"], p["lang"], previous=previous)
+            else:
+                caption, model, _ = ollama_caption(env, p["idea"], p["lang"])
             source = "written by %s from your idea" % model
         else:
             caption = ("✍️ Escribe aquí el texto de esta publicación." if p["lang"] == "Spanish"
@@ -573,6 +580,7 @@ def main():
     parser.add_argument("--placement", choices=("both", "feed", "story"), help="override the instruction's placement")
     parser.add_argument("--cover-image", help="image file to use as the video cover")
     parser.add_argument("--cover-second", help="video timestamp in seconds")
+    parser.add_argument("--alternate-caption", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-threads-caption", help=argparse.SUPPRESS)
     parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
@@ -591,6 +599,8 @@ def main():
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
     p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz), placement_override=args.placement,
              cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
+    if args.dry_run and args.alternate_caption:
+        p["alternate_caption"] = args.alternate_caption
     if not args.dry_run and args.reviewed_caption:
         p["reviewed_caption"] = args.reviewed_caption
         p["reviewed_threads_caption"] = args.reviewed_threads_caption

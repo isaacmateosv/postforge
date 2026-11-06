@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.8]
+
+- Clarify generated versus exact captions and improve Ecuadorian Spanish caption prompts.
+- Generate alternate captions and restore earlier versions from the Mac composer.
+
 ## [2.0.0-rc.7]
 
 - Add private Telegram setup with owner detection and keep the worker in the normal Mac lifecycle.

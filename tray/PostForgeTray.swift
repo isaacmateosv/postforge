@@ -2131,6 +2131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         updateButton()
         newPost?.refreshState(state)
         newPost?.refreshPlacementLabels()
+        newPost?.updateCaptionVersions()
         if let report = newPost?.lastReport { newPost?.report(report.0, dryRun: report.1, exitCode: report.2) }
         if let state = state { whatsappWindow?.refresh(state) }
         if aboutWindow?.isVisible == true { showAbout() }
@@ -2595,6 +2596,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var previewed = false
     var reviewedCaption: String?
     var reviewedThreadsCaption: String?
+    let captionVersions = NSPopUpButton()
+    let alternateCaption = NSButton()
+    var savedVersions: [(instruction: String, output: String)] = []
+    var selectedVersion: Int?
+    var canGenerateVariant = false
+    var working = false
     var lastReport: (String, Bool, Int32)?
 
     init(project: String) {
@@ -2918,7 +2925,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         footer.alignment = .centerY
 
         let mediaLabel = caption(t("Photos & videos", "Fotos y videos"))
-        let ideaLabel = caption(t("Your idea", "Tu idea"))
+        let ideaLabel = caption(t("Your request", "Tu pedido"))
+        ideaPanel.toolTip = t("Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.",
+                              "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.")
         let planLabel = caption(t("Plan", "Plan"))
         let planSpacer = NSView()
         planSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
@@ -2927,7 +2936,15 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         statusApproval.action = #selector(approveStatusFromPlan)
         statusApproval.controlSize = .small
         statusApproval.isHidden = true
-        let planHeader = NSStackView(views: [planLabel, planSpacer, statusApproval, calendar])
+        captionVersions.target = self
+        captionVersions.action = #selector(restoreCaptionVersion)
+        captionVersions.controlSize = .small
+        alternateCaption.title = t("Another Caption…", "Otra versión del texto…")
+        alternateCaption.target = self
+        alternateCaption.action = #selector(runAlternateCaption)
+        alternateCaption.controlSize = .small
+        updateCaptionVersions()
+        let planHeader = NSStackView(views: [planLabel, planSpacer, captionVersions, alternateCaption, statusApproval, calendar])
         planHeader.alignment = .centerY
         connections.font = .systemFont(ofSize: 11)
         connections.textColor = .secondaryLabelColor
@@ -2979,13 +2996,50 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     @objc func draftOptionsChanged() {
+        savedVersions.removeAll()
+        invalidateReviewedPlan()
+    }
+
+    func invalidateReviewedPlan() {
         inputRevision += 1
+        selectedVersion = nil
+        canGenerateVariant = false
         lastReport = nil
         reviewedCaption = nil
         reviewedThreadsCaption = nil
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
+        updateCaptionVersions()
+    }
+
+    func updateCaptionVersions() {
+        captionVersions.removeAllItems()
+        captionVersions.addItem(withTitle: t("Previous versions…", "Versiones anteriores…"))
+        for index in savedVersions.indices {
+            captionVersions.addItem(withTitle: t("Version \(index + 1)", "Versión \(index + 1)"))
+        }
+        captionVersions.selectItem(at: selectedVersion.map { $0 + 1 } ?? 0)
+        captionVersions.isHidden = savedVersions.isEmpty
+        captionVersions.isEnabled = !working
+        alternateCaption.isHidden = !canGenerateVariant
+        alternateCaption.isEnabled = !working
+    }
+
+    @objc func restoreCaptionVersion() {
+        let index = captionVersions.indexOfSelectedItem - 1
+        guard !working, savedVersions.indices.contains(index) else { return }
+        let entry = savedVersions[index]
+        instruction.string = entry.instruction
+        placeholder.isHidden = !entry.instruction.isEmpty
+        inputRevision += 1
+        selectedVersion = index
+        report(entry.output, dryRun: true, exitCode: 0)
+    }
+
+    @objc func runAlternateCaption() {
+        guard canGenerateVariant, let reviewedCaption else { return }
+        run(dryRun: true, previousCaption: reviewedCaption)
     }
 
     @objc func chooseCoverImage() {
@@ -3027,7 +3081,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     func textDidChange(_ notification: Notification) {
         placeholder.isHidden = !instruction.string.isEmpty
-        draftOptionsChanged()
+        invalidateReviewedPlan()
     }
 
     @objc func startDictation() {
@@ -3071,7 +3125,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         emptyState.isHidden = !text.isEmpty
     }
 
-    func run(dryRun: Bool) {
+    func run(dryRun: Bool, previousCaption: String? = nil) {
+        guard !working else { return }
         if (NSApp.delegate as? AppDelegate)?.state?.state == "off" {
             show(t("Turn on PostForge to prepare a plan.", "Enciende PostForge para preparar un plan."))
             return
@@ -3094,12 +3149,15 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         if !second.isEmpty { args += ["--cover-second=\(second)"] }
         if dryRun {
             args.append("--dry-run")
+            if let previousCaption { args.append("--alternate-caption=\(previousCaption)") }
         } else if let reviewedCaption {
             args.append("--reviewed-caption=\(reviewedCaption)")
             if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
         }
         for url in media { args += ["--media", url.path] }
         args.append(text)
+        working = true
+        updateCaptionVersions()
         preview.isEnabled = false
         create.isEnabled = false
         previewed = false
@@ -3114,21 +3172,32 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                     delegate.planningWork -= 1
                     delegate.poll()
                 }
+                self.working = false
                 self.preview.isEnabled = true
-                self.report(output, dryRun: dryRun, exitCode: code)
-                if revision != self.inputRevision {
-                    self.draftOptionsChanged()
-                    if dryRun {
-                        self.show(self.t("The draft options changed. Bake the idea again to review them.",
-                                         "Cambiaste las opciones del borrador. Vuelve a hornear la idea para revisarlas."))
-                    }
+                if dryRun && revision != self.inputRevision {
+                    self.invalidateReviewedPlan()
+                    self.show(self.t("The draft options changed. Bake the idea again to review them.",
+                                     "Cambiaste las opciones del borrador. Vuelve a hornear la idea para revisarlas."))
+                    return
                 }
+                self.report(output, dryRun: dryRun, exitCode: code)
+                if dryRun && self.previewed {
+                    self.savedVersions.append((instruction: text, output: output))
+                    if self.savedVersions.count > 8 { self.savedVersions.removeFirst() }
+                    self.selectedVersion = self.savedVersions.count - 1
+                } else if !dryRun && code == 0 {
+                    self.savedVersions.removeAll()
+                    self.selectedVersion = nil
+                }
+                self.updateCaptionVersions()
             }
         }
     }
 
     func report(_ output: String, dryRun: Bool, exitCode: Int32) {
         lastReport = (output, dryRun, exitCode)
+        canGenerateVariant = false
+        defer { updateCaptionVersions() }
         guard let json = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any] else {
             return show("✖ \(dryRun ? t("Preview", "Vista previa") : t("Draft creation", "Creación de borradores")) \(t("failed", "falló")) (\(exitCode)).\n"
                         + String(output.suffix(800)))
@@ -3213,6 +3282,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         } else {
             statusApproval.isHidden = true
             reviewedCaption = json["caption"] as? String
+            canGenerateVariant = (json["caption_source"] as? String)?.hasPrefix("written by ") == true
             reviewedThreadsCaption = json["threads_caption"] as? String
             previewed = reviewedCaption != nil
             preview.bezelColor = nil
@@ -4233,6 +4303,9 @@ let uiSpanish: [String: String] = [
     "You can finish by deleting ~/postforge by hand.": "Puedes terminar borrando ~/postforge a mano.",
     "You will need this passphrase to restore. It can't be recovered if you forget it.": "Necesitarás esta contraseña para restaurar. No se puede recuperar si la olvidas.",
     "Your idea": "Tu idea",
+    "Your request": "Tu pedido",
+    "Another Caption…": "Otra versión del texto…",
+    "Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.": "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.",
     "Your plan appears here": "Tu plan aparecerá aquí",
     "• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The PostForge Docker containers and installer files\n": "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores de Docker y los archivos de instalación de PostForge\n",
     "⚠︎ NO BACKUP WAS EXPORTED. If you continue, everything above is lost and cannot be recovered.": "⚠︎ NO SE EXPORTÓ NINGÚN RESPALDO. Si continúas, todo lo anterior se pierde y no se puede recuperar.",
@@ -4337,7 +4410,15 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(composer.result.string.contains("Destinations"))
     precondition(composer.result.string.contains("Things to check"))
     precondition(composer.ideaHeight?.constant == 64 && composer.create.isEnabled)
+    let variant = #"{"when_local":"19:15","caption":"Earlier version","caption_source":"written by test from your idea"}"#
+    composer.savedVersions = [(instruction: "Earlier idea", output: variant)]
+    composer.updateCaptionVersions()
+    composer.captionVersions.selectItem(at: 1)
+    composer.restoreCaptionVersion()
+    precondition(composer.instruction.string == "Earlier idea")
+    precondition(composer.reviewedCaption == "Earlier version" && !composer.alternateCaption.isHidden)
     composer.draftOptionsChanged()
+    precondition(composer.captionVersions.isHidden)
     precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
     delegate.application(app, open: [URL(string: "postforge://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
