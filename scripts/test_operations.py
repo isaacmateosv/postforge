@@ -302,6 +302,26 @@ class Operations(unittest.TestCase):
             self.assertEqual(env.read_bytes(), original)
             self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
+    def test_whatsapp_uncertain_delivery_is_not_retried(self):
+        import whatsapp_pending
+
+        item = {"id": "aabbcc112233", "status": "pending", "approved": True,
+                "approval_source": "explicit-whatsapp-command", "when": "2026-01-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(whatsapp_pending, "QUEUE_FILE", str(Path(folder) / "queue.json")), \
+             patch.object(whatsapp_pending, "_send_item", side_effect=TimeoutError) as send:
+            whatsapp_pending._write([item])
+            whatsapp_pending.process({})
+            whatsapp_pending.process({})
+            send.assert_called_once()
+            self.assertEqual(whatsapp_pending._read()[0]["status"], "needs_review")
+            self.assertIsNone(whatsapp_pending.approve(item["id"]))
+            whatsapp_pending._write([dict(item, status="sending")])
+            self.assertEqual(whatsapp_pending.recover_interrupted(), 1)
+            whatsapp_pending.process({})
+            send.assert_called_once()
+            self.assertEqual(whatsapp_pending._read()[0]["review_reason"], "send_interrupted")
+
     def test_status_approval_sends_exact_reference_to_own_chat(self):
         reference = "aabbcc112233"
         env = {}

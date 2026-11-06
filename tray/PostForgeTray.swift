@@ -44,6 +44,7 @@ struct WhatsAppPending: Decodable {
     let pending: Int
     let awaitingApproval: Int
     let approved: Int
+    let needsReview: Int?
     let confirmations: Int
     let next: String?
 }
@@ -1196,6 +1197,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             }
             if let errors = st.failedPosts, errors > 0 {
                 attention.append(info(text("⚠︎ \(plural(errors, "post")) failed in the last 24 h", "⚠︎ \(errors) publicaciones fallaron en 24 h")))
+            }
+            if let count = st.pending.whatsapp?.needsReview, count > 0 {
+                attention.append(info(text("⚠︎ WhatsApp Status delivery needs review (\(count))",
+                                           "⚠︎ Hay Estados de WhatsApp por revisar (\(count))")))
             }
             if let wa = st.pending.whatsapp, wa.confirmations > 0 {
                 attention.append(action(text("Review WhatsApp Plans (\(wa.confirmations))…", "Revisar planes de WhatsApp (\(wa.confirmations))…"),
