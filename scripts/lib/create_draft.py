@@ -27,16 +27,18 @@ NEEDS_MEDIA = {"instagram": "Instagram", "instagram-standalone": "Instagram", "t
                "youtube": "YouTube"}
 
 PROMPT = """Write one social media caption in {lang} about: {topic}
-- Write like a person talking to their audience. Use one or two short sentences with a specific hook or an easy question. Avoid stock openings such as “Enjoy our delicious”.
+- Write like a person talking to their audience. Use at most two short sentences. Lead with a specific detail from the topic, then ask at most one question. Avoid stock openings such as “Enjoy our delicious”.
 - Use zero to two emojis only if they fit the subject. Put them after a complete sentence.
 - Use only the facts in the topic. Do not invent a business name, prices, dates, locations or contact details.
 - Leave one blank line, then add 2 to 4 specific hashtags on one line. Every tag starts with # and contains no spaces, for example #WeekendHike. Skip generic tags and locations not given.
 Return only the caption."""
 
 PROMPT_ES = """Escribe una publicación en español de Ecuador sobre: {topic}
-- Escribe como si conversaras con tu comunidad. Usa una o dos frases cortas con un detalle del tema o una pregunta sencilla. Evita frases de cajón como «Disfruta de nuestros deliciosos». Cuida la concordancia.
+- Escribe máximo 28 palabras antes de los hashtags. Una o dos frases naturales, sin saludo ni introducción. Abre con el producto o la ocasión. Una sola pregunta, si aporta.
+- Usa el nombre del equipo o la marca tal como se indicó. Evita frases de cajón como «Disfruta de nuestros deliciosos», «la combinación perfecta» o «el regalo perfecto». Cuida la concordancia.
+- Ejemplo de tono para otro tema: «¿Qué planta pondrías junto a tu ventana? 🌿». No copies el ejemplo.
 - Usa hasta dos emojis solo si aportan al texto. Ponlos al final de una frase completa.
-- Usa solo los datos del tema. Evita inventar nombres de negocios, precios, fechas, lugares o datos de contacto.
+- Usa solo los datos del tema. No inventes frescura, ingredientes, capas, disponibilidad, regalos, precios, fechas, lugares ni datos de contacto.
 - Deja una línea en blanco y añade de 2 a 4 hashtags concretos en una sola línea. Cada etiqueta empieza con # y va sin espacios, por ejemplo #RutaDeMontaña. Evita etiquetas genéricas y lugares que no se mencionaron.
 Devuelve solo la publicación."""
 
@@ -56,10 +58,12 @@ INSTRUCTION_ECHO = re.compile(r"frases? cortas?|sobre el tema|short sentences?|a
 MORNING_CLAIM = re.compile(r"(every|each) morning|mornings|(todas las|cada|por las|en las) mañanas?", re.IGNORECASE)
 EMOJI_ALWAYS = set("❤🤍🧡💛🫶✨🌟🙂😊😋🥰📲")
 EMOJI_IF = {
+    "🍓": ("fresa", "frutilla", "strawberr"),
+    "⚽": ("fútbol", "futbol", "football", "soccer", "liga deportiva"),
     "🍞": ("pan", "guagua", "bread", "sourdough", "masa madre", "loaf", "loaves"),
     "🥐": ("croissant", "cachito"), "🎂": ("torta", "cumple", "pastel", "cake", "birthday"),
     "🧁": ("cupcake", "magdalena"), "🍪": ("galleta", "cookie"), "☕": ("café", "cafe", "coffee"),
-    "🍵": ("té ", "tea "), "🍫": ("chocolate", "cacao"), "🍓": ("fresa", "frutilla", "strawberr"),
+    "🍵": ("té ", "tea "), "🍫": ("chocolate", "cacao"),
     "🫐": ("arándano", "arandano", "mora", "blueberr", "blackberr"), "🍋": ("limón", "limon", "lemon"),
     "🍯": ("miel", "honey"), "🧀": ("queso", "cheese"), "🥥": ("coco", "coconut"),
     "🍌": ("banano", "guineo", "banana"), "🍊": ("naranja", "orange"), "🍎": ("manzana", "apple"),
@@ -119,8 +123,10 @@ def fitting_emojis(text, topic=""):
     def judge(match):
         emoji = EMOJI_SWAP.get(match.group(0), match.group(0))
         base = emoji.replace("\uFE0F", "")
+        if base == "🎂" and any(term in words for term in ("frutilla", "fresa", "strawberr")):
+            emoji = base = "🍓"
         fits = base in EMOJI_ALWAYS or any(re.search(r"(?<!\w)" + re.escape(w), words) for w in EMOJI_IF.get(base, ()))
-        if not fits or len(kept) >= 2:
+        if not fits or emoji in kept or len(kept) >= 2:
             return ""
         kept.append(emoji)
         return emoji
@@ -149,9 +155,17 @@ def finish(text, lang="English", env=None, topic=""):
     """Clean generated copy and append the operator's optional call to action."""
     body, tags = split_hashtags(PREAMBLE.sub("", text.strip()).strip().strip('"').strip())
     body = re.sub(r"[ \t]{2,}", " ", fitting_emojis(body, topic)).strip()
+    body = re.sub(r"[ \t]*((?:" + EMOJI.pattern + r"[ \t]*)+)([.!?])",
+                  lambda match: match[2] + " " + match[1].strip(), body)
     body = drop_repeats(re.sub(r"[ \t]+([,.!?;:])", r"\1", body), topic)
     if not re.search(r"\w", body):
         return ""  # nothing but emojis or punctuation survived
+    if not EMOJI.search(body) and topic:
+        words = topic.lower()
+        for emoji, terms in EMOJI_IF.items():
+            if any(re.search(r"(?<!\w)" + re.escape(term), words) for term in terms):
+                body += " " + emoji
+                break
     lang = language(lang)
     cta = (env or {}).get(CTA_SETTING.get(lang, ""), "").strip()
     if cta or not ORDER_CHANNEL.search(topic):
@@ -169,20 +183,26 @@ def finish(text, lang="English", env=None, topic=""):
     return caption + ("\n\n" + " ".join(unique[:5]) if unique else "")
 
 
-def ollama_caption(env, topic, lang):
+def ollama_caption(env, topic, lang, *, previous=None):
     base = env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/")
     model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")  # picked in the owner's blind test, 2026-10-31
     seconds = 0.0
+    prompt = build_prompt(topic, lang)
+    if previous:
+        instruction = ("Redacta una alternativa con un inicio diferente. Conserva los hechos del tema."
+                       if language(lang) == "Spanish" else
+                       "Write an alternative with a different opening. Keep the facts from the topic.")
+        prompt += f"\n\n{instruction}\n<previous-caption>\n{previous[:600]}\n</previous-caption>"
     for attempt in (1, 2):  # a second try when the guards leave nothing usable
         try:
             status, data = pmlib.http("POST", base + "/api/generate", body={
                 "model": model,
-                "prompt": build_prompt(topic, lang),
+                "prompt": prompt,
                 "stream": False,
                 "keep_alive": 0,  # evict from unified memory as soon as the caption is done
                 # captions need < 1k tokens; a 2048 context halves the KV cache (target: 8 GB MacBook Air)
                 # 0.5: steadier wording from small models (the A/B saw "se desploman por la ciudad" at 0.7)
-                "options": {"temperature": 0.5, "num_predict": 260, "num_ctx": 2048},
+                "options": {"temperature": 0.65 if previous else 0.5, "num_predict": 180, "num_ctx": 2048},
             }, timeout=600)
         except PMError:
             raise PMError("Ollama is not reachable at %s. Run ./publish-machine.sh start." % base)
@@ -190,7 +210,7 @@ def ollama_caption(env, topic, lang):
             raise PMError("Ollama returned HTTP %s: %s" % (status, str(data)[:300]))
         seconds += data.get("total_duration", 0) / 1e9
         text = finish(data.get("response", ""), lang, env, topic)
-        if text:
+        if text and (not previous or text.casefold() != previous.casefold()):
             return text, model, round(seconds, 1)
     raise PMError("The model's caption didn't pass the checks twice. Try again, or pass your own text with --no-ai.")
 

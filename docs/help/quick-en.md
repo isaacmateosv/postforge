@@ -21,6 +21,8 @@ You can also put the idea first, followed by a semicolon, such as “Cookies and
 4. Click **👨‍🍳 Bake idea**. Check the time, channels, caption, and video warnings.
 5. Click **Create Drafts**, then open **Postiz Calendar**. Review the draft and approve the schedule there.
 
+Use `idea:` or `write about` to ask PostForge to write a caption. Use `caption:` or `text:` to supply the final wording. For generated text, choose **Another Caption…** to try a new version. **Previous versions…** restores a saved request and its preview. Versions are kept while you work in the composer with the same files and draft options. The selected preview is the one used to create drafts.
+
 ## Choose formats and a cover
 
 Use **Draft Options** in the menu bar for shortcuts to the formats and cover controls.
