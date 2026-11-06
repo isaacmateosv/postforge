@@ -48,7 +48,7 @@ NETWORKS = {  # network: (words that name it, Postiz identifiers)
     "threads": (("threads",), ("threads",)),
     "whatsapp": (("whatsapp", "whats app", "wa"), ()),
 }
-ALL_WORDS = re.compile(r"\b(todas las redes|en todas|todas partes|todos lados|post everywhere|everywhere|all networks|all platforms)\b")
+ALL_WORDS = re.compile(r"\b(todas las redes|en todas|todas partes|todo(?:s)? (?:lado(?:s)?|sitio(?:s)?)|post everywhere|everywhere|all networks|all platforms)\b")
 TEXT_APPROVED = re.compile(r"\b(?:only text approved|solo texto aprobado)\b")
 MIN_SCHEDULE_LEAD = timedelta(minutes=5)
 NAMES = {"instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
@@ -95,6 +95,10 @@ def split_instruction(text):
         return text[:exact_mark.start()], text[exact_mark.end():].strip(" \"“”") or None, None
     if idea_mark:
         return text[:idea_mark.start()], None, text[idea_mark.end():].strip(" ;,.:") or None
+    idea, separator, command = text.partition(";")
+    if (separator and idea.strip() and parse_networks(command)[0]
+            and re.search(r"\b(?:postea(?:r)?|publica(?:r)?|sube|post|publish|upload)\b", plain(command))):
+        return command.strip(), None, idea.strip()
     return text, None, None
 
 
@@ -235,7 +239,7 @@ COVER_ATTACHMENT = re.compile(r"\b(?:cover image|foto de portada|imagen de porta
 def placement(command):
     words = plain(command)
     story = bool(re.search(r"\b(story|stories|historia|historias)\b", words))
-    feed = bool(re.search(r"\b(feed|posts|publicacion|publicaciones)\b|\bpost and stor", words))
+    feed = bool(re.search(r"\b(feed|posts|publicacion|publicaciones)\b|\bpost (?:and|y|e) stor", words))
     if re.search(r"\b(?:(?:only|solo|just)\s+(?:story|stories|historia|historias)|(?:story|stories) only)\b", words):
         return "story"
     if re.search(r"\b(?:(?:only|solo|just)\s+(?:feed|posts?|publicacion|publicaciones)|(?:feed|posts?) only)\b", words):
@@ -323,13 +327,16 @@ def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cove
     schedule = command if not cover_word else command[:cover_word.start()] + command[cover_word.end():]
     networks, said_all = parse_networks(schedule)
     if not networks:
-        raise PMError("Say where: Instagram, Facebook, TikTok or YouTube (or \"todas\").")
+        raise PMError("Indica en qué red quieres publicar o escribe «en todo lado»." if es else
+                      "Choose a network or say ‘post everywhere’.")
     when, notes = parse_when(schedule, now)
     if when is None:
         if notes and notes[-1].startswith("requested time"):
-            raise PMError("The requested time has passed or is less than 5 minutes away. "
+            raise PMError("La hora indicada ya pasó o faltan menos de 5 minutos. Indica una nueva hora."
+                          if es else "The requested time has passed or is less than 5 minutes away. "
                           "No post was created. Please send a new future time.")
-        raise PMError("Say when: e.g. \"el viernes a las 6 de la tarde\", \"mañana 9am\", \"hoy 18:00\", or \"ahora\".")
+        raise PMError("Indica cuándo quieres publicar. Por ejemplo, «mañana a las 7:15 p. m.»."
+                      if es else "Say when: for example, ‘tomorrow at 7:15 pm’.")
     return {"ui_lang": ui_lang or lang, "placement": placement_override or placement(command),
             "cover_image": cover_image, "cover_attachment": cover_attachment, "cover_second": cover_second,
             "networks": networks, "said_all": said_all, "command": command, "when": when, "notes": notes, "exact": exact,

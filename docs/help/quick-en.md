@@ -16,6 +16,8 @@ Add media → Bake idea → Create drafts → Approve in Postiz
 YouTube Shorts tomorrow at 9 a.m. Caption: “Here’s what we made this week.”
 ```
 
+You can also put the idea first, followed by a semicolon, such as “Cookies and cupcakes; post everywhere at 7:15 pm, posts and stories.”
+
 4. Click **👨‍🍳 Bake idea**. Check the time, channels, caption, and video warnings.
 5. Click **Create Drafts**, then open **Postiz Calendar**. Review the draft and approve the schedule there.
 

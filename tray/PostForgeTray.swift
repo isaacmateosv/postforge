@@ -2520,6 +2520,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let coverFile = NSTextField(labelWithString: "")
     var coverURL: URL?
     var inputRevision = 0
+    var ideaHeight: NSLayoutConstraint?
+    var planExpanded = false
     var reviewURL: URL?
     var previewed = false
     var lastReport: (String, Bool, Int32)?
@@ -2737,7 +2739,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         // Idea
         instruction.delegate = self
         let ideaPanel = Panel(scroll(instruction, editable: true), insets: NSEdgeInsets(), style: .input)
-        ideaPanel.heightAnchor.constraint(equalToConstant: 96).isActive = true
+        ideaHeight = ideaPanel.heightAnchor.constraint(equalToConstant: 86)
+        ideaHeight?.isActive = true
         placeholder.stringValue = t("Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm: fresh sourdough”",
                                     "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm: pan de masa madre”")
         placeholder.font = .systemFont(ofSize: 13)
@@ -2759,6 +2762,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         preview.title = t("👨‍🍳 Bake idea", "👨‍🍳 Hornea la idea")
         preview.target = self
         preview.action = #selector(runPreview)
+        preview.controlSize = .large
+        preview.font = .systemFont(ofSize: 14, weight: .semibold)
+        preview.bezelColor = .systemBlue
+        preview.widthAnchor.constraint(greaterThanOrEqualToConstant: 136).isActive = true
+        preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
         create.title = t("Create Drafts", "Crear borradores")
         create.target = self
         create.action = #selector(runCreate)
@@ -2773,11 +2781,17 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         actions.spacing = 10
         actions.alignment = .centerY
 
+        let steps = caption(t("1. Bake your idea     →     2. Review the plan     →     3. Create drafts",
+                              "1. Hornea la idea     →     2. Revisa el plan     →     3. Crea los borradores"))
+        steps.font = .systemFont(ofSize: 11, weight: .medium)
+
         // Plan: a read-only result. Until there is one, an empty state explains what happens next.
         result.string = ""
         result.textColor = .labelColor
         result.font = .systemFont(ofSize: 13)
         let planPanel = Panel(scroll(result, editable: false), insets: NSEdgeInsets(), style: .output)
+        result.isRichText = true
+        result.textContainerInset = NSSize(width: 12, height: 12)
         planPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 110).isActive = true
         planPanel.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .vertical)
         let emptyIcon = NSImageView(image: NSImage(systemSymbolName: "list.bullet.clipboard", accessibilityDescription: nil) ?? NSImage())
@@ -2841,16 +2855,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         planHeader.alignment = .centerY
         connections.font = .systemFont(ofSize: 11)
         connections.textColor = .secondaryLabelColor
-        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
+        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, steps, actions, planHeader, planPanel, footer])
         main.orientation = .vertical
         main.alignment = .leading
-        main.spacing = 12
-        main.edgeInsets = NSEdgeInsets(top: 38, left: inset, bottom: 20, right: inset)
-        main.setCustomSpacing(20, after: header)
-        main.setCustomSpacing(22, after: stats)
+        main.spacing = 9
+        main.edgeInsets = NSEdgeInsets(top: 34, left: inset, bottom: 16, right: inset)
+        main.setCustomSpacing(13, after: header)
+        main.setCustomSpacing(14, after: stats)
         for label in [mediaLabel, ideaLabel] { main.setCustomSpacing(6, after: label) }
-        main.setCustomSpacing(20, after: actions)
-        main.setCustomSpacing(16, after: planPanel)
+        main.setCustomSpacing(13, after: actions)
+        main.setCustomSpacing(12, after: planPanel)
         main.setCustomSpacing(6, after: planHeader)
         main.translatesAutoresizingMaskIntoConstraints = false
         for view in [header, stats, drop, coverControls, ideaPanel, actions, planHeader, planPanel, footer] {
@@ -2892,6 +2906,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         inputRevision += 1
         lastReport = nil
         previewed = false
+        preview.bezelColor = .systemBlue
         create.isEnabled = false
     }
 
@@ -3036,8 +3051,24 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         }
         let names = ["instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
                      "threads": "Threads", "whatsapp": "WhatsApp Status"]
-        var lines = [(dryRun ? t("Plan (nothing created yet) for ", "Plan (aún no se ha creado nada) para ") : t("Drafts created for ", "Borradores creados para "))
-                     + ((json["when_utc"] as? String).map { shortDate(iso: $0) } ?? (json["when_local"] as? String ?? "")) + t(" (local time)", " (hora local)")]
+        let document = NSMutableAttributedString(string: "")
+        func line(_ value: String, size: CGFloat = 13, weight: NSFont.Weight = .regular,
+                  color: NSColor = .labelColor, before: CGFloat = 0) {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacingBefore = before
+            style.paragraphSpacing = 5
+            style.lineSpacing = 2
+            document.append(NSAttributedString(string: value + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: size, weight: weight),
+                .foregroundColor: color, .paragraphStyle: style,
+            ]))
+        }
+        let scheduled = (json["when_utc"] as? String).map { shortDate(iso: $0) }
+            ?? (json["when_local"] as? String ?? "")
+        line(dryRun ? t("🗓  Plan ready to review", "🗓  Plan listo para revisar")
+                    : t("✓  Drafts prepared", "✓  Borradores preparados"), size: 18, weight: .bold)
+        line(scheduled + t(" · local time", " · hora local"), weight: .medium, color: .secondaryLabelColor)
+        line(t("📍  Destinations", "📍  Destinos"), weight: .semibold, before: 9)
         for target in json["targets"] as? [[String: Any]] ?? [] {
             let network = target["network"] as? String ?? ""
             let short = network == "youtube" && (json["short"] as? Bool ?? false) ? " (Short)" : ""
@@ -3052,7 +3083,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                 cover = t(" · Cover image", " · Imagen de portada")
             } else { cover = "" }
             let channel = network == "whatsapp" ? t("WhatsApp Status", "Estado de WhatsApp") : target["channel"] as? String ?? ""
-            lines.append("  • \(names[network] ?? network): \(channel)\(short)\(label)\(cover)")
+            line(network == "whatsapp" ? channel : "\(names[network] ?? network) · \(channel)\(short)\(label)\(cover)")
         }
         if let caption = json["caption"] as? String {
             var source = json["caption_source"] as? String ?? ""
@@ -3061,20 +3092,43 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                 let model = String(source.dropFirst("written by ".count).dropLast(" from your idea".count))
                 source = t("written by \(model) from your idea", "redactado por \(model) a partir de tu idea")
             }
-            lines.append("\n\(t("Caption", "Texto")) (\(source)):\n\(caption)")
+            line(t("✍️  Caption", "✍️  Texto"), weight: .semibold, before: 9)
+            if !source.isEmpty { line(source, size: 11, color: .secondaryLabelColor) }
+            line(caption)
         }
-        for note in json["notes"] as? [String] ?? [] { lines.append(t("· assumed: ", "· se asumió: ") + note) }
-        for warning in json["warnings"] as? [String] ?? [] { lines.append("⚠ " + warning) }
+        let notes = json["notes"] as? [String] ?? []
+        let warnings = json["warnings"] as? [String] ?? []
+        if !notes.isEmpty || !warnings.isEmpty {
+            line(t("⚠️  Things to check", "⚠️  Por revisar"), weight: .semibold, before: 9)
+            for note in notes { line(note, color: .secondaryLabelColor) }
+            for warning in warnings { line(warning, color: .systemOrange) }
+        }
         if !dryRun {
-            lines.append(t("\nNothing is published yet: review, edit and approve them on the Postiz calendar.", "\nAún no se ha publicado nada: revisa, edita y aprueba los borradores en el calendario de Postiz."))
+            line(t("Review and approve social drafts in the Postiz calendar.", "Revisa y aprueba los borradores en el calendario de Postiz."),
+                 weight: .medium, color: .secondaryLabelColor, before: 9)
             reviewURL = (json["review_url"] as? String).flatMap(URL.init(string:))
             calendar.isHidden = reviewURL == nil
         } else {
             previewed = true
+            preview.bezelColor = nil
             create.isEnabled = true
-            lines.append(t("\nPlan verified. Click Create Drafts to continue, or edit and bake the idea again.", "\nPlan verificado. Haz clic en Crear borradores para continuar, o edita y vuelve a hornear la idea."))
+            line(t("Create drafts when you’re ready to continue.", "Cuando esté todo listo, pulsa Crear borradores."),
+                 weight: .medium, color: .secondaryLabelColor, before: 9)
         }
-        show(lines.joined(separator: "\n"))
+        result.textStorage?.setAttributedString(document)
+        result.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        emptyState.isHidden = true
+        ideaHeight?.constant = 64
+        if !planExpanded, let bounds = window.screen?.visibleFrame {
+            planExpanded = true
+            var frame = window.frame
+            let extra = max(0, min(140, bounds.height - frame.height))
+            if extra > 0 {
+                frame.origin.y = max(bounds.minY, frame.minY - extra)
+                frame.size.height += extra
+                window.setFrame(frame, display: true, animate: window.isVisible)
+            }
+        }
     }
 }
 
@@ -3879,6 +3933,7 @@ let uiSpanish: [String: String] = [
     "Couldn't save your caption.": "No se pudo guardar tu texto.",
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
+    "1. Bake your idea     →     2. Review the plan     →     3. Create drafts": "1. Hornea la idea     →     2. Revisa el plan     →     3. Crea los borradores",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",
@@ -4164,6 +4219,16 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.refreshLocalizedWindows()
     precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Stories only")
     delegate.newPost!.placementMenu.selectItem(at: 0)
+    let composer = delegate.newPost!
+    precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
+    let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","warnings":["Sample warning"]}"#
+    composer.report(planFixture, dryRun: true, exitCode: 0)
+    precondition(composer.result.string.contains("Plan ready to review"))
+    precondition(composer.result.string.contains("Destinations"))
+    precondition(composer.result.string.contains("Things to check"))
+    precondition(composer.ideaHeight?.constant == 64 && composer.create.isEnabled)
+    composer.draftOptionsChanged()
+    precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
     delegate.application(app, open: [URL(string: "postforge://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
     delegate.newPost!.window.orderOut(nil)

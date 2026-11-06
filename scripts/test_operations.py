@@ -53,6 +53,19 @@ class Operations(unittest.TestCase):
         self.assertIn("4 partes", warnings[-1])
         self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
 
+    def test_topic_first_colloquial_post_everywhere(self):
+        now = datetime(2026, 11, 5, 12, tzinfo=plan_post.ZoneInfo("America/Guayaquil"))
+        text = "galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias"
+        p = plan_post.plan({}, text, [], None, now)
+        self.assertEqual(p["idea"], "galletas y cupcakes")
+        self.assertEqual((p["when"].hour, p["when"].minute), (19, 15))
+        self.assertEqual(p["placement"], "both")
+        self.assertEqual(p["networks"], list(plan_post.NETWORKS))
+        with self.assertRaisesRegex(pmlib.PMError, "hora indicada ya pasó"):
+            plan_post.plan({}, text, [], None, now.replace(hour=20), ui_lang="Spanish")
+        explicit = 'Instagram mañana a las 7pm; texto: "galletas y cupcakes; publica en todo lado"'
+        self.assertEqual(plan_post.split_instruction(explicit)[1], "galletas y cupcakes; publica en todo lado")
+
     def test_everywhere_and_story_only_make_only_supported_drafts(self):
         now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
         channels = [{"id": name, "name": name, "identifier": name}
