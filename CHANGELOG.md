@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.11]
+
+- Place the composer steps near the top and add a brief, interruptible opening highlight.
+
 ## [2.0.0-rc.10]
 
 - Preview the YouTube title and enforce its 100-character limit separately from the caption.
