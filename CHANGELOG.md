@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.2]
+
+- Choose posts, stories, or both in the Mac composer and WhatsApp plans.
+- Set a video cover from an image or a timestamp on supported channels.
+- Render the menu bar glyph at 18 points without automatic enlargement.
+- Document first-time channel setup and API options in English and Ecuadorian Spanish.
+
 ## [2.0.0-rc.1]
 
 - Add an optional Docker-based browser dashboard for local service status and access to Postiz.

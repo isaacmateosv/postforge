@@ -20,6 +20,7 @@ quotes) are kept as written. Times are configured locally (PM_TIMEZONE, default 
 """
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -210,36 +211,63 @@ def detect_lang(text, default):
     return "English" if en > es else ("Spanish" if es > en else default)
 
 
-def media_problem(network, kinds):
+def media_problem(network, kinds, es=False):
     """Why this network can't take these files, or None."""
     videos, photos = kinds.count("video"), kinds.count("image")
     if network == "youtube" and not (videos == 1 and photos == 0):
-        return "YouTube takes exactly one video"
+        return "YouTube admite un solo video" if es else "YouTube takes exactly one video"
     if network == "tiktok" and not ((videos == 1 and photos == 0) or (videos == 0 and 1 <= photos <= 35)):
-        return "TikTok takes one video or photos (not both)"
+        return "TikTok admite un video o fotos por separado" if es else "TikTok takes one video or photos (not both)"
     if network == "instagram" and not 1 <= len(kinds) <= 10:
-        return "Instagram takes 1 to 10 photos or videos"
+        return "Instagram admite de 1 a 10 fotos o videos" if es else "Instagram takes 1 to 10 photos or videos"
     if network == "threads" and len(kinds) > 20:
-        return "Threads takes up to 20 photos or videos"
+        return "Threads admite hasta 20 fotos o videos" if es else "Threads takes up to 20 photos or videos"
     if network == "whatsapp" and len(kinds) > 1:
-        return "WhatsApp Status takes one photo or video per status"
+        return "WhatsApp admite una foto o un video por estado" if es else "WhatsApp Status takes one photo or video per status"
     return None
 
 
-def placement(command, network):
-    """Return the requested Meta placement, or both for the default."""
+COVER_SECOND = re.compile(r"\b(?:cover at|portada en(?: el segundo)?)\s+(-?\d+(?:[.,]\d+)?)"
+                          r"(?:\s*(?:seconds?|segundos?|s)\b)?(?![\w.,])")
+COVER_ATTACHMENT = re.compile(r"\b(?:cover image|foto de portada|imagen de portada)\b")
+
+
+def placement(command):
     words = plain(command)
-    if network not in ("instagram", "facebook"):
-        return None
     story = bool(re.search(r"\b(story|stories|historia|historias)\b", words))
-    feed = bool(re.search(r"\b(feed|publicacion|publicaciones)\b", words))
-    only_story = bool(re.search(r"\b(only|solo|just)\s+(story|stories|historia|historias)\b", words))
-    only_feed = bool(re.search(r"\b(only|solo|just)\s+(feed|post|publicacion|publicaciones)\b", words))
-    if only_story or (story and not feed):
+    feed = bool(re.search(r"\b(feed|posts|publicacion|publicaciones)\b|\bpost and stor", words))
+    if re.search(r"\b(?:(?:only|solo|just)\s+(?:story|stories|historia|historias)|(?:story|stories) only)\b", words):
         return "story"
-    if only_feed or (feed and not story):
+    if re.search(r"\b(?:(?:only|solo|just)\s+(?:feed|posts?|publicacion|publicaciones)|(?:feed|posts?) only)\b", words):
+        return "feed"
+    if story and not feed:
+        return "story"
+    if feed and not story:
         return "feed"
     return "both"
+
+
+def draft_placements(network, requested, has_media):
+    if network == "whatsapp":
+        return ("status",) if requested != "feed" else ()
+    if network in ("facebook", "instagram"):
+        if requested == "both":
+            return ("feed", "story") if has_media else ("feed",)
+        return (requested,) if has_media or requested == "feed" else ()
+    return ("feed",) if requested != "story" else ()
+
+
+def cover_mode(env, network, place, image, second, short):
+    if place != "feed":
+        return None
+    if network == "instagram":
+        return "image" if image else "frame"
+    if network == "youtube" and not short:
+        return "image" if image else "frame-image"
+    if network == "tiktok" and second is not None:
+        if pmlib.draft_settings("tiktok", "", env)["content_posting_method"] == "DIRECT_POST":
+            return "frame"
+    return None
 
 
 def threads_caption(env, caption, lang):
@@ -272,19 +300,39 @@ def threads_caption(env, caption, lang):
     raise PMError("The model could not produce a complete Threads caption within 500 characters.")
 
 
-def plan(env, text, media_paths, lang_arg, now):
+def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cover_image=None,
+         cover_second=None, ui_lang=None):
     command, exact, idea = split_instruction(text)
-    networks, said_all = parse_networks(command)
+    lang = lang_arg or detect_lang(idea or exact or text, env.get("CAPTION_LANGUAGE", "Spanish"))
+    es = (ui_lang or lang) == "Spanish"
+    cover_word = COVER_SECOND.search(plain(command))
+    cover_attachment = bool(COVER_ATTACHMENT.search(plain(command))) and cover_image is None
+    if cover_word and cover_second is None:
+        cover_second = cover_word[1]
+    if cover_second is not None:
+        try:
+            cover_second = float(str(cover_second).replace(",", "."))
+            if not math.isfinite(cover_second) or cover_second < 0:
+                raise ValueError
+        except ValueError:
+            raise PMError("Ingresa un segundo de portada válido, desde 0." if es else
+                          "Enter a valid cover second, starting at 0.")
+    if (cover_image or cover_attachment) and cover_second is not None:
+        raise PMError("Elige una imagen de portada o un segundo del video." if es else
+                      "Choose a cover image or a video timestamp.")
+    schedule = command if not cover_word else command[:cover_word.start()] + command[cover_word.end():]
+    networks, said_all = parse_networks(schedule)
     if not networks:
         raise PMError("Say where: Instagram, Facebook, TikTok or YouTube (or \"todas\").")
-    when, notes = parse_when(command, now)
+    when, notes = parse_when(schedule, now)
     if when is None:
         if notes and notes[-1].startswith("requested time"):
             raise PMError("The requested time has passed or is less than 5 minutes away. "
                           "No post was created. Please send a new future time.")
         raise PMError("Say when: e.g. \"el viernes a las 6 de la tarde\", \"mañana 9am\", \"hoy 18:00\", or \"ahora\".")
-    lang = lang_arg or detect_lang(idea or exact or text, env.get("CAPTION_LANGUAGE", "Spanish"))
-    return {"networks": networks, "said_all": said_all, "command": command, "when": when, "notes": notes, "exact": exact,
+    return {"ui_lang": ui_lang or lang, "placement": placement_override or placement(command),
+            "cover_image": cover_image, "cover_attachment": cover_attachment, "cover_second": cover_second,
+            "networks": networks, "said_all": said_all, "command": command, "when": when, "notes": notes, "exact": exact,
             "idea": idea, "lang": lang, "media": media_paths,
             "text_approved": bool(TEXT_APPROVED.search(command))}
 
@@ -310,6 +358,18 @@ def run(env, p, dry_run):
     result = {"when_local": p["when"].strftime("%a %d %b %Y %H:%M"), "when_utc": p["when"].astimezone(timezone.utc).isoformat(),
               "networks": p["networks"], "lang": p["lang"], "notes": list(p["notes"]), "warnings": [], "drafts": [],
               "dry_run": dry_run}
+    es = p.get("ui_lang", p["lang"]) == "Spanish"
+    requested = p.get("placement") or placement(p["command"])
+    image = p.get("cover_image")
+    second = p.get("cover_second")
+    paths = list(p["media"])
+    if p.get("cover_attachment"):
+        videos = [path for path in paths if os.path.splitext(path)[1].lower() in pmlib.VIDEO_EXT]
+        photos = [path for path in paths if os.path.splitext(path)[1].lower() in pmlib.IMAGE_EXT]
+        if len(paths) != 2 or len(videos) != 1 or len(photos) != 1:
+            raise PMError("Adjunta un video y una sola foto de portada." if es else
+                          "Attach one video and exactly one cover image.")
+        image, paths = photos[0], videos
     postiz = pmlib.Postiz(env)
     connected = postiz.integrations()
     targets = []
@@ -321,38 +381,66 @@ def run(env, p, dry_run):
             continue
         if not channels:
             if not p["said_all"]:
-                result["warnings"].append("%s isn't connected in Postiz: skipped" % NAMES[network])
+                result["warnings"].append(f"{NAMES[network]}: se omitió porque no está conectado en Postiz."
+                                          if es else f"{NAMES[network]}: skipped because it is not connected in Postiz.")
             continue
-        targets += [(network, c, placement(p["command"], network)) for c in channels]
+        targets += [(network, c, None) for c in channels]
     if not targets:
-        raise PMError("None of those networks is connected in Postiz yet (Launches → Add Channel).")
+        raise PMError("Conecta al menos una de esas redes en Postiz con Add Channel." if es else
+                      "Connect at least one of those networks using Add Channel in Postiz.")
 
     tmp = tempfile.mkdtemp(prefix="pm-plan-")
     try:
-        ready = [pmlib.normalize_media(os.path.expanduser(path), tmp) for path in p["media"]]
+        ready = [pmlib.normalize_media(os.path.expanduser(path), tmp) for path in paths]
         kinds = [kind for kind, _ in ready]
         short = kinds == ["video"] and pmlib.is_short(ready[0][1])
+        cover_requested = bool(image) or second is not None
+        normalized_cover = None
+        if cover_requested:
+            if kinds != ["video"]:
+                raise PMError("La portada requiere un solo video." if es else "A cover requires exactly one video.")
+            if image:
+                image = os.path.expanduser(image)
+                if not os.path.isfile(image) or os.path.splitext(image)[1].lower() not in pmlib.IMAGE_EXT:
+                    raise PMError("Elige un archivo de imagen válido para la portada." if es else
+                                  "Choose a valid image file for the cover.")
+                cover_dir = os.path.join(tmp, "cover")
+                os.mkdir(cover_dir)
+                _, normalized_cover = pmlib.normalize_media(image, cover_dir)
+            elif second >= pmlib.ffprobe(ready[0][1])[0]:
+                raise PMError("El segundo de la portada debe estar dentro del video." if es else
+                              "The cover timestamp must be within the video.")
         shorts_requested = re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
         usable = []
         for network, channel, _ in targets:
+            places = draft_placements(network, requested, bool(kinds))
+            if not places:
+                result["warnings"].append(
+                    (f"{NAMES[network]}: se omitió porque no admite ese formato con estos archivos." if es else
+                     f"{NAMES[network]}: skipped because that placement is unavailable for these files."))
+                continue
             if not kinds:
                 if network in ("facebook", "threads") and not p["text_approved"]:
-                    problem = "%s text-only draft skipped: add 'only text approved' to allow it" % NAMES[network]
+                    problem = (f"{NAMES[network]} requiere «solo texto aprobado» para crear un borrador sin archivos"
+                               if es else f"{NAMES[network]} requires ‘only text approved’ for a text-only draft")
                 else:
-                    problem = ("%s needs a photo or video" % NAMES[network]
-                               if channel and channel.get("identifier") in NEEDS_MEDIA else None)
+                    problem = None
+                    if channel and channel.get("identifier") in NEEDS_MEDIA:
+                        problem = (f"{NAMES[network]} requiere una foto o un video" if es else
+                                   f"{NAMES[network]} needs a photo or video")
             else:
-                problem = media_problem(network, kinds)
+                problem = media_problem(network, kinds, es)
                 if not problem and network == "youtube" and shorts_requested and not short:
                     problem = ("YouTube Shorts require a vertical or square video of at most 3 minutes"
-                               if p["lang"] != "Spanish" else
+                               if not es else
                                "YouTube Shorts requiere un video vertical o cuadrado de hasta 3 minutos")
             if problem:
-                result["warnings"].append(problem + ": skipped")
+                result["warnings"].append(problem + (" · se omitió" if es else " · skipped"))
             else:
-                usable.append((network, channel, placement(p["command"], network)))
+                usable.extend((network, channel, place) for place in places)
         if not usable:
-            raise PMError("Nothing to draft: " + "; ".join(result["warnings"]))
+            raise PMError(("No se pueden crear borradores. " if es else "No drafts can be created. ")
+                          + " · ".join(result["warnings"]))
 
         video_networks = {network for network, _, _ in usable} & {"facebook", "youtube", "whatsapp"}
         if video_networks:
@@ -369,9 +457,24 @@ def run(env, p, dry_run):
                        else "✍️ Write this post's text here.")
             source = "placeholder: you gave no idea or text"
             result["warnings"].append("no idea or text given: the drafts have a placeholder caption")
+        modes = [cover_mode(env, n, place, image, second, short) if cover_requested else None
+                 for n, _, place in usable]
+        if cover_requested and not any(modes):
+            result["warnings"].append(
+                "La portada elegida no se aplica a estos destinos. Para TikTok en bandeja o YouTube Shorts, configúrala en la plataforma."
+                if es else "The selected cover does not apply to these destinations. For TikTok inbox uploads or YouTube Shorts, choose the cover on the platform.")
+        if cover_requested and any(modes):
+            unsupported = sorted({NAMES[n] for (n, _, place), mode in zip(usable, modes)
+                                  if place == "feed" and mode is None})
+            if unsupported:
+                names = ", ".join(unsupported)
+                result["warnings"].append(
+                    f"La portada elegida no se aplica a: {names}." if es else
+                    f"The selected cover does not apply to: {names}.")
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
-                                    "placement": place} for n, c, place in usable]})
+                                    "placement": place, "cover": mode, "cover_second": second if mode else None}
+                                   for (n, c, place), mode in zip(usable, modes)]})
         if dry_run:
             return result
 
@@ -383,33 +486,51 @@ def run(env, p, dry_run):
         for kind, path in ready:
             uploaded = postiz.upload(path)
             media.append({"id": uploaded["id"], "path": uploaded["path"]})
+        cover_upload = None
+        if (normalized_cover and "image" in modes) or "frame-image" in modes:
+            cover_file = os.path.join(tmp, "post-cover.jpg")
+            source_args = (["-i", normalized_cover] if normalized_cover else
+                           ["-ss", str(second), "-i", ready[0][1]])
+            pmlib.run(["ffmpeg", "-nostdin", "-loglevel", "error", *source_args, "-frames:v", "1",
+                       "-vf", "scale=1280:1280:force_original_aspect_ratio=decrease:force_divisible_by=2",
+                       "-q:v", "4", cover_file], check=False)
+            if not os.path.isfile(cover_file) or not 0 < os.path.getsize(cover_file) < 2 * 1024 * 1024:
+                raise PMError("No se pudo preparar una portada JPEG de menos de 2 MB." if es else
+                              "Could not prepare a JPEG cover smaller than 2 MB.")
+            cover_upload = postiz.upload(cover_file)
         when_utc = p["when"].astimezone(timezone.utc)
         whatsapp_requested = any(network == "whatsapp" for network, _, _ in usable)
         whatsapp_post_ids = []
-        for network, channel, target_placement in usable:
+        for (network, channel, item_placement), mode in zip(usable, modes):
             if network == "whatsapp":
                 result["drafts"].append({"network": network, "channel": "WhatsApp Status", "post_id": None,
-                                         "pending": True})
+                                         "placement": "status", "pending": True})
                 continue
             target_caption = thread_caption if network == "threads" else caption
-            placements = ("feed", "story") if target_placement == "both" else (target_placement,)
-            for item_placement in placements:
-                settings = {"post_type": "story"} if item_placement == "story" else None
-                created = postiz.create_draft(channel, target_caption, media, when=when_utc,
-                                             settings=settings, short=(network == "youtube" and short))
-                post_id = created[0]["postId"] if created else None
-                if post_id:
-                    whatsapp_post_ids.append(post_id)
-                result["drafts"].append({"network": network, "channel": channel.get("name"),
-                                         "placement": item_placement, "post_id": post_id})
-                pmlib.append_log("drafts.jsonl", {"source": "plan-post", "post_id": post_id,
-                                                  "channel": channel.get("identifier"), "placement": item_placement,
-                                                  "integration_id": channel.get("id"), "when": result["when_utc"],
-                                                  "media": [m["path"] for m in media], "caption": target_caption[:500]})
+            settings = {"post_type": "story"} if item_placement == "story" else {}
+            target_media = media
+            if mode and network == "youtube":
+                settings["thumbnail"] = {key: cover_upload[key] for key in ("id", "path")}
+            elif mode == "image":
+                target_media = [dict(media[0], thumbnail=cover_upload["path"])]
+            elif mode == "frame":
+                target_media = [dict(media[0], thumbnailTimestamp=round(second * 1000))]
+            created = postiz.create_draft(channel, target_caption, target_media, when=when_utc,
+                                         settings=settings, short=(network == "youtube" and short))
+            post_id = created[0]["postId"] if created else None
+            if post_id:
+                whatsapp_post_ids.append(post_id)
+            result["drafts"].append({"network": network, "channel": channel.get("name"),
+                                     "placement": item_placement, "post_id": post_id})
+            pmlib.append_log("drafts.jsonl", {"source": "plan-post", "post_id": post_id,
+                                              "channel": channel.get("identifier"), "placement": item_placement,
+                                              "integration_id": channel.get("id"), "when": result["when_utc"],
+                                              "media": [m["path"] for m in media], "caption": target_caption[:500]})
         if whatsapp_requested and not dry_run:
             pending_id = whatsapp_pending.enqueue(caption, [path for _, path in ready], whatsapp_post_ids, when_utc)
             result["whatsapp_pending_id"] = pending_id
-            result["notes"].append("WhatsApp Status waits for approval")
+            result["notes"].append("El Estado de WhatsApp espera aprobación." if es else
+                                   "WhatsApp Status waits for approval")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     result["review_url"] = "https://%s/launches" % env.get("NGROK_DOMAIN", "<NGROK_DOMAIN>")
@@ -421,9 +542,9 @@ def show(result):
     info("%s for %s (local time)" % (head, result["when_local"]))
     for t in result.get("targets", []):
         done = next((d for d in result["drafts"] if d["channel"] == t["channel"]
-                     and d["network"] == t["network"]), None)
+                     and d["network"] == t["network"] and d.get("placement") == t["placement"]), None)
         extra = " (Short)" if t["network"] == "youtube" and result.get("short") else ""
-        info("  • %s: %s%s%s" % (NAMES[t["network"]], t["channel"], extra, ("  → draft " + str(done["post_id"])) if done else ""))
+        info("  • %s: %s (%s)%s%s" % (NAMES[t["network"]], t["channel"], t["placement"], extra, ("  → draft " + str(done["post_id"])) if done else ""))
     if result.get("caption"):
         info("\nCaption (%s):\n%s\n" % (result["caption_source"], result["caption"]))
     for note in result["notes"]:
@@ -440,6 +561,10 @@ def main():
     parser.add_argument("instruction", help="where, when, and your idea or exact text, in one sentence")
     parser.add_argument("--media", action="append", default=[], help="a photo or video (repeat for several)")
     parser.add_argument("--lang", help="caption language (default: the language of your idea)")
+    parser.add_argument("--placement", choices=("both", "feed", "story"), help="override the instruction's placement")
+    parser.add_argument("--cover-image", help="image file to use as the video cover")
+    parser.add_argument("--cover-second", help="video timestamp in seconds")
+    parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
     parser.add_argument("--dry-run", action="store_true", help="show the plan; create nothing")
     parser.add_argument("--json", action="store_true", help="print the result as JSON")
     args = parser.parse_args()
@@ -453,7 +578,8 @@ def main():
             raise PMError("Media file not found: " + path)
     zone = env.get("PM_TIMEZONE", "America/Guayaquil")
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
-    p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz))
+    p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz), placement_override=args.placement,
+             cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
     result = run(env, p, args.dry_run)
     if args.json:
         out.write(json.dumps(result, ensure_ascii=False, indent=1) + "\n")

@@ -53,6 +53,77 @@ class Operations(unittest.TestCase):
         self.assertIn("4 partes", warnings[-1])
         self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
 
+    def test_everywhere_and_story_only_make_only_supported_drafts(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        channels = [{"id": name, "name": name, "identifier": name}
+                    for name in ("facebook", "instagram-standalone", "threads", "youtube")]
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)):
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = channels
+            for text, expected in (
+                ('Post everywhere tomorrow at 9am; text: "A demo"', {
+                    ("facebook", "feed"), ("facebook", "story"), ("instagram", "feed"),
+                    ("instagram", "story"), ("threads", "feed"), ("youtube", "feed"),
+                    ("whatsapp", "status")}),
+                ('En todas las redes mañana 9am, solo historias; texto: "Un ejemplo"', {
+                    ("facebook", "story"), ("instagram", "story"), ("whatsapp", "status")}),
+            ):
+                plan = plan_post.plan({}, text, ["clip.mp4"], None, now)
+                result = plan_post.run({}, plan, True)
+                self.assertEqual({(t["network"], t["placement"]) for t in result["targets"]}, expected)
+            postiz.create_draft.assert_not_called()
+            postiz.upload.assert_not_called()
+
+    def test_cover_timestamp_only_reaches_supported_video_drafts(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        env = {"TIKTOK_POSTING_METHOD": "DIRECT_POST"}
+        channels = [{"id": name, "name": name, "identifier": name} for name in ("instagram", "tiktok")]
+        p = plan_post.plan(env, 'Instagram y TikTok mañana 9am; portada en el segundo 12,5; texto: "Un ejemplo"',
+                           ["clip.mp4"], None, now)
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)), \
+             patch.object(pmlib, "append_log"):
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = channels
+            postiz.upload.return_value = {"id": "clip", "path": "https://example.test/clip.mp4"}
+            postiz.create_draft.return_value = [{"postId": "draft"}]
+            result = plan_post.run(env, p, False)
+            calls = postiz.create_draft.call_args_list
+            self.assertEqual([call.args[2][0].get("thumbnailTimestamp") for call in calls], [12500, None, 12500])
+            self.assertEqual(calls[1].kwargs["settings"], {"post_type": "story"})
+            with patch.object(wa_inbox, "ui_language", return_value="Spanish"):
+                message = wa_inbox.summary(result, "Spanish", confirmation_id="2")
+            self.assertIn("portada en el segundo 12,5", message)
+            self.assertIn("Instagram · historia", message)
+            self.assertIn("rechazar plan 2", message)
+            with patch.object(wa_inbox, "ui_language", return_value="English"):
+                message = wa_inbox.summary(result, "Spanish", confirmation_id="2")
+            self.assertIn("cover at 12.5 s", message)
+            self.assertIn("Instagram · story", message)
+
+    def test_whatsapp_cover_image_is_separate_from_video_attachment(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            video, cover = (Path(directory) / name for name in ("clip.mp4", "cover.png"))
+            video.touch()
+            cover.touch()
+            plan = plan_post.plan({}, 'Instagram tomorrow at 9am; cover image; text: "A demo"',
+                                  [str(cover), str(video)], None, now)
+            with patch.object(pmlib, "Postiz") as mock_postiz, \
+                 patch.object(pmlib, "normalize_media", side_effect=[("video", str(video)), ("image", str(cover))]) as normalize, \
+                 patch.object(pmlib, "is_short", return_value=False):
+                mock_postiz.return_value.integrations.return_value = [
+                    {"id": "ig", "name": "Instagram", "identifier": "instagram"}]
+                result = plan_post.run({}, plan, True)
+                self.assertEqual(normalize.call_args_list[0].args[0], str(video))
+                self.assertEqual([t["cover"] for t in result["targets"]], ["image", None])
+                mock_postiz.return_value.upload.assert_not_called()
+
     def test_whatsapp_cleanup_keeps_future_confirmation_and_other_uploads(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

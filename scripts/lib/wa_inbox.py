@@ -339,15 +339,30 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
     lines = [REPLY_MARK]
     if heard:
         lines.append(("🎙️ Entendí: “%s”" if es else "🎙️ I heard: “%s”") % heard)
-    targets = ", ".join(names[t["network"]] + (" (Short)" if t["network"] == "youtube" and result.get("short") else "")
-                        for t in result.get("targets", []))
+    targets = []
+    placements = {"feed": ("post", "publicación"), "story": ("story", "historia"),
+                  "status": ("Status", "Estado"), "both": ("post + story", "publicación + historia")}
+    for target in result.get("targets", []):
+        network = target["network"]
+        name = names[network]
+        if network == "youtube" and result.get("short"):
+            name += " (Short)"
+        if target.get("placement") in placements:
+            name += " · " + placements[target["placement"]][es]
+        if target.get("cover_second") is not None:
+            seconds = f'{target["cover_second"]:g}'
+            name += (" · portada en el segundo " + seconds.replace(".", ",") if es
+                     else " · cover at " + seconds + " s")
+        elif target.get("cover") == "image":
+            name += " · imagen de portada" if es else " · cover image"
+        targets.append(name)
     head = (("📝 Verificación para %s: %s" if es else "📝 Verify for %s: %s") if confirmation_id else
             (("✅ Borradores para %s: %s" if es else "✅ Drafts for %s: %s") if result["drafts"] else
              ("📝 Plan para %s: %s" if es else "📝 Plan for %s: %s")))
     when = result["when_local"]
     if es:
         when = " ".join(ES_DATES.get(part, part.lower() if part.isalpha() else part) for part in when.split())
-    lines.append(head % (when, targets))
+    lines.append(head % (when, ", ".join(targets)))
     if has_caption:
         lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
                         else "Caption follows in the next message:")]
@@ -357,10 +372,17 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
         lines += ["", ("Nada se publica sin tu aprobación: revísalos en %s" if es else
                        "Nothing is published without your approval: review them at %s") % result["review_url"]]
     if confirmation_id:
-        lines += ["", ("¿Todos los detalles anteriores son correctos? Responde `aprobar plan %s` para continuar, "
-                       "o envía las correcciones." if es else
-                       "Are all the details above correct? Reply `approve plan %s` to proceed, "
-                       "or send your corrections.") % confirmation_id]
+        if es:
+            lines += ["", f"Responde `aprobar plan {confirmation_id}` para continuar.",
+                      f"Para cambiarlo, responde `rechazar plan {confirmation_id}` y vuelve a enviar tu pedido "
+                      "con los archivos. Puedes indicar «solo publicaciones», «solo historias» o "
+                      "«publicaciones e historias», y «portada en el segundo 12,5» o «imagen de portada» "
+                      "si adjuntas un video y una sola foto."]
+        else:
+            lines += ["", f"Reply `approve plan {confirmation_id}` to continue.",
+                      f"To change it, reply `reject plan {confirmation_id}` and resend your request with its files. "
+                      "You can say ‘only posts’, ‘only stories’, or ‘posts and stories’, and ‘cover at 12.5 s’ "
+                      "or ‘cover image’ if you attach one video and one photo."]
     return "\n".join(lines)
 
 
@@ -427,7 +449,8 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
                 remove_confirmation(confirmation_path)
                 raise PMError("Ese plan ya venció. Envía una hora nueva." if ui_language() == "Spanish"
                               else "That plan has expired. Send a new time.")
-            p = plan_post.plan(env, confirmation["instruction"], confirmation.get("media") or [], None, now)
+            p = plan_post.plan(env, confirmation["instruction"], confirmation.get("media") or [],
+                               confirmation.get("lang"), now, ui_lang=ui_language())
             if scheduled:
                 p["when"] = scheduled.astimezone(tz)
             override = (confirmation.get("caption_override") or "").strip()
@@ -436,8 +459,11 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
             with pmlib.Job("draft", "WhatsApp approval: " + confirmation["instruction"][:50]):
                 result = plan_post.run(env, p, dry_run)
             caption = clean_caption(result.get("caption") or "")
-            result["notes"] = [note for note in result["notes"] if "WhatsApp Status waits for approval" not in note]
-            result["notes"].append("WhatsApp Status approved; it will wait until the scheduled time")
+            result["notes"] = [note for note in result["notes"] if note not in ("WhatsApp Status waits for approval", "El Estado de WhatsApp espera aprobación.")]
+            if any(target.get("network") == "whatsapp" for target in result["targets"]):
+                result["notes"].append("Estado de WhatsApp aprobado para la hora programada."
+                                       if ui_language() == "Spanish" else
+                                       "WhatsApp Status approved for the scheduled time.")
             text = summary(result, p["lang"], confirmation.get("heard"), bool(caption))
             if not dry_run:
                 pending_id = result.get("whatsapp_pending_id")
@@ -467,7 +493,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     caption = ""
     confirmation_id = None
     try:
-        p = plan_post.plan(env, instruction, [], None, now)
+        p = plan_post.plan(env, instruction, [], None, now, ui_lang=ui_language())
         with pmlib.Job("draft", "WhatsApp: " + instruction[:50]):
             p["media"] = [download(env, name, m, folder) for m in media_rows]
             result = plan_post.run(env, p, True)
