@@ -16,6 +16,8 @@ Agrega archivos → Hornea la idea → Crea borradores → Aprueba en Postiz
 YouTube Shorts mañana a las 9 a. m. Texto: «Esto es lo que hicimos esta semana».
 ```
 
+También puedes poner primero la idea y separarla con punto y coma. Por ejemplo, «galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias».
+
 4. Pulsa **👨‍🍳 Hornea la idea**. Revisa la hora, los canales, el texto y los avisos sobre el video.
 5. Pulsa **Crear borradores** y abre el **calendario de Postiz**. Revisa el borrador y aprueba la programación ahí.
 

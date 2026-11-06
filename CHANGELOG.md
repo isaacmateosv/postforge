@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.0-rc.4]
+
+- Give the plan more vertical space and organize it into review sections.
+- Highlight Bake Idea and show the steps before creating drafts.
+- Accept topic-first requests and colloquial Spanish for posting everywhere.
+
 ## [2.0.0-rc.3]
 
 - Add menu bar shortcuts for draft formats, cover images, and cover timestamps.
