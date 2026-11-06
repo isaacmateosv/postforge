@@ -78,6 +78,16 @@ class Operations(unittest.TestCase):
             self.assertEqual([call.args[1] for call in postiz.create_draft.call_args_list],
                              ["Reviewed Threads text", "Reviewed caption", "Reviewed caption"])
 
+    def test_youtube_title_respects_limit_without_trimming_description(self):
+        caption = "#Opening\nA title " + "🍓" * 80 + "\n\nThe full description."
+        for short in (False, True):
+            title = pmlib.youtube_title(caption, short)
+            self.assertLessEqual(len(title.encode("utf-16-le")) // 2, 100)
+            self.assertEqual(title.endswith(" #Shorts"), short)
+            self.assertEqual(pmlib.draft_settings("youtube", caption, short=short)["title"], title)
+            self.assertNotIn("The full description", title)
+        self.assertEqual(pmlib.youtube_title("A <good> title"), "A good title")
+
     def test_caption_intent_distinguishes_brief_from_exact_text(self):
         instruction = 'post everywhere today at 6:40 pm; escribe sobre una torta para “Liga Deportiva Universitaria”'
         command, exact, idea = plan_post.split_instruction(instruction)

@@ -366,6 +366,11 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
     if has_caption:
         lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
                         else "Caption follows in the next message:")]
+    if result.get("youtube_title"):
+        title = result["youtube_title"]
+        count = len(title.encode("utf-16-le")) // 2
+        label = "Título de YouTube" if es else "YouTube title"
+        lines += ["", f"{label} ({count}/100)", title]
     if result.get("threads_caption"):
         lines += ["", ("Texto para Threads:" if es else "Threads caption:"),
                   clean_caption(result["threads_caption"])]

@@ -496,6 +496,8 @@ def run(env, p, dry_run):
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
+                       "youtube_title": pmlib.youtube_title(caption, short) if any(
+                           network == "youtube" for network, _, _ in usable) else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
                                     "placement": place, "cover": mode, "cover_second": second if mode else None}
                                    for (n, c, place), mode in zip(usable, modes)]})

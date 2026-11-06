@@ -282,6 +282,22 @@ PROVIDER_DEFAULTS = {
 }
 
 
+YOUTUBE_TITLE_LIMIT = 100
+
+
+def youtube_title(content, short=False):
+    """Use the caption's first text line, leaving room for the Shorts suffix."""
+    lines = re.sub(r"#\S+|[<>]", "", content).splitlines()
+    title = next((" ".join(line.split()) for line in lines if line.strip()), "")
+    if len(title) < 2:
+        title = "Untitled video"
+    suffix = " #Shorts" if short else ""
+    # Keep within the limit even for supplementary-plane characters such as emojis.
+    budget = YOUTUBE_TITLE_LIMIT - len(suffix)
+    title = title.encode("utf-16-le")[:budget * 2].decode("utf-16-le", errors="ignore").rstrip()
+    return title + suffix
+
+
 def draft_settings(identifier, content, env=None, short=False):
     settings = dict(PROVIDER_DEFAULTS.get(identifier, {}))
     if identifier == "tiktok" and env:
@@ -294,10 +310,7 @@ def draft_settings(identifier, content, env=None, short=False):
         if privacy in ("PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"):
             settings["privacy_level"] = privacy
     if identifier == "youtube":
-        lines = [l for l in re.sub(r"#\S+", "", content).splitlines() if l.strip()]
-        title = (lines[0].strip() if lines else "")[:100]
-        title = title if len(title) >= 2 else "Untitled video"
-        settings["title"] = title[:92].rstrip() + " #Shorts" if short else title
+        settings["title"] = youtube_title(content, short)
     return settings
 
 
