@@ -1154,6 +1154,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let newPostItem = action(text("New Post…", "Nueva publicación…"), #selector(openNewPost), enabled: up)
         newPostItem.keyEquivalent = "n"
         menu.addItem(newPostItem)
+        let draftOptions = NSMenu()
+        draftOptions.autoenablesItems = false
+        for (index, title) in [
+            text("Posts Only…", "Solo publicaciones…"),
+            text("Stories Only…", "Solo historias…"),
+            text("Posts and Stories…", "Publicaciones e historias…"),
+            text("Choose Cover Image…", "Elegir imagen de portada…"),
+            text("Set Cover Timestamp…", "Indicar segundo de portada…"),
+        ].enumerated() {
+            if index == 3 { draftOptions.addItem(.separator()) }
+            let item = action(title, #selector(openDraftOption(_:)), enabled: up)
+            item.tag = index + 1
+            draftOptions.addItem(item)
+        }
+        let optionsItem = NSMenuItem(title: text("Draft Options", "Opciones de borrador"), action: nil, keyEquivalent: "")
+        optionsItem.submenu = draftOptions
+        optionsItem.isEnabled = up
+        menu.addItem(optionsItem)
         menu.addItem(action(text("Open Postiz Calendar", "Abrir calendario de Postiz"), #selector(openPostiz), enabled: up))
         if isOff {
             menu.addItem(action(st?.state == "partial" ? text("Restore All Services", "Restaurar todos los servicios") :
@@ -2143,6 +2161,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         if newPost == nil { newPost = NewPostWindow(project: project) }
         newPost?.refreshState(state)
         newPost?.show()
+    }
+
+    @objc func openDraftOption(_ sender: NSMenuItem) {
+        openNewPost()
+        guard let composer = newPost else { return }
+        switch sender.tag {
+        case 1...3:
+            composer.placementMenu.selectItem(at: sender.tag)
+            composer.draftOptionsChanged()
+        case 4:
+            composer.chooseCoverImage()
+        case 5:
+            composer.window.makeFirstResponder(composer.coverSecond)
+        default:
+            break
+        }
     }
 
     @objc func openPostiz() {
@@ -4087,6 +4121,10 @@ if CommandLine.arguments.contains("--verify-ui") {
         precondition(trayMenu.items.dropLast().last?.title == about)
         precondition(trayMenu.items.last?.action == #selector(AppDelegate.quitApp))
         precondition(trayMenu.items.first(where: { $0.title == updates })?.action == #selector(AppDelegate.checkUpdatesFromMenu))
+        let draftOptions = trayMenu.items.first {
+            $0.title == (language == "es" ? "Opciones de borrador" : "Draft Options")
+        }?.submenu
+        precondition(draftOptions?.items.filter { $0.action == #selector(AppDelegate.openDraftOption(_:)) }.map(\.tag) == [1, 2, 3, 4, 5])
         let settings = trayMenu.items.compactMap(\.submenu).last!
         precondition(settings.items.allSatisfy { $0.title != updates && $0.title != about })
     }

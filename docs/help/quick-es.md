@@ -21,6 +21,7 @@ YouTube Shorts mañana a las 9 a. m. Texto: «Esto es lo que hicimos esta semana
 
 ## Elige los formatos y la portada
 
+Abre **Opciones de borrador** en la barra de menús para acceder a los formatos y la portada.
 En la ventana de publicación, usa **Crear borradores de** para elegir publicaciones,
 historias o ambos formatos. **Automático** sigue tu instrucción. «Publica en todas
 las redes» incluye publicaciones e historias donde se admiten. Las historias
