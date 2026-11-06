@@ -24,6 +24,7 @@ services:
     command: [python, -m, postforge_v2, telegram]
     environment:
       TELEGRAM_TOKEN_FILE: /run/secrets/telegram-token
+      TELEGRAM_BOT_ID: ${TELEGRAM_BOT_ID:-}
       TELEGRAM_OWNER_ID: ${TELEGRAM_OWNER_ID:-}
       TELEGRAM_LANGUAGE: ${TELEGRAM_LANGUAGE:-en}
       TELEGRAM_HEARTBEAT_MINUTES: ${TELEGRAM_HEARTBEAT_MINUTES:-0}

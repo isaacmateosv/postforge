@@ -24,6 +24,16 @@ cd ~/postforge
 ./scripts/recheck.sh --live
 ```
 
+## Configura Telegram
+
+Crea un bot exclusivo con BotFather. En Terminal, desde la carpeta de PostForge,
+ejecuta `python3 v2/telegram_setup.py --language es --heartbeat 0`. Ingresa el
+token en el campo oculto y envía `/start` en tu chat privado con el bot cuando
+se te indique. Confirma la cuenta, ejecuta `./postforge.sh telegram start` y
+envía `/status`. El bot se detiene cuando PostForge se apaga por inactividad.
+Con `0` no se envían avisos periódicos. Para activarlos, elige entre 5 y 1440
+minutos.
+
 ## Acceso independiente sin ngrok
 
 Para una instalación local, ejecuta Compose en el Mac, en Linux o en Windows

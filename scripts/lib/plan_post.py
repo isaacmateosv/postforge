@@ -454,7 +454,9 @@ def run(env, p, dry_run):
             durations = [pmlib.ffprobe(path)[0] for kind, path in ready if kind == "video"]
             result["warnings"].extend(video_warnings(video_networks, durations, p["lang"], short))
 
-        if p["exact"]:
+        if p.get("reviewed_caption"):
+            caption, source = p["reviewed_caption"], "reviewed caption"
+        elif p["exact"]:
             caption, source = p["exact"], "your text"
         elif p["idea"]:
             caption, model, _ = ollama_caption(env, p["idea"], p["lang"])
@@ -478,17 +480,17 @@ def run(env, p, dry_run):
                 result["warnings"].append(
                     f"La portada elegida no se aplica a: {names}." if es else
                     f"The selected cover does not apply to: {names}.")
+        thread_caption = caption
+        if any(network == "threads" for network, _, _ in usable):
+            thread_caption = p.get("reviewed_threads_caption") or threads_caption(env, caption, p["lang"])
         result.update({"caption": caption, "caption_source": source, "short": short,
+                       "threads_caption": thread_caption if thread_caption != caption else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
                                     "placement": place, "cover": mode, "cover_second": second if mode else None}
                                    for (n, c, place), mode in zip(usable, modes)]})
         if dry_run:
             return result
 
-        thread_caption = threads_caption(env, caption, p["lang"]) if any(
-            network == "threads" for network, _, _ in usable) else caption
-        if thread_caption != caption:
-            result["warnings"].append("Threads caption rewritten by the local model to fit 500 characters")
         media = []
         for kind, path in ready:
             uploaded = postiz.upload(path)
@@ -571,6 +573,8 @@ def main():
     parser.add_argument("--placement", choices=("both", "feed", "story"), help="override the instruction's placement")
     parser.add_argument("--cover-image", help="image file to use as the video cover")
     parser.add_argument("--cover-second", help="video timestamp in seconds")
+    parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
+    parser.add_argument("--reviewed-threads-caption", help=argparse.SUPPRESS)
     parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
     parser.add_argument("--dry-run", action="store_true", help="show the plan; create nothing")
     parser.add_argument("--json", action="store_true", help="print the result as JSON")
@@ -587,6 +591,9 @@ def main():
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
     p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz), placement_override=args.placement,
              cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
+    if not args.dry_run and args.reviewed_caption:
+        p["reviewed_caption"] = args.reviewed_caption
+        p["reviewed_threads_caption"] = args.reviewed_threads_caption
     result = run(env, p, args.dry_run)
     if args.json:
         out.write(json.dumps(result, ensure_ascii=False, indent=1) + "\n")

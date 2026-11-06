@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.7]
+
+- Add private Telegram setup with owner detection and keep the worker in the normal Mac lifecycle.
+- Preserve reviewed caption text when creating drafts and show any shortened Threads version before approval.
+
 ## [2.0.0-rc.6]
 
 - Move WhatsApp Plans & Receipts to the top-level menu bar menu.

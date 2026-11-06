@@ -2593,6 +2593,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var planExpanded = false
     var reviewURL: URL?
     var previewed = false
+    var reviewedCaption: String?
+    var reviewedThreadsCaption: String?
     var lastReport: (String, Bool, Int32)?
 
     init(project: String) {
@@ -2979,6 +2981,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     @objc func draftOptionsChanged() {
         inputRevision += 1
         lastReport = nil
+        reviewedCaption = nil
+        reviewedThreadsCaption = nil
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
@@ -3088,7 +3092,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         if let url = coverURL { args += ["--cover-image", url.path] }
         let second = coverSecond.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if !second.isEmpty { args += ["--cover-second=\(second)"] }
-        if dryRun { args.append("--dry-run") }
+        if dryRun {
+            args.append("--dry-run")
+        } else if let reviewedCaption {
+            args.append("--reviewed-caption=\(reviewedCaption)")
+            if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
+        }
         for url in media { args += ["--media", url.path] }
         args.append(text)
         preview.isEnabled = false
@@ -3167,6 +3176,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         if let caption = json["caption"] as? String {
             var source = json["caption_source"] as? String ?? ""
             if source == "your text" { source = t("your text", "tu texto") }
+            else if source == "reviewed caption" { source = t("reviewed caption", "texto revisado") }
             else if source.hasPrefix("written by ") && source.hasSuffix(" from your idea") {
                 let model = String(source.dropFirst("written by ".count).dropLast(" from your idea".count))
                 source = t("written by \(model) from your idea", "redactado por \(model) a partir de tu idea")
@@ -3174,6 +3184,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             line(t("✍️  Caption", "✍️  Texto"), weight: .semibold, before: 9)
             if !source.isEmpty { line(source, size: 11, color: .secondaryLabelColor) }
             line(caption)
+        }
+        if let threadsCaption = json["threads_caption"] as? String {
+            line(t("✍️  Threads caption", "✍️  Texto para Threads"), weight: .semibold, before: 9)
+            line(threadsCaption)
         }
         let notes = json["notes"] as? [String] ?? []
         let warnings = json["warnings"] as? [String] ?? []
@@ -3198,9 +3212,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             } else { statusApproval.isHidden = true }
         } else {
             statusApproval.isHidden = true
-            previewed = true
+            reviewedCaption = json["caption"] as? String
+            reviewedThreadsCaption = json["threads_caption"] as? String
+            previewed = reviewedCaption != nil
             preview.bezelColor = nil
-            create.isEnabled = true
+            create.isEnabled = previewed
             line(t("Create drafts when you’re ready to continue.", "Cuando esté todo listo, pulsa Crear borradores."),
                  weight: .medium, color: .secondaryLabelColor, before: 9)
         }

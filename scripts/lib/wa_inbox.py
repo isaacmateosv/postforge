@@ -366,6 +366,9 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
     if has_caption:
         lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
                         else "Caption follows in the next message:")]
+    if result.get("threads_caption"):
+        lines += ["", ("Texto para Threads:" if es else "Threads caption:"),
+                  clean_caption(result["threads_caption"])]
     lines += ["· " + ("supuse: " if es else "assumed: ") + n for n in result["notes"]]
     lines += ["⚠ " + w for w in result["warnings"]]
     if result.get("review_url"):
@@ -458,8 +461,12 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
             if scheduled:
                 p["when"] = scheduled.astimezone(tz)
             override = (confirmation.get("caption_override") or "").strip()
+            saved_result = confirmation.get("result") or {}
             if override:  # edited in the PostForge app's WhatsApp window: use it as the exact caption
                 p["exact"] = override
+            elif saved_result.get("caption"):
+                p["reviewed_caption"] = saved_result["caption"]
+                p["reviewed_threads_caption"] = saved_result.get("threads_caption")
             with pmlib.Job("draft", "WhatsApp approval: " + confirmation["instruction"][:50]):
                 result = plan_post.run(env, p, dry_run)
             caption = clean_caption(result.get("caption") or "")
