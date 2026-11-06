@@ -61,7 +61,7 @@ def referenced_media():
                 queue = json.load(source)
             if not isinstance(queue, list) or not all(isinstance(item, dict) for item in queue):
                 return None
-            references += json.dumps([item for item in queue if item.get("status") != "sent"])
+            references += json.dumps([item for item in queue if item.get("status") not in ("sent", "cancelled")])
         for path in glob.glob(os.path.join(ROOT, 'run', 'wa-confirmations', '*.json')):
             with open(path, encoding='utf-8') as source:
                 references += json.dumps(json.load(source))
