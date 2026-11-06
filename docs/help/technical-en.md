@@ -24,6 +24,15 @@ cd ~/postforge
 ./scripts/recheck.sh --live
 ```
 
+## Set up Telegram
+
+Create a dedicated bot with BotFather. In Terminal, from the PostForge folder,
+run `python3 v2/telegram_setup.py --language en --heartbeat 0`. Enter the bot
+token at the hidden prompt and send `/start` from your private chat when asked.
+Confirm the owner, run `./postforge.sh telegram start`, then send `/status`.
+The worker follows the PostForge stack, including idle shutdown. A heartbeat
+of `0` is off. Choose 5–1440 minutes to enable it.
+
 ## Standalone access without ngrok
 
 For on-premises use, run the Compose stack on the Mac, Linux host, or Windows

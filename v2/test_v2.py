@@ -69,5 +69,38 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(call.call_args.kwargs["chat_id"], 7)
 
 
+
+
+
+class TelegramSetupTest(unittest.TestCase):
+    def test_discovery_requires_private_start_from_the_owner(self):
+        from telegram_setup import pending_owners
+
+        def update(owner, chat, message, kind="private"):
+            return {"message": {"from": {"id": owner}, "chat": {"id": chat, "type": kind}, "text": message}}
+
+        self.assertEqual(pending_owners([update(10, 10, "/start"), update(11, 10, "/start"),
+                                         update(12, 12, "/status"), update(13, 13, "/start", "group")]), {10})
+
+    def test_saves_bot_and_owner_separately_from_token(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from telegram_setup import save
+
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder) / "telegram"
+            token = "42:" + "synthetic" * 4
+            save(directory, token, 17, "es", 15)
+            self.assertEqual((directory / "token").read_text().strip(), token)
+            settings = (directory / "settings.env").read_text()
+            self.assertNotIn(token, settings)
+            self.assertIn("TELEGRAM_BOT_ID=42", settings)
+            self.assertIn("TELEGRAM_OWNER_ID=17", settings)
+            if os.name != "nt":
+                self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+                self.assertEqual((directory / "settings.env").stat().st_mode & 0o777, 0o600)
+
+
 if __name__ == "__main__":
     unittest.main()

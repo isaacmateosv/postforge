@@ -91,6 +91,9 @@ def run():
             raise ValueError
         if 0 < minutes < 5:
             raise ValueError
+        configured_bot = os.environ.get("TELEGRAM_BOT_ID")
+        if configured_bot and token.split(":", 1)[0] != configured_bot:
+            raise ValueError
     except (KeyError, OSError, ValueError):
         raise SystemExit("Configure the Telegram token file, numeric owner ID and heartbeat (0 or 5–1440 minutes).") from None
     es = os.environ.get("TELEGRAM_LANGUAGE") == "es"
@@ -106,6 +109,13 @@ def run():
                 raise ValueError
         except (OSError, ValueError, TypeError):
             raise SystemExit("Telegram state is unreadable. Repair the state file before restarting.") from None
+    bot_id = token.split(":", 1)[0]
+    if state.get("bot_id", bot_id) != bot_id:
+        state = {"offset": 0, "heartbeat": 0}
+    if state.get("owner_id", owner) != owner:
+        state["heartbeat"] = 0
+    state.update(bot_id=bot_id, owner_id=owner)
+    save_state(state)
     delay = 1
     while True:
         try:

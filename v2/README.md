@@ -102,22 +102,36 @@ then disable the old public route after checking the new one.
 
 ## Optional Telegram status and heartbeat
 
-Create a bot with BotFather and obtain your numeric Telegram user ID.
-Start a private chat with the bot. Put the token in `run/telegram/token`
-inside the project. On macOS and Linux, set the directory to mode `0700`
-and the file to `0444` so the non-root container can read the file mount
-while other host users cannot traverse the directory. On Windows, keep the
-project in a private user directory and restrict its access with Windows ACLs.
-The token is mounted as a Compose secret. Keep it out of `.env` and source control.
+Create a dedicated bot with BotFather and open its private chat in Telegram.
+From the project folder, run the setup helper. It asks for the token through
+a hidden prompt, validates the bot, and identifies your numeric user ID from
+a private `/start` message. If automatic detection finds more than one candidate,
+use `--owner-id YOUR_NUMERIC_ID` and confirm the account explicitly.
 
-Provide these non-secret settings when starting Compose:
-- `TELEGRAM_OWNER_ID` is the one authorized private-chat user ID.
-- `TELEGRAM_LANGUAGE` is `en` or `es`.
-- `TELEGRAM_HEARTBEAT_MINUTES` is `0` (off) or `5` to `1440`.
+```sh
+python3 v2/telegram_setup.py --language en --heartbeat 0
+./postforge.sh telegram start
+./postforge.sh telegram status
+```
+
+Use `--language es` for Ecuadorian Spanish. Set heartbeat to `0` (off) or
+`5`–`1440` minutes. On macOS, the worker follows the PostForge stack lifecycle,
+including idle shutdown. Run the start command again after changing the token
+or settings. The worker remembers its update cursor and restarts with the
+same settings when the stack comes back on.
+
+On Windows or Linux, start the optional worker with Compose from the project
+folder. Include your gateway override if you use one.
 
 ```text
-docker compose -f docker-compose.yml -f v2/compose.yml --profile telegram up -d postforge-telegram
+docker compose --env-file .env --env-file run/telegram/settings.env -f docker-compose.yml -f v2/compose.yml --profile telegram up -d --build --force-recreate --no-deps postforge-telegram
 ```
+
+The token lives in `run/telegram/token`, separate from `.env`. Compose mounts
+it as a file readable by the non-root container. On macOS and Linux the
+enclosing directory is private. On Windows, use a private user folder and
+restrict access with Windows ACLs. Keep the token out of chats, screenshots
+and source control.
 
 Send `/status` and use the **Refresh status** button. The worker uses outbound
 long polling, so it has no public webhook. Remove any existing webhook from a

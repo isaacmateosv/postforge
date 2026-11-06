@@ -53,6 +53,31 @@ class Operations(unittest.TestCase):
         self.assertIn("4 partes", warnings[-1])
         self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
 
+    def test_drafts_use_reviewed_caption_and_threads_variant(self):
+        now = datetime(2026, 11, 5, 12, tzinfo=timezone.utc)
+        text = "Threads and Facebook tomorrow at 9am; idea: share a project update"
+        plan = plan_post.plan({}, text, ["clip.mp4"], "English", now)
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)), \
+             patch.object(pmlib, "append_log"), \
+             patch.object(plan_post, "ollama_caption", return_value=("Reviewed caption", "test", 0)) as generate, \
+             patch.object(plan_post, "threads_caption", return_value="Reviewed Threads text") as shorten:
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = [{"id": name, "name": name, "identifier": name}
+                                                for name in ("threads", "facebook")]
+            postiz.upload.return_value = {"id": "clip", "path": "https://example.test/clip.mp4"}
+            postiz.create_draft.return_value = [{"postId": "draft"}]
+            preview = plan_post.run({}, plan, True)
+            self.assertEqual(preview["threads_caption"], "Reviewed Threads text")
+            plan.update(reviewed_caption=preview["caption"], reviewed_threads_caption=preview["threads_caption"])
+            plan_post.run({}, plan, False)
+            generate.assert_called_once()
+            shorten.assert_called_once()
+            self.assertEqual([call.args[1] for call in postiz.create_draft.call_args_list],
+                             ["Reviewed Threads text", "Reviewed caption", "Reviewed caption"])
+
     def test_topic_first_colloquial_post_everywhere(self):
         now = datetime(2026, 11, 5, 12, tzinfo=plan_post.ZoneInfo("America/Guayaquil"))
         text = "galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias"
