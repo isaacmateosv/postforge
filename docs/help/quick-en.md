@@ -36,6 +36,8 @@ Instagram Reels accept both options. Regular YouTube videos use an image or a
 frame extracted from the video. TikTok Direct Post can use a frame timestamp.
 Choose the cover on the platform for TikTok inbox uploads and YouTube Shorts.
 
+If the plan has a video for a destination that accepts a cover and you haven’t chosen one, PostForge asks whether to continue. After reviewing the plan, use **Edit cover…** to unlock the cover controls and bake the revised plan again.
+
 ## Use WhatsApp or Siri
 
 Send a file and instruction to your own WhatsApp chat while PostForge is on. Review the plan it sends back. Confirming the plan prepares your drafts. Review social drafts in Postiz. Add “only posts”, “only stories”, “posts and stories”, or “cover at 12.5 s” before your caption. For a separate cover, attach one video and one photo and say “cover image”. The reply shows the plan and gives you the commands to approve it or reject it and resend your request.

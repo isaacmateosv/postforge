@@ -2197,7 +2197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         case 4:
             composer.chooseCoverImage()
         case 5:
-            composer.window.makeFirstResponder(composer.coverSecond)
+            composer.editCover()
         default:
             break
         }
@@ -2563,6 +2563,53 @@ final class UserGuideWindow: NSObject {
 /// "New Post…": files plus one sentence (typed or dictated) become one Postiz draft per network at
 /// that time. Preview shows the plan; Create Drafts makes them. Nothing publishes until approved in
 /// Postiz (HITL). The work is done by scripts/plan-post.sh --json.
+private final class MixingIndicator: NSView {
+    private var timer: Timer?
+    private var phase = 0.0
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 28, height: 25) }
+
+    func start() {
+        isHidden = false
+        guard timer == nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.phase += 0.55
+            self.needsDisplay = true
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        isHidden = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let whisk = NSBezierPath()
+        let x = 14 + sin(phase) * 4
+        whisk.move(to: NSPoint(x: x + 5, y: 22))
+        whisk.line(to: NSPoint(x: x, y: 12))
+        whisk.curve(to: NSPoint(x: x - 3, y: 8),
+                    controlPoint1: NSPoint(x: x + 4, y: 5), controlPoint2: NSPoint(x: x - 6, y: 4))
+        whisk.line(to: NSPoint(x: x, y: 12))
+        NSColor.systemOrange.setStroke()
+        whisk.lineWidth = 1.7
+        whisk.lineCapStyle = .round
+        whisk.stroke()
+
+        let bowl = NSBezierPath()
+        bowl.move(to: NSPoint(x: 3, y: 12))
+        bowl.line(to: NSPoint(x: 25, y: 12))
+        bowl.curve(to: NSPoint(x: 3, y: 12),
+                   controlPoint1: NSPoint(x: 23, y: 0), controlPoint2: NSPoint(x: 5, y: 0))
+        NSColor.labelColor.setStroke()
+        bowl.lineWidth = 1.6
+        bowl.lineCapStyle = .round
+        bowl.stroke()
+    }
+}
+
 final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let project: String
     let window: NSWindow
@@ -2588,6 +2635,13 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let placementMenu = NSPopUpButton()
     let coverSecond = NSTextField()
     let coverFile = NSTextField(labelWithString: "")
+    let chooseCover = NSButton()
+    let clearCover = NSButton()
+    let changeCover = NSButton()
+    private let mixer = MixingIndicator()
+    var coverLocked = false
+    var coverAvailable = false
+    var acceptedNoCover = false
     var coverURL: URL?
     var inputRevision = 0
     var ideaHeight: NSLayoutConstraint?
@@ -2802,8 +2856,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let placements = NSStackView(views: [placementLabel, placementMenu])
         placements.spacing = 8
 
-        let chooseCover = NSButton(title: t("Choose image…", "Elegir imagen…"), target: self, action: #selector(chooseCoverImage))
-        let clearCover = NSButton(title: t("Clear", "Limpiar"), target: self, action: #selector(clearCoverImage))
+        chooseCover.title = t("Choose image…", "Elegir imagen…")
+        chooseCover.target = self
+        chooseCover.action = #selector(chooseCoverImage)
+        clearCover.title = t("Clear", "Limpiar")
+        clearCover.target = self
+        clearCover.action = #selector(clearCoverImage)
+        changeCover.title = t("Edit cover…", "Editar portada…")
+        changeCover.target = self
+        changeCover.action = #selector(editCover)
+        changeCover.isHidden = true
         let coverLabel = caption(t("Video cover", "Portada del video"))
         coverSecond.placeholderString = t("Second", "Segundo")
         coverSecond.toolTip = t("Enter a second in the video, such as 12.5.", "Ingresa un segundo del video, por ejemplo 12,5.")
@@ -2811,7 +2873,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         coverSecond.widthAnchor.constraint(equalToConstant: 72).isActive = true
         coverFile.lineBreakMode = .byTruncatingMiddle
         coverFile.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let coverControls = NSStackView(views: [coverLabel, chooseCover, coverSecond, clearCover, coverFile])
+        let coverControls = NSStackView(views: [coverLabel, chooseCover, coverSecond, clearCover, changeCover, coverFile])
         coverControls.spacing = 6
 
         // Idea
@@ -2855,7 +2917,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         spinner.isDisplayedWhenStopped = false
         let actionSpacer = NSView()
         actionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let actions = NSStackView(views: [dictate, actionSpacer, spinner, preview, create])
+        mixer.isHidden = true
+        let actions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, preview, create])
         actions.spacing = 10
         actions.alignment = .centerY
 
@@ -2997,6 +3060,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     @objc func draftOptionsChanged() {
         savedVersions.removeAll()
+        acceptedNoCover = false
         invalidateReviewedPlan()
     }
 
@@ -3010,7 +3074,48 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
+        coverLocked = false
+        updateCoverControls()
         updateCaptionVersions()
+    }
+
+    func updateCoverControls() {
+        chooseCover.isEnabled = !coverLocked && !working
+        coverSecond.isEnabled = !coverLocked && !working
+        clearCover.isEnabled = !coverLocked && !working
+        clearCover.isHidden = coverLocked
+        changeCover.isHidden = !coverLocked || !coverAvailable
+        changeCover.isEnabled = !working
+    }
+
+    @objc func editCover() {
+        guard !working else { return }
+        if coverLocked {
+            draftOptionsChanged()
+            show(t("Choose a cover, then bake the idea again to review the updated plan.",
+                   "Elige una portada y vuelve a hornear la idea para revisar el plan actualizado."))
+        }
+        window.makeFirstResponder(coverSecond)
+    }
+
+    func confirmPlanWithoutCover(_ output: String) -> Bool {
+        guard !acceptedNoCover,
+              let plan = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any],
+              plan["video_without_cover"] as? Bool == true,
+              let delegate = NSApp.delegate as? AppDelegate else { return true }
+        acceptedNoCover = delegate.ask(
+            t("Continue without a cover?", "¿Continuar sin portada?"),
+            t("You can choose an image or a frame from the video. If you continue, each platform uses its default where applicable.",
+              "Puedes elegir una imagen o un fotograma del video. Si continúas, cada plataforma usará su portada predeterminada cuando corresponda."),
+            safe: t("Choose a cover", "Elegir portada"),
+            risky: t("Continue without cover", "Continuar sin portada"))
+        if !acceptedNoCover {
+            invalidateReviewedPlan()
+            show(t("Choose an image or enter a second from the video, then bake the idea again.",
+                   "Elige una imagen o indica un segundo del video y vuelve a hornear la idea."))
+            editCover()
+        }
+        return acceptedNoCover
     }
 
     func updateCaptionVersions() {
@@ -3043,6 +3148,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     @objc func chooseCoverImage() {
+        guard !working else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         if panel.runModal() == .OK, let url = panel.url {
@@ -3157,22 +3263,26 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         for url in media { args += ["--media", url.path] }
         args.append(text)
         working = true
+        updateCoverControls()
         updateCaptionVersions()
         preview.isEnabled = false
         create.isEnabled = false
         previewed = false
-        spinner.startAnimation(nil)
+        if dryRun { mixer.start() } else { spinner.startAnimation(nil) }
         (NSApp.delegate as? AppDelegate)?.planningWork += 1
         show(dryRun ? t("Reading your plan and writing the caption…", "Leyendo tu plan y redactando el texto…") : t("Creating drafts…", "Creando borradores…"))
         DispatchQueue.global(qos: .userInitiated).async {
             let (code, output) = runCommand(args, in: self.project, timeout: 900, quietErrors: true)
             DispatchQueue.main.async {
                 self.spinner.stopAnimation(nil)
+                self.mixer.stop()
                 if let delegate = NSApp.delegate as? AppDelegate {
                     delegate.planningWork -= 1
                     delegate.poll()
                 }
                 self.working = false
+                self.updateCoverControls()
+                self.updateCaptionVersions()
                 self.preview.isEnabled = true
                 if dryRun && revision != self.inputRevision {
                     self.invalidateReviewedPlan()
@@ -3180,6 +3290,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                                      "Cambiaste las opciones del borrador. Vuelve a hornear la idea para revisarlas."))
                     return
                 }
+                if dryRun && code == 0 && !self.confirmPlanWithoutCover(output) { return }
                 self.report(output, dryRun: dryRun, exitCode: code)
                 if dryRun && self.previewed {
                     self.savedVersions.append((instruction: text, output: output))
@@ -3197,7 +3308,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     func report(_ output: String, dryRun: Bool, exitCode: Int32) {
         lastReport = (output, dryRun, exitCode)
         canGenerateVariant = false
-        defer { updateCaptionVersions() }
+        defer {
+            updateCaptionVersions()
+            updateCoverControls()
+        }
         guard let json = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any] else {
             return show("✖ \(dryRun ? t("Preview", "Vista previa") : t("Draft creation", "Creación de borradores")) \(t("failed", "falló")) (\(exitCode)).\n"
                         + String(output.suffix(800)))
@@ -3285,6 +3399,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             canGenerateVariant = (json["caption_source"] as? String)?.hasPrefix("written by ") == true
             reviewedThreadsCaption = json["threads_caption"] as? String
             previewed = reviewedCaption != nil
+            coverLocked = previewed
+            coverAvailable = json["video_cover_available"] as? Bool == true
             preview.bezelColor = nil
             create.isEnabled = previewed
             line(t("Create drafts when you’re ready to continue.", "Cuando esté todo listo, pulsa Crear borradores."),
@@ -4113,6 +4229,7 @@ let uiSpanish: [String: String] = [
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",
+    "Edit cover…": "Editar portada…",
     "Second": "Segundo",
     "Enter a second in the video, such as 12.5.": "Ingresa un segundo del video, por ejemplo 12,5.",
     "Create Drafts": "Crear borradores",
@@ -4404,12 +4521,15 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.newPost!.placementMenu.selectItem(at: 0)
     let composer = delegate.newPost!
     precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
-    let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","warnings":["Sample warning"]}"#
+    let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","video_cover_available":true,"warnings":["Sample warning"]}"#
     composer.report(planFixture, dryRun: true, exitCode: 0)
     precondition(composer.result.string.contains("Plan ready to review"))
     precondition(composer.result.string.contains("Destinations"))
     precondition(composer.result.string.contains("Things to check"))
     precondition(composer.ideaHeight?.constant == 64 && composer.create.isEnabled)
+    precondition(!composer.chooseCover.isEnabled && !composer.coverSecond.isEnabled && !composer.changeCover.isHidden)
+    composer.editCover()
+    precondition(composer.chooseCover.isEnabled && composer.coverSecond.isEnabled && !composer.create.isEnabled)
     let variant = #"{"when_local":"19:15","caption":"Earlier version","caption_source":"written by test from your idea"}"#
     composer.savedVersions = [(instruction: "Earlier idea", output: variant)]
     composer.updateCaptionVersions()

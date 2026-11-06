@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.9]
+
+- Confirm missing video covers before review and require an explicit edit to change a reviewed cover.
+- Show a small mixing animation while preparing the plan.
+
 ## [2.0.0-rc.8]
 
 - Clarify generated versus exact captions and improve Ecuadorian Spanish caption prompts.

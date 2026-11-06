@@ -38,6 +38,8 @@ normales de YouTube puedes usar una imagen o un fotograma extraído del video.
 En publicación directa de TikTok puedes indicar el segundo. Para los envíos a
 la bandeja de TikTok y YouTube Shorts, elige la portada en la plataforma.
 
+Si el plan incluye un video para un destino que admite portada y todavía no elegiste una, PostForge te pregunta si quieres continuar. En un plan listo para revisar, usa **Editar portada…** para habilitar los controles y volver a hornear el plan.
+
 ## Usa WhatsApp o Siri
 
 Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras PostForge esté encendido. Revisa el plan que te devuelve. Al confirmarlo, se preparan los borradores. Revisa los borradores de redes sociales en Postiz. Antes del texto, escribe «solo publicaciones», «solo historias», «publicaciones e historias» o «portada en el segundo 12,5». Para usar una imagen aparte, adjunta un video y una foto y escribe «imagen de portada». La respuesta muestra el plan y los comandos para aprobarlo o rechazarlo y reenviar tu pedido.
