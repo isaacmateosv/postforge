@@ -431,7 +431,7 @@ def to_jpeg(src, out_dir, max_side=1920):
     return out
 
 
-def to_mp4(src, out_dir, max_seconds=None, max_side=1920):
+def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
     """Return src if it already is an H.264/AAC MP4 within limits, else a transcoded copy."""
     if not which("ffprobe") or not which("ffmpeg"):
         raise PMError("ffmpeg/ffprobe are required for video (brew install ffmpeg).")
@@ -440,19 +440,28 @@ def to_mp4(src, out_dir, max_seconds=None, max_side=1920):
         raise PMError("No video stream found in " + src)
     ext = os.path.splitext(src)[1].lower()
     too_long = bool(max_seconds) and duration > max_seconds
+    fits_bytes = max_bytes is None or os.path.getsize(src) <= max_bytes
     if (ext == ".mp4" and vcodec == "h264" and acodec in (None, "aac")
-            and not too_long and max(width, height) <= max_side):
+            and not too_long and fits_bytes and max(width, height) <= max_side):
         return src
     out = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".mp4")
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", src]
     if too_long:
         cmd += ["-t", str(max_seconds)]
+    rate_limit = []
+    if max_bytes is not None:
+        seconds = max(1, min(duration, max_seconds or duration))
+        # Allow for audio, MP4 overhead and encoder bitrate variation.
+        video_kbps = max(100, int(max_bytes * 8 * 0.8 / seconds / 1000) - 96)
+        rate_limit = ["-maxrate", f"{video_kbps}k", "-bufsize", f"{video_kbps}k"]
     cmd += [
         "-vf", "scale='min(%d,iw)':'min(%d,ih)':force_original_aspect_ratio=decrease,"
                "scale=trunc(iw/2)*2:trunc(ih/2)*2" % (max_side, max_side),
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", *rate_limit, "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", out,
     ]
     info("      Transcoding video to H.264/AAC MP4 (%s, %.0fs, %dx%d)..." % (vcodec, duration, width, height))
     run(cmd)
+    if max_bytes is not None and os.path.getsize(out) > max_bytes:
+        raise PMError("Prepared video exceeds the safe size for WhatsApp Status.")
     return out
