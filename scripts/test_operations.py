@@ -302,6 +302,27 @@ class Operations(unittest.TestCase):
             self.assertEqual(env.read_bytes(), original)
             self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
+    def test_status_approval_sends_exact_reference_to_own_chat(self):
+        reference = "aabbcc112233"
+        env = {}
+        with patch.object(sys, "argv", ["wa-inbox", "--send-status-approval", reference]), \
+             patch.object(pmlib, "load_env", return_value=env), \
+             patch.object(wa_inbox, "own_identity", return_value=("instance", "id", "555", [])), \
+             patch.object(wa_inbox, "ui_language", return_value="Spanish"), \
+             patch.object(wa_inbox, "reply") as reply:
+            self.assertEqual(wa_inbox.main(), 0)
+        reply.assert_called_once_with(env, "instance", "555", "555",
+                                      "aprobar whatsapp " + reference, {}, False)
+
+    def test_generated_caption_repairs_split_tag_and_drops_unrelated_emoji(self):
+        text = "¿Galletas o cupcakes ? 🍪🎂\n\n#GalletasY CupcakesEcuador\n\n#ComidaCasera #comidacasera"
+        self.assertEqual(
+            create_draft.finish(text, "Spanish", topic="galletas y cupcakes"),
+            "¿Galletas o cupcakes? 🍪\n\n#GalletasYCupcakesEcuador #ComidaCasera",
+        )
+        inline = "Start with #Weekend Hikes are more fun outside."
+        self.assertEqual(create_draft.split_hashtags(inline), (inline, []))
+
     def test_caption_removes_prompt_echo_and_duplicate_cta(self):
         text = 'Pan de yuca recién horneado. Pan de yuca recién horneado. 🍎\nEscribe frases cortas sobre el tema.\nHaz tu pedido por WhatsApp.\n#PanDeYuca #PanDeYuca'
         result = create_draft.finish(text, 'Spanish', topic='pan de yuca')

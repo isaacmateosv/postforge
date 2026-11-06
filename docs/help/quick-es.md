@@ -42,6 +42,8 @@ Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras Post
 
 En tu Mac, importa **Nueva publicación en PostForge** con **Atajos de Siri…** en Ayuda y dile ese nombre a Siri. El atajo abre la ventana de publicación. Elige **Encender** ahí si los servicios están inactivos.
 
+Después de crear los borradores en el Mac, aprueba por separado el Estado de WhatsApp. Usa **Aprobar Estado…** en el plan o **Aprobar Estado de WhatsApp…** en la barra de menús. Revisa la confirmación en tu propio chat. Si la hora ya pasó, el Estado puede enviarse en cuanto lo apruebes.
+
 ## Libera recursos para editar
 
 PostForge apaga sus servicios después de una hora sin actividad ni trabajo en cola. Durante la pausa, las instrucciones de WhatsApp quedan pendientes. Activa **Avisarme por WhatsApp antes de apagar** si quieres un aviso en tu propio chat. Desactiva **Apagar al estar inactivo** si quieres que la recepción siga disponible mientras el Mac esté despierto.

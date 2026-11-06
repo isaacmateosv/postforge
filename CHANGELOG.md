@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.5]
+
+- Improve generated caption tone, hashtag layout, and contextual emoji filtering.
+- Surface separate WhatsApp Status approval in the plan and menu bar.
+
 ## [2.0.0-rc.4]
 
 - Give the plan more vertical space and organize it into review sections.

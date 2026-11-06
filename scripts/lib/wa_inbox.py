@@ -429,9 +429,13 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     normalized_instruction = approval_text(instruction)
     approval = APPROVE_WHATSAPP.fullmatch(normalized_instruction)
     if approval:
-        item_id = whatsapp_pending.approve(approval.group(1))
-        text = ("✅ WhatsApp Status aprobado. Se enviará a la hora programada." if item_id
-                else "No hay un WhatsApp Status pendiente para aprobar.")
+        item_id = None if dry_run else whatsapp_pending.approve(approval.group(1))
+        if ui_language() == "Spanish":
+            text = ("✅ Estado de WhatsApp aprobado. Se enviará a la hora programada o en cuanto se pueda si ya pasó."
+                    if item_id else "No hay un Estado de WhatsApp pendiente para aprobar.")
+        else:
+            text = ("✅ WhatsApp Status approved. It will send at the scheduled time or as soon as possible if overdue."
+                    if item_id else "There is no pending WhatsApp Status to approve.")
         reply(env, name, number, number, text, state, dry_run)
         if item_id and not dry_run:
             whatsapp_pending.process(env)
@@ -583,6 +587,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="one pass, then exit")
     parser.add_argument("--dry-run", action="store_true", help="no drafts, no replies, nothing marked done")
     parser.add_argument("--reject-plan", metavar="ID", help="reject a saved confirmation plan")
+    parser.add_argument("--send-status-approval", metavar="ID", help="send a specific Status approval to your own chat")
     parser.add_argument("--send-plan-approval", metavar="ID", help="send a plan approval to your own WhatsApp chat")
     args = parser.parse_args()
     if args.idle_notice:
@@ -592,6 +597,15 @@ def main():
                    if ui_language() == "Spanish" else
                    "PostForge is about to go idle. Intake will pause until you turn it on at the Mac.")
         reply(env, instance, number, number, REPLY_MARK + "\n" + message, {}, False, timeout=5)
+        return 0
+    if args.send_status_approval:
+        reference = args.send_status_approval
+        if not re.fullmatch(r"[a-f0-9]{12}", reference):
+            raise PMError("Invalid WhatsApp Status reference")
+        env = pmlib.load_env()
+        instance, _, number, _ = own_identity(env)
+        command = ("aprobar whatsapp " if ui_language() == "Spanish" else "approve whatsapp ") + reference
+        reply(env, instance, number, number, command, {}, args.dry_run)
         return 0
     if args.reject_plan or args.send_plan_approval:
         env = pmlib.load_env()

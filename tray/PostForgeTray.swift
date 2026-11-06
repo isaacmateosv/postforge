@@ -1316,6 +1316,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 if wa.awaitingApproval > 0 { parts.append(text("\(wa.awaitingApproval) awaiting approval", "\(wa.awaitingApproval) esperando aprobación")) }
                 if wa.approved > 0 { parts.append(text("\(wa.approved) approved", "\(wa.approved) aprobados")) }
                 menu.addItem(info(text("WhatsApp Status: " + parts.joined(separator: ", "), "Estado de WhatsApp: " + parts.joined(separator: ", "))))
+                if st.isUp && wa.awaitingApproval > 0 {
+                    let statusMenu = NSMenu()
+                    statusMenu.autoenablesItems = false
+                    for status in pendingStatusApprovals().suffix(8).reversed() {
+                        guard let id = status["id"] as? String else { continue }
+                        let when = (status["when"] as? String).map { shortDate(iso: $0) } ?? ""
+                        let caption = (status["caption"] as? String ?? "").split(whereSeparator: \.isNewline).joined(separator: " ")
+                        let entry = action("\(when) · \(caption.prefix(36))", #selector(approveStatusFromMenu(_:)), enabled: busy == nil)
+                        entry.representedObject = id
+                        statusMenu.addItem(entry)
+                    }
+                    if !statusMenu.items.isEmpty {
+                        let approval = NSMenuItem(title: text("Approve WhatsApp Status…", "Aprobar Estado de WhatsApp…"),
+                                                  action: nil, keyEquivalent: "")
+                        approval.submenu = statusMenu
+                        menu.addItem(approval)
+                    }
+                }
                 if let next = wa.next { menu.addItem(info(text("Next WhatsApp Status: \(shortDate(iso: next))", "Siguiente estado de WhatsApp: \(shortDate(iso: next))"))) }
             }
         }
@@ -2179,6 +2197,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
     }
 
+    func pendingStatusApprovals() -> [[String: Any]] {
+        guard let data = FileManager.default.contents(atPath: project + "/run/whatsapp-pending.json"),
+              let items = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return [] }
+        return items.filter { $0["status"] as? String == "pending" && $0["approved"] as? Bool != true }
+    }
+
+    @objc func approveStatusFromMenu(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? String { approveStatus(id) }
+    }
+
+    func approveStatus(_ id: String, onSuccess: (() -> Void)? = nil) {
+        guard let status = pendingStatusApprovals().first(where: { $0["id"] as? String == id }) else {
+            alert(text("Status unavailable", "Estado no disponible"),
+                  text("This Status has already been approved or is no longer in the queue.",
+                       "Este Estado ya fue aprobado o salió de la cola."))
+            return
+        }
+        let when = (status["when"] as? String).map { shortDate(iso: $0) } ?? ""
+        let caption = String((status["caption"] as? String ?? "").prefix(120))
+        let detail = [when, caption, text("If the scheduled time has passed, it can send as soon as WhatsApp is available.",
+                                          "Si la hora programada ya pasó, el Estado puede enviarse en cuanto WhatsApp esté disponible.")].joined(separator: "\n\n")
+        guard ask(text("Approve this WhatsApp Status?", "¿Aprobar este Estado de WhatsApp?"), detail,
+                  safe: text("Cancel", "Cancelar"), risky: text("Approve Status", "Aprobar Estado")) else { return }
+        let dir = project
+        windowWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(["/usr/bin/python3", dir + "/scripts/lib/wa_inbox.py",
+                                             "--send-status-approval", id], in: dir, timeout: 60)
+            DispatchQueue.main.async {
+                self.windowWork -= 1
+                if code == 0 {
+                    onSuccess?()
+                    self.alert(self.text("Approval sent", "Aprobación enviada"),
+                               self.text("Check your WhatsApp self-chat for confirmation.", "Revisa tu chat contigo en WhatsApp para confirmar."))
+                } else {
+                    self.log("Status approval failed: \(output)")
+                    self.alert(self.text("Couldn’t send the approval", "No se pudo enviar la aprobación"),
+                               self.text("Check that PostForge is on and WhatsApp is linked.", "Verifica que PostForge esté encendido y WhatsApp esté vinculado."))
+                }
+                self.poll()
+            }
+        }
+    }
+
     @objc func openPostiz() {
         if let url = URL(string: state?.postizUrl ?? "http://localhost:4200") { NSWorkspace.shared.open(url) }
     }
@@ -2509,6 +2571,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let preview = NSButton(title: "Preview", target: nil, action: nil)
     let create = NSButton(title: "Create Drafts", target: nil, action: nil)
     let calendar = NSButton(title: "Open Postiz Calendar", target: nil, action: nil)
+    let statusApproval = NSButton(title: "", target: nil, action: nil)
+    var pendingStatusID: String?
     let updatesButton = NSButton(title: "", target: nil, action: nil)
     let spinner = NSProgressIndicator()
     var statsQueue = NSTextField(labelWithString: "0")
@@ -2851,7 +2915,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let planLabel = caption(t("Plan", "Plan"))
         let planSpacer = NSView()
         planSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let planHeader = NSStackView(views: [planLabel, planSpacer, calendar])
+        statusApproval.title = t("Approve Status…", "Aprobar Estado…")
+        statusApproval.target = self
+        statusApproval.action = #selector(approveStatusFromPlan)
+        statusApproval.controlSize = .small
+        statusApproval.isHidden = true
+        let planHeader = NSStackView(views: [planLabel, planSpacer, statusApproval, calendar])
         planHeader.alignment = .centerY
         connections.font = .systemFont(ofSize: 11)
         connections.textColor = .secondaryLabelColor
@@ -2976,6 +3045,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     @objc func openWhatsAppFromWindow() { (NSApp.delegate as? AppDelegate)?.reviewWhatsAppPlans() }
     @objc func openBackupFromWindow() { (NSApp.delegate as? AppDelegate)?.openBackupWindow() }
+
+    @objc func approveStatusFromPlan() {
+        guard let id = pendingStatusID, let delegate = NSApp.delegate as? AppDelegate else { return }
+        delegate.approveStatus(id) { self.statusApproval.isHidden = true }
+    }
 
     @objc func openCalendar() {
         if let url = reviewURL { NSWorkspace.shared.open(url) }
@@ -3108,7 +3182,17 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                  weight: .medium, color: .secondaryLabelColor, before: 9)
             reviewURL = (json["review_url"] as? String).flatMap(URL.init(string:))
             calendar.isHidden = reviewURL == nil
+            pendingStatusID = json["whatsapp_pending_id"] as? String
+            if let id = pendingStatusID,
+               let delegate = NSApp.delegate as? AppDelegate,
+               delegate.pendingStatusApprovals().contains(where: { $0["id"] as? String == id }) {
+                statusApproval.isHidden = false
+                line(t("WhatsApp Status needs separate approval. Use Approve Status above.",
+                       "El Estado de WhatsApp necesita su propia aprobación. Pulsa Aprobar Estado arriba."),
+                     weight: .semibold, color: .systemOrange, before: 6)
+            } else { statusApproval.isHidden = true }
         } else {
+            statusApproval.isHidden = true
             previewed = true
             preview.bezelColor = nil
             create.isEnabled = true
@@ -3934,6 +4018,7 @@ let uiSpanish: [String: String] = [
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
     "1. Bake your idea     →     2. Review the plan     →     3. Create drafts": "1. Hornea la idea     →     2. Revisa el plan     →     3. Crea los borradores",
+    "Approve Status…": "Aprobar Estado…",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",
