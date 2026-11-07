@@ -310,8 +310,6 @@ def change_plan_tag(path, confirmation, value, env, dry_run=False):
         thread_text = plan_post.tagged_threads_caption(env, thread_body, confirmation["lang"], tag)
         result["threads_caption"] = thread_text if thread_text != caption else None
     result.update(caption=caption, final_tag=tag)
-    if result.get("youtube_title"):
-        result["youtube_title"] = pmlib.youtube_title(caption, result.get("short", False))
     confirmation.pop("caption_override", None)
     if not dry_run:
         metadata = os.stat(path)
@@ -397,10 +395,7 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
         lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
                         else "Caption follows in the next message:")]
     if result.get("youtube_title"):
-        title = result["youtube_title"]
-        count = len(title.encode("utf-16-le")) // 2
-        label = "Título de YouTube" if es else "YouTube title"
-        lines += ["", f"{label} ({count}/100)", title]
+        lines += ["", "Título de YouTube" if es else "YouTube title", result["youtube_title"]]
     if result.get("threads_caption"):
         lines += ["", ("Texto para Threads:" if es else "Threads caption:"),
                   clean_caption(result["threads_caption"])]
@@ -528,6 +523,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
             elif saved_result.get("caption"):
                 p["reviewed_caption"] = saved_result["caption"]
                 p["reviewed_threads_caption"] = saved_result.get("threads_caption")
+                p["reviewed_youtube_title"] = saved_result.get("youtube_title")
             with pmlib.Job("draft", "WhatsApp approval: " + confirmation["instruction"][:50]):
                 result = plan_post.run(env, p, dry_run)
             caption = clean_caption(result.get("caption") or "")

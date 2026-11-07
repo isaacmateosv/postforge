@@ -56,7 +56,7 @@ PostForge apaga sus servicios después de una hora sin actividad ni trabajo en c
 
 ## Revisa la duración de tus videos
 
-- **Facebook** avisa cuando el video dura un minuto o más para que puedas considerar una edición más corta.
+- Los **reels de Instagram** de más de tres minutos no se recomiendan a nuevas audiencias.
 - **YouTube Shorts** requiere un video vertical o cuadrado de hasta tres minutos.
 - **Estado de WhatsApp** divide los videos largos en partes de hasta 60 segundos después de aprobarlos.
 

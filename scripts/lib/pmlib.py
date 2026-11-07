@@ -304,22 +304,37 @@ def apply_final_tag(caption, tag):
     if not tag:
         return caption
     caption = remove_final_tag(caption, tag)
-    return caption + ("\n\n" if caption else "") + tag
+    if not caption:
+        return tag
+    last_line = caption.rsplit("\n", 1)[-1]
+    separator = " " if re.fullmatch(r"#\w+(?:[ \t]+#\w+)*", last_line) else "\n\n"
+    return caption + separator + tag
 
 
 YOUTUBE_TITLE_LIMIT = 100
 
 
-def youtube_title(content, short=False):
-    """Use the caption's first text line, leaving room for the Shorts suffix."""
+def youtube_title_line(content):
     lines = re.sub(r"#\S+|[<>]", "", content).splitlines()
-    title = next((" ".join(line.split()) for line in lines if line.strip()), "")
-    if len(title) < 2:
-        title = "Untitled video"
+    return next((" ".join(line.split()) for line in lines if line.strip()), "")
+
+
+def youtube_title_fits(title, short=False):
+    budget = YOUTUBE_TITLE_LIMIT - (len(" #Shorts") if short else 0)
+    return len(title) >= 2 and len(title.encode("utf-16-le")) // 2 <= budget
+
+
+def youtube_title(content, short=False):
+    """Format the title and fall back to a whole-word cut if it is too long."""
+    title = youtube_title_line(content)
     suffix = " #Shorts" if short else ""
-    # Keep within the limit even for supplementary-plane characters such as emojis.
-    budget = YOUTUBE_TITLE_LIMIT - len(suffix)
-    title = title.encode("utf-16-le")[:budget * 2].decode("utf-16-le", errors="ignore").rstrip()
+    if len(title) < 2:
+        return "Untitled video" + suffix
+    if not youtube_title_fits(title, short):
+        budget = YOUTUBE_TITLE_LIMIT - len(suffix) - 1
+        truncated = title.encode("utf-16-le")[:budget * 2].decode("utf-16-le", errors="ignore")
+        whole = truncated.rsplit(" ", 1)[0] if " " in truncated else truncated
+        title = whole.rstrip(" ,;:–-") + "…"
     return title + suffix
 
 

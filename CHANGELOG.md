@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.13]
+
+- Preview a concise YouTube title with AI help when the first line is too long, and keep the full description.
+- Keep generated hashtags together with the final business tag.
+- Warn about new-audience recommendations for Instagram Reels over three minutes.
+- Center the composer steps and add sparks to the mixing animation.
+
 ## [2.0.0-rc.12]
 
 - Add an editable final hashtag and a WhatsApp review step for changing it per plan.
