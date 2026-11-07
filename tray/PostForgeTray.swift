@@ -2644,6 +2644,7 @@ private final class ComposerSteps: NSTextField {
     private func render(progress: Double? = nil) {
         let style = NSMutableParagraphStyle()
         style.lineBreakMode = .byWordWrapping
+        style.alignment = .center
         let line = NSMutableAttributedString(string: text, attributes: [
             .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
             .foregroundColor: accent, .paragraphStyle: style,
@@ -2710,6 +2711,19 @@ private final class MixingIndicator: NSView {
         bowl.lineWidth = 1.6
         bowl.lineCapStyle = .round
         bowl.stroke()
+
+        let sparks = NSBezierPath()
+        for (index, center) in [NSPoint(x: 6, y: 19), NSPoint(x: 24, y: 21)].enumerated() {
+            let radius = 1.4 + (1 + sin(phase + Double(index) * 2)) * 0.55
+            sparks.move(to: NSPoint(x: center.x - radius, y: center.y))
+            sparks.line(to: NSPoint(x: center.x + radius, y: center.y))
+            sparks.move(to: NSPoint(x: center.x, y: center.y - radius))
+            sparks.line(to: NSPoint(x: center.x, y: center.y + radius))
+        }
+        NSColor.systemYellow.setStroke()
+        sparks.lineWidth = 1
+        sparks.lineCapStyle = .round
+        sparks.stroke()
     }
 }
 
@@ -2755,6 +2769,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var reviewedCaption: String?
     var reviewedThreadsCaption: String?
     var reviewedFinalTag: String?
+    var reviewedYouTubeTitle: String?
     let captionVersions = NSPopUpButton()
     let alternateCaption = NSButton()
     var savedVersions: [(instruction: String, output: String)] = []
@@ -3042,6 +3057,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         steps.isBordered = false
         steps.drawsBackground = false
         steps.maximumNumberOfLines = 2
+        steps.alignment = .center
         refreshStepLabels()
 
         // Plan: a read-only result. Until there is one, an empty state explains what happens next.
@@ -3190,6 +3206,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         reviewedCaption = nil
         reviewedThreadsCaption = nil
         reviewedFinalTag = nil
+        reviewedYouTubeTitle = nil
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
@@ -3379,6 +3396,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             args.append("--reviewed-caption=\(reviewedCaption)")
             if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
             if let reviewedFinalTag { args.append("--final-tag=\(reviewedFinalTag)") }
+            if let reviewedYouTubeTitle { args.append("--reviewed-youtube-title=\(reviewedYouTubeTitle)") }
         }
         for url in media { args += ["--media", url.path] }
         args.append(text)
@@ -3489,9 +3507,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             line(caption)
         }
         if let title = json["youtube_title"] as? String {
-            let length = title.utf16.count
-            line(t("▶  YouTube title · \(length)/100", "▶  Título de YouTube · \(length)/100"),
-                 weight: .semibold, before: 9)
+            line(t("▶  YouTube title", "▶  Título de YouTube"), weight: .semibold, before: 9)
             line(title)
         }
         if let threadsCaption = json["threads_caption"] as? String {
@@ -3525,6 +3541,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             canGenerateVariant = (json["caption_source"] as? String)?.hasPrefix("written by ") == true
             reviewedThreadsCaption = json["threads_caption"] as? String
             reviewedFinalTag = json["final_tag"] as? String
+            reviewedYouTubeTitle = json["youtube_title"] as? String
             previewed = reviewedCaption != nil
             coverLocked = previewed
             coverAvailable = json["video_cover_available"] as? Bool == true
@@ -4650,6 +4667,8 @@ if CommandLine.arguments.contains("--verify-ui") {
     let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
     let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
     precondition(steps.stringValue.hasPrefix("1. Bake your idea"))
+    let stepStyle = steps.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+    precondition(stepStyle?.alignment == .center)
     defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
     precondition(steps.stringValue.hasPrefix("1. Hornea la idea"))

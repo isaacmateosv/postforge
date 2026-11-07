@@ -54,7 +54,7 @@ PostForge turns off its services after an hour without activity or queued work. 
 
 ## Video limits worth checking
 
-- **Facebook** flags clips of at least one minute so you can consider a shorter edit.
+- **Instagram Reels** over three minutes aren’t recommended to new audiences.
 - **YouTube Shorts** need a vertical or square video of up to three minutes.
 - **WhatsApp Status** splits longer videos into clips of up to 60 seconds after approval.
 

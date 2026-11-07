@@ -45,13 +45,14 @@ tunnel = module("tunnel_url", "tunnel_url.py")
 
 class Operations(unittest.TestCase):
     def test_video_warnings_respect_platform_thresholds(self):
-        networks = {"facebook", "youtube", "whatsapp"}
-        self.assertEqual(plan_post.video_warnings(networks, [59], "English"), [])
-        self.assertEqual(len(plan_post.video_warnings(networks, [60], "English")), 1)
+        networks = {"instagram", "youtube", "whatsapp"}
+        self.assertEqual(plan_post.video_warnings(networks, [60], "English"), [])
+        self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 1)
         warnings = plan_post.video_warnings(networks, [181], "Spanish")
         self.assertEqual(len(warnings), 3)
+        self.assertIn("nuevas audiencias", warnings[0])
         self.assertIn("4 partes", warnings[-1])
-        self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
+        self.assertEqual(plan_post.video_warnings({"facebook"}, [181], "English"), [])
 
     def test_drafts_use_reviewed_caption_and_threads_variant(self):
         now = datetime(2026, 11, 5, 12, tzinfo=timezone.utc)
@@ -81,7 +82,7 @@ class Operations(unittest.TestCase):
     def test_final_tag_moves_to_footer_and_whatsapp_can_change_it(self):
         tag = pmlib.final_tag("MiNegocio")
         caption = pmlib.apply_final_tag("Mi texto\n\n#minegocio #OtraEtiqueta", tag)
-        self.assertEqual(caption, "Mi texto\n\n#OtraEtiqueta\n\n#MiNegocio")
+        self.assertEqual(caption, "Mi texto\n\n#OtraEtiqueta #MiNegocio")
         self.assertEqual(pmlib.apply_final_tag(caption, tag), caption)
         self.assertEqual(pmlib.apply_final_tag(caption, ""), caption)
         with self.assertRaises(pmlib.PMError):
@@ -95,7 +96,7 @@ class Operations(unittest.TestCase):
             path.write_text(json.dumps(confirmation))
             mtime = path.stat().st_mtime_ns
             result = wa_inbox.change_plan_tag(str(path), confirmation, "#OtroNegocio", {})
-            self.assertEqual(result["caption"], "Mi texto\n\n#OtraEtiqueta\n\n#OtroNegocio")
+            self.assertEqual(result["caption"], "Mi texto\n\n#OtraEtiqueta #OtroNegocio")
             self.assertEqual(result["threads_caption"], "Texto corto\n\n#OtroNegocio")
             self.assertEqual(json.loads(path.read_text())["result"]["final_tag"], "#OtroNegocio")
             self.assertEqual(path.stat().st_mtime_ns, mtime)
@@ -109,6 +110,30 @@ class Operations(unittest.TestCase):
             self.assertEqual(pmlib.draft_settings("youtube", caption, short=short)["title"], title)
             self.assertNotIn("The full description", title)
         self.assertEqual(pmlib.youtube_title("A <good> title"), "A good title")
+
+    def test_youtube_long_title_uses_reviewable_ai_summary(self):
+        caption = ("¿Te gustaría unirte a nosotros con una rica torta de frutillas con chantilly "
+                   "para celebrar los partidos de Liga Deportiva Universitaria?")
+        with patch.object(pmlib, "http", return_value=(200, {
+            "response": "Torta de frutillas con chantilly para la hinchada de Liga"
+        })) as generate:
+            title = plan_post.reviewed_youtube_title({}, caption, "Torta para hinchas de Liga", "Spanish", True)
+        generate.assert_called_once()
+        self.assertEqual(title, "Torta de frutillas con chantilly para la hinchada de Liga #Shorts")
+        with patch.object(pmlib, "http", side_effect=pmlib.PMError("offline")):
+            fallback = plan_post.reviewed_youtube_title({}, caption, None, "Spanish", True)
+        prefix = fallback.removesuffix("… #Shorts")
+        self.assertTrue(caption.startswith(prefix + " "))
+        self.assertLessEqual(len(fallback), 100)
+
+    def test_generated_caption_retries_when_hashtags_are_missing(self):
+        with patch.object(pmlib, "http", side_effect=[
+            (200, {"response": "Galletas para compartir."}),
+            (200, {"response": "Galletas para compartir.\n\n#Galletas #Antojo"}),
+        ]) as generate:
+            caption, _, _ = create_draft.ollama_caption({}, "galletas", "Spanish")
+        self.assertEqual(generate.call_count, 2)
+        self.assertTrue(pmlib.apply_final_tag(caption, "#MiNegocio").endswith("#Galletas #Antojo #MiNegocio"))
 
     def test_caption_intent_distinguishes_brief_from_exact_text(self):
         instruction = 'post everywhere today at 6:40 pm; escribe sobre una torta para “Liga Deportiva Universitaria”'
@@ -201,7 +226,8 @@ class Operations(unittest.TestCase):
                                   [str(cover), str(video)], None, now)
             with patch.object(pmlib, "Postiz") as mock_postiz, \
                  patch.object(pmlib, "normalize_media", side_effect=[("video", str(video)), ("image", str(cover))]) as normalize, \
-                 patch.object(pmlib, "is_short", return_value=False):
+                 patch.object(pmlib, "is_short", return_value=False), \
+                 patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)):
                 mock_postiz.return_value.integrations.return_value = [
                     {"id": "ig", "name": "Instagram", "identifier": "instagram"}]
                 result = plan_post.run({}, plan, True)

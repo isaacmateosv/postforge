@@ -193,7 +193,8 @@ def ollama_caption(env, topic, lang, *, previous=None):
                        if language(lang) == "Spanish" else
                        "Write an alternative with a different opening. Keep the facts from the topic.")
         prompt += f"\n\n{instruction}\n<previous-caption>\n{previous[:600]}\n</previous-caption>"
-    for attempt in (1, 2):  # a second try when the guards leave nothing usable
+    fallback = ""
+    for attempt in (1, 2):  # a second try if the caption is unusable or lacks relevant hashtags
         try:
             status, data = pmlib.http("POST", base + "/api/generate", body={
                 "model": model,
@@ -205,13 +206,26 @@ def ollama_caption(env, topic, lang, *, previous=None):
                 "options": {"temperature": 0.65 if previous else 0.5, "num_predict": 180, "num_ctx": 2048},
             }, timeout=600)
         except PMError:
+            if fallback:
+                return fallback, model, round(seconds, 1)
             raise PMError("Ollama is not reachable at %s. Run ./publish-machine.sh start." % base)
         if status != 200 or not isinstance(data, dict):
+            if fallback:
+                return fallback, model, round(seconds, 1)
             raise PMError("Ollama returned HTTP %s: %s" % (status, str(data)[:300]))
         seconds += data.get("total_duration", 0) / 1e9
         text = finish(data.get("response", ""), lang, env, topic)
         if text and (not previous or text.casefold() != previous.casefold()):
-            return text, model, round(seconds, 1)
+            _, tags = split_hashtags(text)
+            if len(tags) >= 2:
+                return text, model, round(seconds, 1)
+            if not fallback or tags:
+                fallback = text
+            prompt += ("\nIncluye dos hashtags concretos del tema, en una sola línea al final."
+                       if language(lang) == "Spanish" else
+                       "\nInclude two specific hashtags about the topic on one final line.")
+    if fallback:
+        return fallback, model, round(seconds, 1)
     raise PMError("The model's caption didn't pass the checks twice. Try again, or pass your own text with --no-ai.")
 
 

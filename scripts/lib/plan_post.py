@@ -307,6 +307,32 @@ def threads_caption(env, caption, lang, limit=500):
     raise PMError("The model could not produce a complete Threads caption within 500 characters.")
 
 
+def reviewed_youtube_title(env, caption, idea, lang, short):
+    original = pmlib.youtube_title_line(caption)
+    if not original or pmlib.youtube_title_fits(original, short):
+        return pmlib.youtube_title(caption, short)
+    limit = pmlib.YOUTUBE_TITLE_LIMIT - (len(" #Shorts") if short else 0)
+    prompt = (
+        f"Write one complete YouTube title in {lang}, at most {limit} characters. "
+        "Keep the subject and distinctive details. Use a short phrase that makes sense on its own. "
+        "Avoid generic invitations, hashtags, quotation marks, and invented facts. "
+        "Return only the title.\n"
+        f"Topic: {(idea or '')[:350]}\nCaption: {caption[:600]}"
+    )
+    try:
+        status, data = pmlib.http("POST", env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/") + "/api/generate",
+                                  body={"model": env.get("LOCAL_LLM_MODEL", "llama3.2:3b"), "prompt": prompt,
+                                        "stream": False, "keep_alive": 0,
+                                        "options": {"temperature": 0.2, "num_predict": 55, "num_ctx": 2048}}, timeout=45)
+        if status == 200 and isinstance(data, dict):
+            suggestion = pmlib.youtube_title_line((data.get("response") or "").strip().strip('"“”'))
+            if pmlib.youtube_title_fits(suggestion, short):
+                return pmlib.youtube_title(suggestion, short)
+    except PMError:
+        pass
+    return pmlib.youtube_title(caption, short)
+
+
 def tagged_threads_caption(env, caption, lang, tag):
     if not tag:
         return threads_caption(env, caption, lang)
@@ -359,9 +385,9 @@ def video_warnings(networks, durations, lang, short=False):
     es = lang == "Spanish"
     warnings = []
     longest = max(durations, default=0)
-    if "facebook" in networks and longest >= 60:
-        warnings.append("Facebook: el video dura un minuto o más. Considera una versión más corta si buscas un clip breve."
-                        if es else "Facebook: the video is at least one minute long. Consider a shorter cut for a quick clip.")
+    if "instagram" in networks and longest > 180:
+        warnings.append("Instagram: este reel supera los 3 minutos y no se recomendará a nuevas audiencias."
+                        if es else "Instagram: this Reel exceeds three minutes and won’t be recommended to new audiences.")
     if "youtube" in networks and longest > 180 and not short:
         warnings.append("YouTube: el video supera los 3 minutos y se publicaría como video normal."
                         if es else "YouTube: the video exceeds three minutes and would publish as a regular video.")
@@ -460,10 +486,12 @@ def run(env, p, dry_run):
             raise PMError(("No se pueden crear borradores. " if es else "No drafts can be created. ")
                           + " · ".join(result["warnings"]))
 
-        video_networks = {network for network, _, _ in usable} & {"facebook", "youtube", "whatsapp"}
+        video_networks = {network for network, _, _ in usable} & {"youtube", "whatsapp"}
+        if kinds == ["video"] and any(network == "instagram" and place == "feed" for network, _, place in usable):
+            video_networks.add("instagram")
         if video_networks:
             durations = [pmlib.ffprobe(path)[0] for kind, path in ready if kind == "video"]
-            result["warnings"].extend(video_warnings(video_networks, durations, p["lang"], short))
+            result["warnings"].extend(video_warnings(video_networks, durations, p.get("ui_lang", p["lang"]), short))
 
         if p.get("reviewed_caption"):
             caption, source = p["reviewed_caption"], "reviewed caption"
@@ -502,15 +530,19 @@ def run(env, p, dry_run):
             reviewed_threads = p.get("reviewed_threads_caption")
             thread_caption = (pmlib.apply_final_tag(reviewed_threads, tag) if reviewed_threads else
                               tagged_threads_caption(env, caption, p["lang"], tag))
+        youtube_title = None
+        if any(network == "youtube" for network, _, _ in usable):
+            selected_title = p.get("reviewed_youtube_title")
+            youtube_title = (pmlib.youtube_title(selected_title, short) if selected_title else
+                             reviewed_youtube_title(env, caption, p["idea"], p["lang"], short))
         cover_available = kinds == ["video"] and any(
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "final_tag": tag,
+                       "youtube_title": youtube_title,
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
-                       "youtube_title": pmlib.youtube_title(caption, short) if any(
-                           network == "youtube" for network, _, _ in usable) else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
                                     "placement": place, "cover": mode, "cover_second": second if mode else None}
                                    for (n, c, place), mode in zip(usable, modes)]})
@@ -543,6 +575,8 @@ def run(env, p, dry_run):
                 continue
             target_caption = thread_caption if network == "threads" else caption
             settings = {"post_type": "story"} if item_placement == "story" else {}
+            if network == "youtube":
+                settings["title"] = youtube_title
             target_media = media
             if mode and network == "youtube":
                 settings["thumbnail"] = {key: cover_upload[key] for key in ("id", "path")}
@@ -602,6 +636,7 @@ def main():
     parser.add_argument("--alternate-caption", help=argparse.SUPPRESS)
     parser.add_argument("--final-tag", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
+    parser.add_argument("--reviewed-youtube-title", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-threads-caption", help=argparse.SUPPRESS)
     parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
     parser.add_argument("--dry-run", action="store_true", help="show the plan; create nothing")
@@ -626,6 +661,7 @@ def main():
     if not args.dry_run and args.reviewed_caption:
         p["reviewed_caption"] = args.reviewed_caption
         p["reviewed_threads_caption"] = args.reviewed_threads_caption
+        p["reviewed_youtube_title"] = args.reviewed_youtube_title
     result = run(env, p, args.dry_run)
     if args.json:
         out.write(json.dumps(result, ensure_ascii=False, indent=1) + "\n")
