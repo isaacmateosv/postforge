@@ -3,7 +3,10 @@
 Turn a photo or video and an idea into a draft you can review before it goes live.
 
 ```text
-Add media → Bake idea → Create drafts → Approve in Postiz
+Media or text → Bake and review
+                   ├─ Create drafts → Approve in Postiz
+                   └─ Confirm direct scheduling
+WhatsApp Status → separate approval
 ```
 
 ## Make your first post
@@ -21,9 +24,37 @@ You can also put the idea first, followed by a semicolon, such as “Cookies and
 4. Click **👨‍🍳 Bake idea**. Check the time, channels, caption, and video warnings.
 5. Click **Create Drafts**, then open **Postiz Calendar**. Review the draft and approve the schedule there.
 
-Use `idea:` or `write about` to ask PostForge to write a caption. Use `caption:` or `text:` to supply the final wording. For generated text, choose **Another Caption…** to try a new version. **Previous versions…** restores a saved request and its preview. Versions are kept while you work in the composer with the same files and draft options. The selected preview is the one used to create drafts.
+Use **idea:** or **write about** followed by an unquoted brief to generate a caption. Use **caption:** or **text:** for your finished wording. A caption enclosed in double quotation marks is preserved, including when it follows **idea:**. The reusable final hashtag is still appended if configured.
 
-On macOS, press **⌘ Return** to bake the plan. Use **Edit Caption…** or **Another Caption…** to revise the copy while keeping the time, destinations and cover. In WhatsApp, reply `improve plan 1` when the bot offers it. **Schedule Directly…** queues eligible social posts for automatic publication after you confirm. WhatsApp Status stays separate. Protected media delivery must be available before you can schedule media directly.
+```text
+Facebook and Threads tomorrow at 7:15 pm; idea: announce our new opening hours
+WhatsApp tomorrow at 7:15 pm; caption: "We open at 10 tomorrow. See you! ✨"
+```
+
+The wider Mac composer keeps the request and media on the left and the plan on the right. **Create Drafts** becomes available after a successful bake. Changing the request, media, formats, or cover requires another bake. The request box grows within the window and scrolls for longer text.
+
+Use **Try Another Caption** for another wording, **‹ / ›** to browse up to eight retained versions, and **Edit Caption…** for manual corrections. These actions change only the copy section, including the related Threads caption and YouTube title. Time, destinations, cover, notes, and warnings stay on the same plan. An exact caption is rewritten only when you explicitly request another version. Versions belong to the current baked plan.
+
+On macOS, **⌘ Return** bakes the idea and **⌘Z** undoes request edits. **Schedule Directly…** schedules the selected social posts after confirmation. **Create Drafts** keeps the separate Postiz approval step. WhatsApp Status requires its own approval.
+
+## Send a text-only announcement
+
+When no media is attached, Bake idea opens a destination check. Select **Facebook post**, **Threads post**, **WhatsApp Status**, or a combination. The plan shows your choices before creation. Instagram feed posts and Stories, Facebook Stories, TikTok, and YouTube require media in this workflow. To use an announcement on those placements, attach a suitable image or video.
+
+In WhatsApp, confirm supported text destinations explicitly, for example:
+
+```text
+Facebook y Threads mañana a las 19:15, solo texto aprobado; texto: "Mañana atendemos desde las 10. ✨"
+WhatsApp tomorrow at 7:15 pm; caption: "We open at 10 tomorrow. ✨"
+```
+
+Use **improve plan 1** when offered to request new wording while preserving the plan. Review the returned caption before approval. You can use your own exact text from the start.
+
+## Clear unwanted work
+
+**Clear…** offers a local composer reset, deletion of Postiz drafts and failed entries, cancellation of queued posts and pending WhatsApp Status items, or both stored-work scopes. It previews the number of matching entries before a separate confirmation. A composer reset clears unsaved fields only. Cleanup uses the current Postiz organization and skips entries whose state changed after the preview.
+
+Published entries are outside the cleanup scope. A send that already started may finish. Review any item with unconfirmed delivery before posting again. Shared media follows the configured retention period. Intake plans still waiting in the WhatsApp review window can be rejected there.
 
 ## Choose formats and a cover
 
@@ -58,6 +89,7 @@ PostForge turns off its services after an hour without activity or queued work. 
 
 - **Instagram Reels** over three minutes aren’t recommended to new audiences.
 - **YouTube Shorts** need a vertical or square video of up to three minutes.
+- **Facebook/Instagram Stories** split a long single video into separate clips. Review each Story draft in order.
 - **WhatsApp Status** splits longer videos into clips of up to 60 seconds after approval.
 
 ## Find things again

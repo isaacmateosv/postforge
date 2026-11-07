@@ -353,9 +353,12 @@ Before creating a real post:
 1. Open the PostForge menu (the calendar-and-paper-plane icon at the top right of the screen) or
    click the PostForge icon in the Dock to open the New Post window.
 2. Confirm the menu says **Ready to post** and the window's status says **Running**.
-3. Create one test draft for a future time.
-4. Confirm it appears as a **Draft** in Postiz.
-5. Reject the test draft.
+3. In the wide composer, attach media or confirm the text-only announcement destinations.
+   Use **idea:** for a brief or **caption:** with double quotes for exact wording.
+4. Bake with **⌘ Return**, review the time and destinations, then choose **Create Drafts**.
+5. Create one test draft for a future time.
+6. Confirm it appears as a **Draft** in Postiz.
+7. Reject the test draft using **Clear…** or the Postiz calendar.
 
 Nothing should publish unless you explicitly approve it in the intended workflow.
 
@@ -369,7 +372,10 @@ New Post…
 Open Postiz Calendar
 Turn Off…
 Coming up · No scheduled posts waiting
+WhatsApp Plans & Receipts…
+Check for Updates…
 Settings & Tools ▸
+About PostForge
 Quit PostForge (posting keeps running)
 ```
 

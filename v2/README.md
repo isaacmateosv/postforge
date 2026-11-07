@@ -4,6 +4,10 @@ This branch adds a local, read-only browser dashboard and an optional Telegram
 health worker. It uses Docker Compose and Python on macOS, Windows with
 Docker Desktop, and Linux with Docker Engine and the Compose plugin.
 The shared Compose services and the existing Postiz web app handle publishing.
+The dashboard has no Electron dependency. A Rust desktop wrapper and a browser
+composer have not been implemented. The native Mac composer uses Swift/AppKit.
+See the bilingual offline guides in docs/help for the current Mac workflows,
+announcement destination confirmation, caption versions, and cleanup behavior.
 The release candidate still needs end-to-end Windows and Linux host validation.
 
 ## Local web dashboard

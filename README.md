@@ -76,9 +76,24 @@ Open **Help → PostForge Help** in the Mac app to read either guide offline in 
 3. **Approve in Postiz.** Review the caption, accounts, media, and schedule. WhatsApp plans also require explicit approval.
 4. **Let Temporal run the schedule.** Keep the Mac and stack online; the tray shows health, waiting work, and connections that need attention.
 
+The Mac composer uses two columns, with media and the request beside the scrollable
+plan. Bake with **⌘ Return**, review the resolved time and destinations, and then
+use **Create Drafts** or confirm **Schedule Directly…**. **Try Another Caption**,
+**Edit Caption…**, and the **‹ / ›** version controls update the copy section.
+Changing scheduling inputs requires a fresh bake. Use **idea:** with an unquoted
+brief to generate copy, or **caption:** and double quotes to preserve your wording.
+
+With no media, the app asks which supported text destinations should receive the
+announcement. **Clear…** previews and confirms cleanup of drafts, failed entries,
+queued posts and pending WhatsApp Status. Work already sending may finish.
+The current workflows and limitations are described in the
+[English quick guide](docs/help/quick-en.md),
+[guía rápida en español de Ecuador](docs/help/quick-es.md),
+[English technical guide](docs/help/technical-en.md), and
+[guía técnica en español](docs/help/technical-es.md).
+
 Open **PostForge → About PostForge** for the app icon, version/build, copyright and license. **How It Works…** opens this flow; **License & Notices…** displays the bundled legal texts offline. In the tray, **About PostForge** is directly above **Quit PostForge**.
 
-<p align="center"><img src="docs/images/app-es-ec.png" width="560" alt="PostForge native app in Ecuadorian Spanish"></p>
 
 ## Credentials and first connection
 
