@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.14]
+
+- Move channel reconnection countdowns into a Connections popover beside the service status.
+
 ## [2.0.0-rc.13]
 
 - Preview a concise YouTube title with AI help when the first line is too long, and keep the full description.
