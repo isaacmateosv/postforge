@@ -44,6 +44,85 @@ tunnel = module("tunnel_url", "tunnel_url.py")
 
 
 class Operations(unittest.TestCase):
+    def test_media_links_are_scoped_expire_and_reject_writes(self):
+        import media_links
+        from urllib.parse import urlsplit
+        key = b"k" * 32
+        origin = "https://media.example.test"
+        path = "/uploads/2026/11/06/synthetic_media_only_123456.mp4"
+        now = 1794013200
+        expiry = now + 86400
+        with patch.object(media_links.time, "time", return_value=now):
+            link = media_links.signed_url(key, origin, origin + path, expiry)
+        uri = urlsplit(link).path
+        self.assertTrue(media_links.authorized(key, "GET", uri, now))
+        self.assertTrue(media_links.authorized(key, "HEAD", uri, now))
+        for method in ("POST", "PUT", "DELETE"):
+            self.assertFalse(media_links.authorized(key, method, uri, now))
+        self.assertFalse(media_links.authorized(key, "GET", uri, expiry))
+        self.assertFalse(media_links.authorized(b"x" * 32, "GET", uri, now))
+        self.assertFalse(media_links.authorized(key, "GET", uri.replace("123456", "123457"), now))
+        self.assertFalse(media_links.authorized(key, "GET", uri + "?override=1", now))
+        self.assertFalse(media_links.authorized(key, "GET", uri.replace("/uploads/", "/uploads/../"), now))
+        self.assertFalse(media_links.authorized(key, "GET", uri, now - media_links.MAX_AGE))
+        with patch.object(media_links.time, "time", return_value=now):
+            with self.assertRaises(ValueError):
+                media_links.signed_url(key, origin, "https://other.example" + path, expiry)
+            with self.assertRaises(ValueError):
+                media_links.signed_url(key, origin, origin + path, now + media_links.MAX_AGE + 1)
+
+    def test_secure_media_failure_stops_before_creating_any_posts(self):
+        import media_links
+        now = datetime.now(timezone.utc)
+        env = {"FRONTEND_URL": "https://media.example.test"}
+        p = plan_post.plan(env, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="feed")
+        p["reviewed_caption"] = "Delivery check"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gateway = root / "data/gateway"
+            gateway.mkdir(parents=True)
+            (gateway / "configuration.yml").write_text("{}")
+            (gateway / "media-signing.key").write_bytes(b"k" * 32)
+            with patch.object(pmlib, "ROOT", directory), \
+                 patch.object(pmlib, "Postiz") as client, \
+                 patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+                 patch.object(pmlib, "is_short", return_value=False), \
+                 patch.object(media_links, "serves_media", return_value=False):
+                client.return_value.integrations.return_value = [
+                    {"id": "facebook-test", "identifier": "facebook", "name": "Synthetic account"}]
+                client.return_value.upload.return_value = {
+                    "id": "synthetic-media",
+                    "path": env["FRONTEND_URL"] + "/uploads/2026/11/06/synthetic_media_only_123456.mp4"}
+                with self.assertRaisesRegex(pmlib.PMError, "No posts were created"):
+                    plan_post.run(env, p, False, schedule=True)
+                client.return_value.create_draft.assert_not_called()
+
+    def test_long_story_uses_separate_clips_and_keeps_full_feed_video(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="both")
+        p["reviewed_caption"] = "Delivery check"
+        with patch.object(pmlib, "Postiz") as client, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(93, "h264", "aac", 1080, 1920)), \
+             patch.object(pmlib, "split_story_video", return_value=["part1.mp4", "part2.mp4"]), \
+             patch.object(pmlib, "append_log"):
+            api = client.return_value
+            api.integrations.return_value = [{"id": "test", "identifier": "facebook", "name": "Test"}]
+            api.upload.side_effect = lambda path: {"id": path, "path": path}
+            api.create_draft.return_value = [{"postId": "synthetic-draft"}]
+            result = plan_post.run({}, p, False)
+            self.assertEqual(len(result["drafts"]), 3)
+            calls = api.create_draft.call_args_list
+            self.assertEqual(calls[0].args[2][0]["path"], "clip.mp4")
+            self.assertEqual(calls[1].args[2][0]["path"], "part1.mp4")
+            self.assertEqual(calls[2].args[2][0]["path"], "part2.mp4")
+            self.assertEqual(calls[1].kwargs["settings"]["post_type"], "story")
+            self.assertEqual(calls[2].kwargs["when"] - calls[1].kwargs["when"], timedelta(minutes=1))
+            self.assertTrue(any("2 Story drafts" in warning for warning in result["warnings"]))
+
     def test_video_warnings_respect_platform_thresholds(self):
         networks = {"instagram", "youtube", "whatsapp"}
         self.assertEqual(plan_post.video_warnings(networks, [60], "English"), [])

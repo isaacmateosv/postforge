@@ -81,3 +81,38 @@ Si Postiz queda inaccesible al cambiar el túnel, revisa en el registro si se re
 ./postforge.sh channels
 ./postforge.sh maintenance check
 ```
+
+### Entrega de archivos con el acceso seguro
+
+PostForge genera un enlace firmado para que cada red social descargue el archivo
+adjunto. El enlace permite GET y HEAD únicamente para ese archivo y vence 48 horas
+después de la hora planificada. Esta ruta permite programar hasta 30 días por
+adelantado. Si cambias un borrador a una fecha posterior al vencimiento del enlace
+o cambias el dominio público, prepara nuevos borradores antes de aprobarlos.
+Quien tenga un enlace vigente puede descargar ese archivo, así que trátalo como
+información privada. El panel de Postiz, la API y los archivos sin enlace firmado
+siguen requiriendo el inicio de sesión del acceso seguro.
+
+Antes de crear publicaciones, PostForge verifica una descarga de un byte en cada
+enlace firmado, incluidas las portadas. Si falla, detiene la creación y muestra
+el problema. El verificador autoriza la solicitud y Postiz transmite el archivo
+directamente. No se crea otra copia del video. Las reglas de retención vigentes
+siguen controlando su eliminación.
+
+Las nuevas configuraciones del acceso seguro crean una clave privada de 32 bytes
+para firmar los enlaces. En una instalación anterior, créala una sola vez con
+este comando y aplica los archivos actualizados de Compose y Caddy.
+
+    python3 scripts/lib/media_links.py init-key data/gateway/media-signing.key
+
+Mantén la clave privada. Respaldo y traslado la incluye en el archivo cifrado del
+acceso seguro. Al restaurar un respaldo anterior, se genera una clave nueva.
+Una sesión revocada o vencida en una red social todavía requiere volver a
+conectarla desde Postiz.
+
+Si seleccionas historias de Facebook o Instagram y adjuntas un solo video largo,
+se preparan clips equilibrados de menos de 60 segundos. Las publicaciones del
+feed conservan el video completo. Revisa cada borrador de historia en orden.
+La programación directa separa las partes por un minuto. Los clips temporales
+se eliminan después de subirlos y sus copias en Postiz siguen las reglas
+normales de retención.

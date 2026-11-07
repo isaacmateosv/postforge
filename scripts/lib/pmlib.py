@@ -7,6 +7,7 @@ Stdlib only, Python 3.9 compatible (macOS system python3): no backslashes inside
 f-string expressions, no match statements, no `X | Y` type unions.
 """
 import json
+import math
 import mimetypes
 import os
 import re
@@ -531,3 +532,24 @@ def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
     if max_bytes is not None and os.path.getsize(out) > max_bytes:
         raise PMError("Prepared video exceeds the safe size for WhatsApp Status.")
     return out
+
+
+def split_story_video(path, folder):
+    """Prepare balanced Story clips under 60 seconds without dropping the tail."""
+    duration = ffprobe(path)[0]
+    if duration <= 60:
+        return [path]
+    count = math.ceil(duration / 59.5)
+    span = duration / count
+    parts = []
+    for index in range(count):
+        target = os.path.join(folder, "story-%02d.mp4" % (index + 1))
+        run(["ffmpeg", "-nostdin", "-y", "-v", "error",
+             "-ss", str(index * span), "-i", path, "-t", str(span),
+             "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264",
+             "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", target])
+        if not 3 <= ffprobe(target)[0] <= 60:
+            raise PMError("Could not prepare a Story clip between 3 and 60 seconds.")
+        parts.append(target)
+    return parts

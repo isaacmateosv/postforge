@@ -15,6 +15,23 @@
             }
         }
 
+        @signedMedia path_regexp signedMedia ^/postforge-media/[0-9]{10}/[a-f0-9]{64}(/uploads/.*)$
+        handle @signedMedia {
+            route {
+                forward_auth postforge-media-auth:8081 {
+                    uri /verify
+                }
+                rewrite * {re.signedMedia.1}
+                header Cache-Control "private, no-store"
+                reverse_proxy postiz:5000 {
+                    header_up -Cookie
+                    header_up -Authorization
+                    header_up -Proxy-Authorization
+                    header_up -X-Forwarded-Uri
+                }
+            }
+        }
+
         handle {
             forward_auth postforge-auth:9091 {
                 uri /api/authz/forward-auth

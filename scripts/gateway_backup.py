@@ -17,6 +17,7 @@ from credentials import run_openssl
 
 MAGIC = b"PostForge gateway backup v1\n"
 FILES = ("configuration.yml", "users.json", "state.sqlite3")
+OPTIONAL_FILES = ("media-signing.key",)
 LIMIT = 64 * 1024 * 1024
 
 
@@ -57,8 +58,16 @@ def export_gateway(directory, output, password):
         if sum((work / name).stat().st_size for name in FILES) > LIMIT:
             raise ValueError("Gateway backup exceeds the supported size")
         validate(work)
+        included = list(FILES)
+        for name in OPTIONAL_FILES:
+            source = directory / name
+            if source.exists() or source.is_symlink():
+                if source.is_symlink() or not source.is_file() or source.stat().st_size != 32:
+                    raise ValueError("Invalid media signing key")
+                shutil.copyfile(source, work / name)
+                included.append(name)
         with zipfile.ZipFile(work / "snapshot", "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for name in FILES:
+            for name in included:
                 archive.write(work / name, name)
         salt = os.urandom(16)
         encryption_password, auth_key = keys(password, salt)
@@ -92,13 +101,22 @@ def restore_gateway(backup, directory, password):
         (work / "ciphertext").write_bytes(body[offset:])
         run_openssl("decrypt", encryption_password, work / "ciphertext", work / "snapshot")
         with zipfile.ZipFile(work / "snapshot") as archive:
-            if sorted(archive.namelist()) != sorted(FILES) or sum(entry.file_size for entry in archive.infolist()) > LIMIT:
+            names = archive.namelist()
+            if (len(names) != len(set(names)) or not set(FILES) <= set(names)
+                    or not set(names) <= set(FILES + OPTIONAL_FILES)
+                    or sum(entry.file_size for entry in archive.infolist()) > LIMIT):
                 raise ValueError("Invalid gateway backup contents")
             staged = work / "gateway"
             staged.mkdir(mode=0o700)
-            for name in FILES:
+            for name in names:
+                if name in OPTIONAL_FILES and archive.getinfo(name).file_size != 32:
+                    raise ValueError("Invalid media signing key")
                 fd = os.open(staged / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(fd, "wb") as output, archive.open(name) as source:
                     shutil.copyfileobj(source, output)
+        if not (staged / "media-signing.key").exists():
+            fd = os.open(staged / "media-signing.key", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as output:
+                output.write(os.urandom(32))
         validate(staged)
         staged.rename(directory)
