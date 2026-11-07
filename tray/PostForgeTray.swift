@@ -2735,7 +2735,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let emptyState = NSStackView()
     let status = NSTextField(labelWithString: "")
     let turnOnButton = NSButton(title: "", target: nil, action: nil)
-    let connections = NSTextField(wrappingLabelWithString: "")
+    let connectionsButton = NSButton()
+    private let connectionsPopover = NSPopover()
+    private var connectionDetails: [String] = []
     let instruction = NSTextView()
     private let steps = ComposerSteps()
     let result = NSTextView()
@@ -2843,13 +2845,53 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         default: break
         }
         let delegate = NSApp.delegate as? AppDelegate
-        let connection = state.map { delegate?.connectionLines($0).prefix(2).joined(separator: "\n") ?? "" } ?? ""
+        let details = state.map { delegate?.connectionLines($0) ?? [] } ?? []
+        if details != connectionDetails {
+            connectionDetails = details
+            if connectionsPopover.isShown { updateConnectionsPopover() }
+        }
         status.stringValue = "● " + (delegate?.busy ?? label)
-        connections.stringValue = connection
-        connections.toolTip = state.map { delegate?.connectionLines($0).joined(separator: "\n") ?? "" }
-        connections.isHidden = connection.isEmpty
+        let hasAlert = state?.channelAlerts?.isEmpty == false
+        connectionsButton.image = NSImage(systemSymbolName: hasAlert ? "exclamationmark.circle" : "link",
+                                         accessibilityDescription: nil)
+        connectionsButton.contentTintColor = hasAlert ? .systemOrange : nil
         status.textColor = tone
         turnOnButton.isHidden = state?.state != "off" && state?.state != "partial"
+    }
+
+    @objc func showConnections() {
+        if connectionsPopover.isShown {
+            connectionsPopover.performClose(nil)
+            return
+        }
+        updateConnectionsPopover()
+        connectionsPopover.behavior = .transient
+        connectionsPopover.show(relativeTo: connectionsButton.bounds, of: connectionsButton, preferredEdge: .maxY)
+    }
+
+    private func updateConnectionsPopover() {
+        let title = NSTextField(labelWithString: t("Channel connections", "Conexiones de canales"))
+        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        let details = connectionDetails.isEmpty
+            ? [t("No connection details available yet.", "Todavía no hay datos de conexión.")]
+            : connectionDetails
+        let rows = details.map { detail in
+            let label = NSTextField(wrappingLabelWithString: detail)
+            label.font = .systemFont(ofSize: 12)
+            label.textColor = .secondaryLabelColor
+            label.preferredMaxLayoutWidth = 254
+            return label
+        }
+        let stack = NSStackView(views: [title] + rows)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 7
+        stack.edgeInsets = NSEdgeInsets(top: 13, left: 15, bottom: 13, right: 15)
+        for row in rows { row.widthAnchor.constraint(equalToConstant: 254).isActive = true }
+        let controller = NSViewController()
+        controller.view = stack
+        connectionsPopover.contentViewController = controller
+        connectionsPopover.contentSize = stack.fittingSize
     }
 
     func caption(_ text: String) -> NSTextField {
@@ -2920,7 +2962,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         turnOnButton.target = self
         turnOnButton.action = #selector(turnOnFromWindow)
         turnOnButton.controlSize = .small
-        let serviceControls = NSStackView(views: [status, turnOnButton])
+        connectionsButton.title = t("Connections", "Conexiones")
+        connectionsButton.target = self
+        connectionsButton.action = #selector(showConnections)
+        connectionsButton.controlSize = .small
+        connectionsButton.imagePosition = .imageLeading
+        let serviceControls = NSStackView(views: [status, connectionsButton, turnOnButton])
         serviceControls.orientation = .vertical
         serviceControls.alignment = .trailing
         serviceControls.spacing = 4
@@ -3143,9 +3190,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         updateCaptionVersions()
         let planHeader = NSStackView(views: [planLabel, planSpacer, captionVersions, alternateCaption, statusApproval, calendar])
         planHeader.alignment = .centerY
-        connections.font = .systemFont(ofSize: 11)
-        connections.textColor = .secondaryLabelColor
-        let main = NSStackView(views: [header, steps, connections, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
+        let main = NSStackView(views: [header, steps, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
         main.orientation = .vertical
         main.alignment = .leading
         main.spacing = 9
@@ -4370,6 +4415,7 @@ let uiSpanish: [String: String] = [
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
     "Approve Status…": "Aprobar Estado…",
     "Final hashtag…": "Etiqueta final…",
+    "Connections": "Conexiones",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",
@@ -4667,11 +4713,17 @@ if CommandLine.arguments.contains("--verify-ui") {
     let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
     let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
     precondition(steps.stringValue.hasPrefix("1. Bake your idea"))
+    precondition(composer.connectionsButton.title == "Connections")
+    precondition(composer.connectionsButton.action == #selector(NewPostWindow.showConnections))
+    let serviceHeader = composerStack.arrangedSubviews[0] as! NSStackView
+    let serviceControls = serviceHeader.arrangedSubviews.last as! NSStackView
+    precondition(serviceControls.arrangedSubviews.contains { $0 === composer.connectionsButton })
     let stepStyle = steps.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
     precondition(stepStyle?.alignment == .center)
     defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
     precondition(steps.stringValue.hasPrefix("1. Hornea la idea"))
+    precondition(composer.connectionsButton.title == "Conexiones")
     defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
     steps.startSweep(in: composer.window)
