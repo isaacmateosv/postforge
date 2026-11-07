@@ -92,11 +92,22 @@ def split_instruction(text):
     idea_mark = IDEA_MARK.search(text)
     if (idea_mark and (not exact_mark or idea_mark.start() < exact_mark.start())
             and (not quoted or idea_mark.start() < quoted.start())):
-        return text[:idea_mark.start()], None, text[idea_mark.end():].strip(" ;,.:") or None
+        body = text[idea_mark.end():].strip(" ;,.:")
+        literal = QUOTED.fullmatch(body)
+        if literal:
+            return text[:idea_mark.start()], literal.group(1).strip(), None
+        brief, separator, tail = body.rpartition(";")
+        if separator and re.search(r"\b(?:post|publish|upload|postea|publica|sube|programa|schedule)\b", plain(tail)):
+            return text[:idea_mark.start()] + " " + tail, None, brief.strip() or None
+        return text[:idea_mark.start()], None, body or None
     if quoted and (not exact_mark or quoted.start() < exact_mark.start()):
         return text[:quoted.start()] + " " + text[quoted.end():], quoted.group(1).strip(), None
     if exact_mark:
-        return text[:exact_mark.start()], text[exact_mark.end():].strip(" \"“”") or None, None
+        body = text[exact_mark.end():].strip()
+        literal = QUOTED.match(body)
+        if literal:
+            return text[:exact_mark.start()] + " " + body[literal.end():], literal.group(1).strip(), None
+        return text[:exact_mark.start()], body.strip(" \"“”") or None, None
     if idea_mark:
         return text[:idea_mark.start()], None, text[idea_mark.end():].strip(" ;,.:") or None
     idea, separator, command = text.partition(";")
@@ -123,12 +134,16 @@ def parse_when(command, now):
     words = plain(command)
     clock = re.sub(r"\b(" + "|".join(NUMBER_WORDS) + r")\b", lambda m: str(NUMBER_WORDS[m.group(1)]), words)
     clock = re.sub(r"\b(\d{1,2}) y media\b", r"\1:30", re.sub(r"\b(\d{1,2}) y cuarto\b", r"\1:15", clock))
+    clock = re.sub(r"\b([ap])\s*\.?\s*m\s*\.?", r"\1m", clock)
     notes = []
     weekday = re.search(r"\b(" + "|".join(WEEKDAYS) + r")\b", words)
 
     day = None
     m = re.search(r"\b(\d{1,2}) (?:de )?" + MONTH + r"\b", words) or re.search(r"\b" + MONTH + r"\.? (\d{1,2})\b", words)
-    if m:
+    iso = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", words)
+    if iso:
+        day = _date(now, int(iso[2]), int(iso[3]), iso[1])
+    elif m:
         a, b = m.groups()
         day = _date(now, *((MONTHS[b], int(a)) if a.isdigit() else (MONTHS[a], int(b))))
     elif re.search(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b", words):
@@ -141,7 +156,13 @@ def parse_when(command, now):
     elif re.search(r"\b(hoy|today|tonight|esta noche|esta tarde|this afternoon|this evening)\b", words):
         day = now.date()
     elif weekday:
-        day = now.date() + timedelta(days=(WEEKDAYS[weekday.group(1)] - now.weekday()) % 7)
+        offset = (WEEKDAYS[weekday.group(1)] - now.weekday()) % 7
+        if offset == 0 and re.search(r"\b(?:next|proximo|proxima)\b", words):
+            offset = 7
+        day = now.date() + timedelta(days=offset)
+
+    if day is None and (m or iso):
+        return None, ["invalid calendar date"]
 
     hour = minute = None
     ampm = None
@@ -155,12 +176,12 @@ def parse_when(command, now):
         if m:
             hour, minute, ampm = int(m.group(1)), 0, m.group(2)
         else:
-            m = re.search(r"\b(\d{1,2})\s*(?:h|hrs?|horas)\b(?!\s+de)|\ba las? (\d{1,2})\b|\b(\d{1,2}) (?=" + PERIOD + ")", clock)
+            m = re.search(r"\b(\d{1,2})\s*(?:h|hrs?|horas)\b(?!\s+de)|\b(?:a las?|at) (\d{1,2})\b|\b(\d{1,2}) (?=" + PERIOD + ")", clock)
             if m:
                 hour, minute = int(next(g for g in m.groups() if g)), 0
     if hour is not None:
-        if hour > 23 or minute > 59:
-            hour = minute = None
+        if hour > 23 or minute > 59 or (ampm and not 1 <= hour <= 12):
+            return None, ["invalid clock time"]
         elif ampm and ampm.startswith("p") and hour < 12:
             hour += 12
         elif ampm and ampm.startswith("a") and hour == 12:
@@ -345,13 +366,14 @@ def tagged_threads_caption(env, caption, lang, tag):
 
 def revise_copy(env, snapshot, instruction, edited=None):
     """Update only caption fields on a previously calculated preview."""
-    _, _, idea = split_instruction(instruction)
+    _, exact, idea = split_instruction(instruction)
     lang = snapshot["lang"]
     tag = pmlib.final_tag(snapshot.get("final_tag"))
     if edited is None:
-        if not idea:
-            raise PMError("No hay una idea para reescribir." if lang == "Spanish" else "There is no idea to rewrite.")
-        caption, model, _ = ollama_caption(env, idea, lang, previous=snapshot["caption"])
+        brief = idea or exact or snapshot.get("caption")
+        if not brief:
+            raise PMError("No hay un texto para reescribir." if lang == "Spanish" else "There is no caption to rewrite.")
+        caption, model, _ = ollama_caption(env, brief, lang, previous=snapshot["caption"])
         source = "written by %s from your idea" % model
     else:
         caption = edited.strip()
@@ -368,7 +390,7 @@ def revise_copy(env, snapshot, instruction, edited=None):
 
 
 def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cover_image=None,
-         cover_second=None, ui_lang=None):
+         cover_second=None, ui_lang=None, text_networks=None):
     command, exact, idea = split_instruction(text)
     lang = lang_arg or detect_lang(idea or exact or text, env.get("CAPTION_LANGUAGE", "Spanish"))
     es = (ui_lang or lang) == "Spanish"
@@ -389,22 +411,32 @@ def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cove
                       "Choose a cover image or a video timestamp.")
     schedule = command if not cover_word else command[:cover_word.start()] + command[cover_word.end():]
     networks, said_all = parse_networks(schedule)
+    if text_networks is not None:
+        if media_paths or not text_networks or not set(text_networks) <= {"facebook", "threads", "whatsapp"}:
+            raise PMError("Choose supported text-only destinations without attached media.")
+        networks, said_all = list(dict.fromkeys(text_networks)), False
     if not networks:
         raise PMError("Indica en qué red quieres publicar o escribe «en todo lado»." if es else
                       "Choose a network or say ‘post everywhere’.")
     when, notes = parse_when(schedule, now)
     if when is None:
+        if notes == ["invalid clock time"]:
+            raise PMError("La hora indicada no es válida. Usa, por ejemplo, 19:15 o 7:15 p. m." if es else
+                          "That time is invalid. Use a time such as 19:15 or 7:15 pm.")
+        if notes == ["invalid calendar date"]:
+            raise PMError("La fecha indicada no existe. Revisa el día, mes y año." if es else
+                          "That calendar date does not exist. Check the day, month, and year.")
         if notes and notes[-1].startswith("requested time"):
             raise PMError("La hora indicada ya pasó o faltan menos de 5 minutos. Indica una nueva hora."
                           if es else "The requested time has passed or is less than 5 minutes away. "
                           "No post was created. Please send a new future time.")
         raise PMError("Indica cuándo quieres publicar. Por ejemplo, «mañana a las 7:15 p. m.»."
                       if es else "Say when: for example, ‘tomorrow at 7:15 pm’.")
-    return {"ui_lang": ui_lang or lang, "placement": placement_override or placement(command),
+    return {"ui_lang": ui_lang or lang, "placement": "both" if text_networks is not None else placement_override or placement(command),
             "cover_image": cover_image, "cover_attachment": cover_attachment, "cover_second": cover_second,
             "networks": networks, "said_all": said_all, "command": command, "when": when, "notes": notes, "exact": exact,
             "idea": idea, "lang": lang, "media": media_paths,
-            "text_approved": bool(TEXT_APPROVED.search(command))}
+            "text_approved": text_networks is not None or bool(TEXT_APPROVED.search(command))}
 
 
 def video_warnings(networks, durations, lang, short=False):
@@ -464,6 +496,11 @@ def run(env, p, dry_run, schedule=False):
         ready = [pmlib.normalize_media(os.path.expanduser(path), tmp) for path in paths]
         kinds = [kind for kind, _ in ready]
         short = kinds == ["video"] and pmlib.is_short(ready[0][1])
+        if not kinds and not p["text_approved"] and any(n in ("facebook", "threads") for n, _, _ in targets):
+            raise PMError(
+                "Sin archivos, confirma los destinos del anuncio. Facebook y Threads admiten publicaciones de texto; WhatsApp admite Estados de texto. Instagram requiere una foto o un video. Para confirmar, vuelve a enviar los destinos y la hora con «solo texto aprobado; texto: tu anuncio»."
+                if es else
+                "Without media, confirm the announcement destinations. Facebook and Threads accept text posts; WhatsApp accepts text Status. Instagram needs a photo or video. Resend the destinations and time with ‘only text approved; caption: your announcement’ to confirm.")
         cover_requested = bool(image) or second is not None
         normalized_cover = None
         if cover_requested:
@@ -599,7 +636,7 @@ def run(env, p, dry_run, schedule=False):
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "final_tag": tag,
-                       "can_rewrite": bool(p["idea"] and not p["exact"]),
+                       "can_rewrite": bool(p["idea"] or p["exact"]),
                        "direct_schedule_available": has_social_posts and not media_blocked,
                        "direct_schedule_blocked_by_gateway": has_social_posts and media_blocked,
                        "youtube_title": youtube_title,
@@ -735,6 +772,7 @@ def main():
     parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-youtube-title", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-threads-caption", help=argparse.SUPPRESS)
+    parser.add_argument("--text-networks", help="confirmed text-only destinations, comma separated")
     parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
     parser.add_argument("--dry-run", action="store_true", help="show the plan; create nothing")
     parser.add_argument("--json", action="store_true", help="print the result as JSON")
@@ -762,7 +800,8 @@ def main():
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
     now = datetime.now(tz)
     p = plan(env, args.instruction, args.media, args.lang, now, placement_override=args.placement,
-             cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
+             cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang,
+             text_networks=args.text_networks.split(",") if args.text_networks is not None else None)
     if args.final_tag is not None:
         p["final_tag"] = args.final_tag
     if args.dry_run and args.alternate_caption:

@@ -41,9 +41,57 @@ import pmlib
 import machine_state
 credentials = module("credentials", "credentials.py")
 tunnel = module("tunnel_url", "tunnel_url.py")
+manage_posts = module("manage_posts", "manage_posts.py")
 
 
 class Operations(unittest.TestCase):
+    def test_quoted_idea_is_exact_and_schedule_ignores_caption_dates(self):
+        words = 'WhatsApp today at 8:36 pm; idea: "Open on Saturday at 9am. See you! 🎉"'
+        command, exact, idea = plan_post.split_instruction(words)
+        self.assertEqual(exact, "Open on Saturday at 9am. See you! 🎉")
+        self.assertIsNone(idea)
+        now = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
+        when, notes = plan_post.parse_when(command, now)
+        self.assertEqual((when.day, when.hour, when.minute), (7, 20, 36))
+        command, exact, idea = plan_post.split_instruction("idea: a project update; post everywhere tomorrow at 7pm")
+        self.assertEqual(idea, "a project update")
+        self.assertEqual(plan_post.parse_when(command, now)[0].hour, 19)
+        self.assertEqual(plan_post.parse_when("2026-11-09 at 18:30", now)[0].day, 9)
+        self.assertIsNone(plan_post.parse_when("2026-02-31 at 18:30", now)[0])
+        self.assertEqual(plan_post.parse_when("mañana a las 8:36 p. m.", now)[0].hour, 20)
+        self.assertIsNone(plan_post.parse_when("tomorrow at 25:00", now)[0])
+        self.assertIsNone(plan_post.parse_when("tomorrow at 13 pm", now)[0])
+        command, exact, idea = plan_post.split_instruction('caption: "Offers tomorrow at 9am"; post everywhere today at 7pm')
+        self.assertEqual(exact, "Offers tomorrow at 9am")
+        self.assertEqual(plan_post.parse_when(command, now)[0].hour, 19)
+
+    def test_cleanup_skips_changed_posts_and_inflight_whatsapp(self):
+        from unittest.mock import Mock
+        client = Mock(org_id="synthetic-org")
+        group = {"group": "g", "posts": [{"id": "a", "state": "DRAFT"}]}
+        reviewed = {"organization": "synthetic-org", "scope": "all", "groups": [group],
+                    "whatsapp": [{"id": "w", "status": "pending"}]}
+        changed = {"groups": [], "whatsapp": []}
+        with patch.object(manage_posts, "snapshot", return_value=changed), \
+             patch.object(manage_posts.whatsapp_pending, "_queue_lock"), \
+             patch.object(manage_posts.whatsapp_pending, "_read", return_value=[{"id": "w", "status": "sending"}]), \
+             patch.object(manage_posts.whatsapp_pending, "_write") as write:
+            result = manage_posts.clear({}, reviewed, client)
+        client._call.assert_not_called()
+        write.assert_not_called()
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(result["cancelled_whatsapp"], 0)
+
+    def test_cleanup_calls_cancellation_api_and_checks_removal(self):
+        from unittest.mock import Mock
+        client = Mock(org_id="synthetic-org")
+        group = {"group": "g", "posts": [{"id": "a", "state": "DRAFT"}]}
+        reviewed = {"organization": "synthetic-org", "scope": "drafts", "groups": [group], "whatsapp": []}
+        with patch.object(manage_posts, "snapshot", side_effect=[{"groups": [group]}, {"groups": []}]):
+            result = manage_posts.clear({}, reviewed, client)
+        client._call.assert_called_once_with("DELETE", "/posts/a")
+        self.assertEqual(result["deleted"], 1)
+
     def test_media_links_are_scoped_expire_and_reject_writes(self):
         import media_links
         from urllib.parse import urlsplit
@@ -122,6 +170,26 @@ class Operations(unittest.TestCase):
             self.assertEqual(calls[1].kwargs["settings"]["post_type"], "story")
             self.assertEqual(calls[2].kwargs["when"] - calls[1].kwargs["when"], timedelta(minutes=1))
             self.assertTrue(any("2 Story drafts" in warning for warning in result["warnings"]))
+
+    def test_text_announcement_overrides_require_explicit_supported_destinations(self):
+        now = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
+        selected = plan_post.plan({}, 'Instagram tomorrow at 7pm; caption: "Opening at 10 tomorrow"',
+                                  [], "English", now, text_networks=["facebook", "threads", "whatsapp"])
+        self.assertEqual(selected["networks"], ["facebook", "threads", "whatsapp"])
+        self.assertEqual(selected["placement"], "both")
+        self.assertTrue(selected["text_approved"])
+        self.assertEqual(selected["exact"], "Opening at 10 tomorrow")
+        with patch.object(pmlib, "Postiz") as client:
+            client.return_value.integrations.return_value = [
+                {"id": "facebook", "identifier": "facebook", "name": "Example"},
+                {"id": "threads", "identifier": "threads", "name": "Example"}]
+            output = plan_post.run({}, selected, True)
+            self.assertEqual([(item["network"], item["placement"]) for item in output["targets"]],
+                             [("facebook", "feed"), ("threads", "feed"), ("whatsapp", "status")])
+            client.return_value.create_draft.assert_not_called()
+        with self.assertRaises(pmlib.PMError):
+            plan_post.plan({}, "Instagram tomorrow at 7pm; idea: an announcement", [], "English", now,
+                           text_networks=["instagram"])
 
     def test_video_warnings_respect_platform_thresholds(self):
         networks = {"instagram", "youtube", "whatsapp"}

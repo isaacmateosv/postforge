@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.19]
+
+- Use a wide two-column composer and prominent bake and draft actions.
+- Revise only the copy section and browse caption versions with arrows.
+- Preserve quoted captions, validate dates and times, and confirm text-only announcement destinations.
+- Add scoped cleanup with a preview, confirmation, state rechecks, and scheduler cancellation.
+- Hide model identifiers in the composer, add a third baking sparkle, and update bilingual workflows and technical guides.
+
 ## [2.0.0-rc.18]
 
 - Restore media delivery through the protected gateway with expiring, file-scoped signed links.

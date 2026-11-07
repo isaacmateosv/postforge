@@ -54,7 +54,7 @@ URLs to match it. Review the v2 README before making a public cutover.
 ## Daily operation
 
 - The Mac composer and WhatsApp self-chat use the same planner. A quoted caption is kept as written.
-- Social drafts require approval in Postiz. WhatsApp Status follows its own explicit approval queue.
+- By default, social posts become drafts for Postiz approval. Schedule Directly requires confirmation before queueing. WhatsApp Status follows its own explicit approval queue.
 - A stopped stack pauses intake. A WhatsApp message cannot turn on the local listener. For a local restart, use Siri to open the composer and choose **Turn On**.
 - Hourly update checks compare the public PostForge release, declared Docker images, and stable upstream Evolution releases. Package upgrades refresh an active stack and preserve its runtime data.
 
@@ -112,3 +112,46 @@ Facebook or Instagram Stories are selected. The full video stays on feed posts.
 Review each Story draft in order. Direct scheduling spaces Story parts one minute
 apart. Encoded temporary clips are removed after upload, and their uploaded copies
 follow the normal Postiz retention rules.
+
+## Composer state and advanced configuration
+
+Caption revision and version navigation patch only the stored caption fields.
+The native view replaces the attributed copy range, preserving plan metadata and
+scroll position. Editing the request or attachment options invalidates that plan
+and clears its version history. The two-column composer grows its request field
+within a fixed-height workspace and keeps the plan independently scrollable.
+
+The request parser separates scheduling instructions from caption content.
+Double-quoted content and explicit caption/text fields preserve wording. An
+unquoted idea field requests generation. Ecuadorian day/month dates, ISO dates,
+weekdays, AM/PM including spaced “p. m.”, and local timezone scheduling are
+supported. Review the resolved date and hour before creation. Invalid dates,
+invalid times, and past or too-soon times produce an error. For predictable
+results, place the destinations and schedule before the caption or brief.
+
+The local model is an advanced setting. Install the desired Ollama model and set
+LOCAL_LLM_MODEL in the private .env file. OLLAMA_HOST_URL selects the local server.
+The next bake reads these settings. The ordinary composer uses descriptive copy
+labels and hides the model identifier. Choosing a larger model increases memory
+and generation time. Models remain external to the installer.
+
+Cleanup first snapshots eligible unpublished groups for the selected organization.
+Confirmation applies only to that snapshot, rechecks each group and uses Postiz's
+public DELETE endpoint so its scheduler cancellation path executes. Changed work
+is skipped. Pending WhatsApp Status records are cancelled under the queue lock,
+and items already marked sending are excluded. Cancellation may race with an
+external publish already in progress. Failures and skipped entries are reported,
+and a retry requires another preview. The tool does not purge media shared by
+other posts or bypass retention.
+
+Text-only announcements require explicit supported-destination selection in the
+Mac UI. The CLI accepts --text-networks facebook,threads,whatsapp with no media.
+WhatsApp uses the explicit “only text approved” / “solo texto aprobado” command.
+Facebook and Threads use feed posts and WhatsApp uses Status. Instagram and
+Facebook Story publishing in this app use media. Text-to-image announcement
+cards and interactive Telegram publishing buttons are future work.
+
+Windows/Linux currently use the Python browser dashboard and shared Docker
+services. It is read-only and has no native composer or Rust desktop wrapper.
+There is no Electron shell. The Mac app is Swift/AppKit. Ctrl+Enter for a
+cross-platform composer remains pending that implementation.

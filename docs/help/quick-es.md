@@ -3,7 +3,10 @@
 Convierte una foto o un video y una idea en un borrador que puedas revisar antes de publicar.
 
 ```text
-Agrega archivos → Hornea la idea → Crea borradores → Aprueba en Postiz
+Archivos o texto → Hornea y revisa
+                     ├─ Crea borradores → Aprueba en Postiz
+                     └─ Confirma la programación directa
+Estado de WhatsApp → aprobación aparte
 ```
 
 ## Haz tu primera publicación
@@ -21,9 +24,37 @@ También puedes poner primero la idea y separarla con punto y coma. Por ejemplo,
 4. Pulsa **👨‍🍳 Hornea la idea**. Revisa la hora, los canales, el texto y los avisos sobre el video.
 5. Pulsa **Crear borradores** y abre el **calendario de Postiz**. Revisa el borrador y aprueba la programación ahí.
 
-Usa `idea:` o `escribe sobre` para pedir que PostForge redacte el texto. Usa `texto:` para que conserve tus palabras tal cual. Si el texto fue generado, pulsa **Otra versión del texto…** para probar una alternativa. **Versiones anteriores…** recupera el pedido y su vista previa. Las versiones se guardan mientras trabajas con los mismos archivos y opciones. Al crear borradores se usa la versión seleccionada.
+Usa **idea:** o **escribe sobre** con un tema sin comillas para generar un texto. Usa **texto:** o **caption:** para conservar la redacción que ya preparaste. Un texto entre comillas dobles se conserva, incluso después de **idea:**. Si configuraste una etiqueta final, se añade al final.
 
-En macOS, presiona **⌘ Intro** para hornear el plan. Usa **Editar texto…** u **Otra versión del texto…** para cambiar el texto y conservar la hora, los destinos y la portada. En WhatsApp, responde `mejora plan 1` cuando el bot te lo sugiera. **Programar directamente…** pone en cola las publicaciones aptas para que salgan automáticamente después de confirmar. El Estado de WhatsApp se aprueba por separado. La entrega por el acceso seguro debe funcionar para programar archivos directamente.
+```text
+Facebook y Threads mañana a las 7:15 p. m.; idea: anunciar nuestro nuevo horario
+WhatsApp mañana a las 19:15; texto: "Mañana atendemos desde las 10. ¡Te esperamos! ✨"
+```
+
+La ventana más ancha mantiene el pedido y los archivos a la izquierda y el plan a la derecha. **Crear borradores** se habilita después de hornear correctamente. Cambiar el pedido, los archivos, los formatos o la portada requiere volver a hornear. El campo del pedido crece dentro de la ventana y permite desplazarte si el texto es más largo.
+
+Pulsa **Probar otro texto** para pedir otra redacción, usa **‹ / ›** para recorrer hasta ocho versiones guardadas o **Editar texto…** para corregirlo a mano. Estas acciones cambian únicamente la sección del texto, incluidos el texto de Threads y el título de YouTube cuando correspondan. Se conservan la fecha, los destinos, la portada, las notas y las advertencias del plan. Un texto exacto se reescribe solo si pides otra versión. Las versiones pertenecen al plan actual.
+
+En macOS, **⌘ Return** hornea la idea y **⌘Z** deshace cambios en el pedido. **Programar directamente…** programa las publicaciones seleccionadas después de confirmar. **Crear borradores** mantiene la aprobación posterior en Postiz. El Estado de WhatsApp requiere su propia aprobación.
+
+## Enviar un anuncio solo de texto
+
+Si no adjuntaste archivos, Hornea la idea abre una selección de destinos. Elige **Publicación de Facebook**, **Publicación de Threads**, **Estado de WhatsApp** o varios. Revisa esos destinos en el plan antes de continuar. En este flujo, las publicaciones e historias de Instagram, las historias de Facebook, TikTok y YouTube requieren un archivo. Para usarlos con un anuncio, adjunta una imagen o un video adecuado.
+
+En WhatsApp, confirma los destinos compatibles de forma explícita, por ejemplo:
+
+```text
+Facebook y Threads mañana a las 19:15, solo texto aprobado; texto: "Mañana atendemos desde las 10. ✨"
+WhatsApp mañana a las 19:15; texto: "Mañana atendemos desde las 10. ✨"
+```
+
+Responde **mejora plan 1** cuando se ofrezca para pedir otra redacción sin cambiar el plan. Revisa el texto que recibes antes de aprobarlo. También puedes enviar tus palabras exactas desde el inicio.
+
+## Limpiar elementos que ya no necesitas
+
+**Limpiar…** permite reiniciar el formulario, eliminar borradores y publicaciones fallidas de Postiz, cancelar la cola y los Estados pendientes de WhatsApp o combinar ambos alcances guardados. Primero muestra cuántos elementos coinciden y después solicita confirmar. Reiniciar el formulario limpia solo los campos sin guardar. La limpieza usa la organización actual de Postiz y conserva elementos cuyo estado cambió después de la vista previa.
+
+Las publicaciones que ya salieron quedan fuera del alcance. Un envío que ya empezó podría completarse. Revisa cualquier entrega sin confirmar antes de volver a publicar. Los archivos compartidos siguen la retención configurada. Los planes recibidos por WhatsApp que todavía esperan revisión se pueden rechazar en esa ventana.
 
 ## Elige los formatos y la portada
 
@@ -60,6 +91,7 @@ PostForge apaga sus servicios después de una hora sin actividad ni trabajo en c
 
 - Los **reels de Instagram** de más de tres minutos no se recomiendan a nuevas audiencias.
 - **YouTube Shorts** requiere un video vertical o cuadrado de hasta tres minutos.
+- Las **historias de Facebook e Instagram** dividen un video largo en clips separados. Revisa cada borrador en orden.
 - **Estado de WhatsApp** divide los videos largos en partes de hasta 60 segundos después de aprobarlos.
 
 ## Encuentra las herramientas

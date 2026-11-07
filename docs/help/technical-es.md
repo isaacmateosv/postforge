@@ -116,3 +116,49 @@ feed conservan el video completo. Revisa cada borrador de historia en orden.
 La programación directa separa las partes por un minuto. Los clips temporales
 se eliminan después de subirlos y sus copias en Postiz siguen las reglas
 normales de retención.
+
+## Estado del formulario y configuración avanzada
+
+La revisión y navegación de versiones modifican solo los campos del texto.
+La vista nativa reemplaza esa sección y conserva los datos del plan y la posición
+de desplazamiento. Editar el pedido o las opciones de los archivos invalida el
+plan y limpia sus versiones. La ventana de dos columnas permite crecer al campo
+del pedido dentro del espacio disponible y desplazar el plan por separado.
+
+El analizador separa la programación del contenido. Las comillas dobles y los
+campos texto/caption conservan la redacción. Una idea sin comillas solicita
+generación. Se admiten fechas día/mes de Ecuador, fechas ISO, días de la semana,
+AM/PM incluso con espacios como “p. m.” y la zona horaria configurada. Revisa la
+fecha y hora resueltas antes de crear borradores. Las fechas u horas inválidas,
+pasadas o demasiado próximas producen un error. Para obtener resultados
+predecibles, escribe los destinos y la hora antes del texto o la idea.
+
+El modelo local es una configuración avanzada. Instala el modelo de Ollama que
+necesites y define LOCAL_LLM_MODEL en el archivo privado .env. OLLAMA_HOST_URL
+selecciona el servidor local. El siguiente horneado lee esos valores. El formulario
+muestra etiquetas descriptivas y oculta el identificador del modelo. Un modelo
+más grande consume más memoria y tarda más en generar. Los modelos se mantienen
+fuera del instalador.
+
+La limpieza toma una vista previa de los grupos pendientes en la organización
+seleccionada. Al confirmar, vuelve a revisar cada grupo y usa el DELETE de la API
+pública de Postiz para ejecutar su cancelación del programador. Conserva los
+elementos que cambiaron. Los Estados pendientes de WhatsApp se cancelan con el
+bloqueo de la cola; los que ya están enviándose quedan excluidos. Una publicación
+externa que ya empezó puede completarse. Se muestran los fallos y elementos
+omitidos; un nuevo intento requiere otra vista previa. Los archivos compartidos
+por otras publicaciones siguen la retención normal.
+
+Los anuncios sin archivos requieren elegir destinos compatibles en la interfaz
+del Mac. La CLI acepta --text-networks facebook,threads,whatsapp sin archivos.
+En WhatsApp se usa la confirmación “solo texto aprobado” / “only text approved”.
+Facebook y Threads usan publicaciones del feed; WhatsApp usa Estados.
+Las historias de Instagram y Facebook en esta app requieren archivos. Las
+tarjetas que convierten texto en imagen y los botones de Telegram para publicar
+quedan pendientes de implementación.
+
+Windows y Linux usan actualmente el panel web en Python y los servicios de
+Docker compartidos. El panel es de solo lectura y carece de un formulario nativo
+o una aplicación de escritorio en Rust. No usa Electron. La app del Mac está
+hecha con Swift/AppKit. Ctrl+Enter queda pendiente para el futuro formulario
+multiplataforma.

@@ -2092,13 +2092,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     @objc func showPublishingFlow() {
-        let window = makeSecondaryWindow(title: text("How PostForge works", "Cómo funciona PostForge"), height: 440)
+        let window = makeSecondaryWindow(title: text("How PostForge works", "Cómo funciona PostForge"), height: 560)
         let root = BackgroundView()
         let title = windowLabel("PostForge", size: 24, weight: .bold)
-        let stages = [text("1 · Media + your idea\nMac app or WhatsApp self-chat", "1 · Archivos + tu idea\nApp para Mac o chat contigo en WhatsApp"),
-                      text("2 · Local AI → preview → your approval", "2 · IA local → vista previa → tu aprobación"),
-                      text("3 · Postiz drafts → review & schedule", "3 · Borradores en Postiz → revisión y programación"),
-                      text("4 · Temporal → connected social channels", "4 · Temporal → redes sociales conectadas")]
+        let stages = [text("1 · Media or a text announcement\nMac app or WhatsApp self-chat", "1 · Archivos o un anuncio de texto\nApp para Mac o chat contigo en WhatsApp"),
+                      text("2 · Keep your words or generate copy → review", "2 · Conserva tu texto o genera uno → revisa"),
+                      text("3 · Create drafts or confirm direct scheduling", "3 · Crea borradores o confirma la programación"),
+                      text("4 · Scheduled delivery · WhatsApp approved separately", "4 · Envío programado · WhatsApp se aprueba aparte")]
         var views: [NSView] = [title]
         for (index, stage) in stages.enumerated() {
             if index > 0 { views.append(windowLabel("↓", size: 16, color: .systemTeal)) }
@@ -2696,7 +2696,7 @@ private final class MixingIndicator: NSView {
     private var timer: Timer?
     private var phase = 0.0
 
-    override var intrinsicContentSize: NSSize { NSSize(width: 28, height: 25) }
+    override var intrinsicContentSize: NSSize { NSSize(width: 30, height: 29) }
 
     func start() {
         isHidden = false
@@ -2738,7 +2738,7 @@ private final class MixingIndicator: NSView {
         bowl.stroke()
 
         let sparks = NSBezierPath()
-        for (index, center) in [NSPoint(x: 6, y: 19), NSPoint(x: 24, y: 21)].enumerated() {
+        for (index, center) in [NSPoint(x: 5, y: 19), NSPoint(x: 24, y: 21), NSPoint(x: 15, y: 25)].enumerated() {
             let radius = 1.4 + (1 + sin(phase + Double(index) * 2)) * 0.55
             sparks.move(to: NSPoint(x: center.x - radius, y: center.y))
             sparks.line(to: NSPoint(x: center.x + radius, y: center.y))
@@ -2749,6 +2749,31 @@ private final class MixingIndicator: NSView {
         sparks.lineWidth = 1
         sparks.lineCapStyle = .round
         sparks.stroke()
+    }
+}
+
+final class ComposerActionButton: NSButton {
+    override func draw(_ dirtyRect: NSRect) {
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1),
+                                 xRadius: 15, yRadius: 15)
+        let base = bezelColor ?? NSColor.systemBlue
+        let fill = isEnabled ? base : base.withAlphaComponent(0.22)
+        (isHighlighted ? fill.blended(withFraction: 0.15, of: .black) ?? fill : fill).setFill()
+        shape.fill()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let text = NSAttributedString(string: title, attributes: [
+            .font: font ?? NSFont.systemFont(ofSize: 14, weight: .semibold),
+            .foregroundColor: isEnabled ? NSColor.white : NSColor.white.withAlphaComponent(0.45),
+            .paragraphStyle: paragraph,
+        ])
+        let height = text.size().height
+        text.draw(in: NSRect(x: 6, y: (bounds.height - height) / 2, width: bounds.width - 12, height: height))
+        if window?.firstResponder === self {
+            NSColor.keyboardFocusIndicatorColor.setStroke()
+            shape.lineWidth = 2
+            shape.stroke()
+        }
     }
 }
 
@@ -2766,11 +2791,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let instruction = NSTextView()
     private let steps = ComposerSteps()
     let result = NSTextView()
-    let preview = NSButton(title: "Preview", target: nil, action: nil)
-    let create = NSButton(title: "Create Drafts", target: nil, action: nil)
+    let preview = ComposerActionButton(title: "Preview", target: nil, action: nil)
+    let create = ComposerActionButton(title: "Create Drafts", target: nil, action: nil)
     let schedule = NSButton()
     let editCaption = NSButton()
     var reviewedWhen: String?
+    var textOnlyNetworks: [String]?
     var canScheduleSocials = false
     let calendar = NSButton(title: "Open Postiz Calendar", target: nil, action: nil)
     let statusApproval = NSButton(title: "", target: nil, action: nil)
@@ -2794,15 +2820,17 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var coverURL: URL?
     var inputRevision = 0
     var ideaHeight: NSLayoutConstraint?
-    private var largestRequestHeight: CGFloat = 86
-    var planExpanded = false
     var reviewURL: URL?
     var previewed = false
     var reviewedCaption: String?
     var reviewedThreadsCaption: String?
     var reviewedFinalTag: String?
     var reviewedYouTubeTitle: String?
-    let captionVersions = NSPopUpButton()
+    let captionPrevious = NSButton()
+    let captionNext = NSButton()
+    let captionVersionLabel = NSTextField(labelWithString: "")
+    let clearWork = NSButton()
+    var captionRange: NSRange?
     let alternateCaption = NSButton()
     var savedVersions: [(instruction: String, output: String)] = []
     var selectedVersion: Int?
@@ -2812,7 +2840,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     init(project: String) {
         self.project = project
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 820),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 790),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
@@ -2822,7 +2850,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         window.appearance = NSAppearance(named: .darkAqua)  // one look: the controls are drawn for dark
         window.backgroundColor = BackgroundView.color
         window.isMovableByWindowBackground = true
-        window.contentMinSize = NSSize(width: 520, height: 730)
+        let bounds = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 900)
+        window.contentMinSize = NSSize(width: min(920, bounds.width - 48), height: min(700, bounds.height - 48))
+        window.setContentSize(NSSize(width: min(1060, bounds.width - 48), height: min(790, bounds.height - 48)))
         window.isReleasedWhenClosed = false
         build()
         refreshState(nil)
@@ -3088,7 +3118,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let finalTagButton = NSButton(title: t("Final hashtag…", "Etiqueta final…"),
                                       target: NSApp.delegate, action: #selector(AppDelegate.editCaptionFinalTag))
         finalTagButton.controlSize = .small
-        let placements = NSStackView(views: [placementLabel, placementMenu, finalTagButton])
+        let placements = NSStackView(views: [placementLabel, placementMenu])
         placements.spacing = 8
 
         chooseCover.title = t("Choose image…", "Elegir imagen…")
@@ -3117,8 +3147,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let ideaPanel = Panel(scroll(instruction, editable: true), insets: NSEdgeInsets(), style: .input)
         ideaHeight = ideaPanel.heightAnchor.constraint(equalToConstant: 86)
         ideaHeight?.isActive = true
-        placeholder.stringValue = t("Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm: fresh sourdough”",
-                                    "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm: pan de masa madre”")
+        placeholder.stringValue = t("Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm; idea: our new launch”",
+                                    "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm; idea: nuestro lanzamiento”")
         placeholder.font = .systemFont(ofSize: 13)
         placeholder.textColor = .tertiaryLabelColor
         placeholder.maximumNumberOfLines = 2
@@ -3150,6 +3180,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         create.target = self
         create.action = #selector(runCreate)
         create.isEnabled = false
+        create.controlSize = .large
+        create.font = .systemFont(ofSize: 14, weight: .semibold)
+        create.bezelColor = .systemBlue
+        create.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
         schedule.title = t("Schedule Directly…", "Programar directamente…")
         schedule.target = self
         schedule.action = #selector(scheduleReviewedPlan)
@@ -3160,9 +3194,13 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let actionSpacer = NSView()
         actionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         mixer.isHidden = true
-        let actions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, preview, create, schedule])
+        let actions = NSStackView(views: [preview, create])
+        actions.distribution = .fillEqually
         actions.spacing = 10
         actions.alignment = .centerY
+        let secondaryActions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, schedule])
+        secondaryActions.spacing = 8
+        secondaryActions.alignment = .centerY
 
         steps.isEditable = false
         steps.isSelectable = false
@@ -3229,7 +3267,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         updatesButton.action = #selector(AppDelegate.openUpdates)
         updatesButton.controlSize = .small
         refreshUpdates(available: (NSApp.delegate as? AppDelegate)?.updatesAvailable == true)
-        let footer = NSStackView(views: [whatsappButton, updatesButton, footerSpacer, backupButton])
+        clearWork.title = t("Clear…", "Limpiar…")
+        clearWork.target = self
+        clearWork.action = #selector(clearWorkspace)
+        clearWork.controlSize = .small
+        let footer = NSStackView(views: [whatsappButton, updatesButton, clearWork, footerSpacer, backupButton])
         footer.spacing = 8
         footer.alignment = .centerY
 
@@ -3245,10 +3287,17 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         statusApproval.action = #selector(approveStatusFromPlan)
         statusApproval.controlSize = .small
         statusApproval.isHidden = true
-        captionVersions.target = self
-        captionVersions.action = #selector(restoreCaptionVersion)
-        captionVersions.controlSize = .small
-        alternateCaption.title = t("Another Caption…", "Otra versión del texto…")
+        captionPrevious.title = "‹"
+        captionNext.title = "›"
+        captionPrevious.target = self
+        captionNext.target = self
+        captionPrevious.action = #selector(previousCaption)
+        captionNext.action = #selector(nextCaption)
+        captionPrevious.toolTip = t("Previous caption", "Texto anterior")
+        captionNext.toolTip = t("Next caption", "Texto siguiente")
+        captionVersionLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        captionVersionLabel.alignment = .center
+        alternateCaption.title = t("Try Another Caption", "Probar otro texto")
         alternateCaption.target = self
         alternateCaption.action = #selector(runAlternateCaption)
         alternateCaption.controlSize = .small
@@ -3257,24 +3306,53 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         editCaption.action = #selector(editReviewedCaption)
         editCaption.controlSize = .small
         updateCaptionVersions()
-        let planHeader = NSStackView(views: [planLabel, planSpacer, captionVersions, editCaption, alternateCaption, statusApproval, calendar])
+        let planHeader = NSStackView(views: [planLabel, planSpacer, statusApproval, calendar])
         planHeader.alignment = .centerY
-        let main = NSStackView(views: [header, steps, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
+        let versionSpacer = NSView()
+        versionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let captionToolbar = NSStackView(views: [captionPrevious, captionVersionLabel, captionNext,
+                                                versionSpacer, editCaption, alternateCaption])
+        captionToolbar.spacing = 5
+        captionToolbar.alignment = .centerY
+        let inputHint = NSTextField(wrappingLabelWithString: t(
+            "idea: a brief to write from · caption: your exact words. Quoted text stays as written.",
+            "idea: un tema para redactar · texto: tus palabras exactas. Lo que va entre comillas se conserva."))
+        inputHint.font = .systemFont(ofSize: 11)
+        inputHint.textColor = .secondaryLabelColor
+        let extraOptions = NSStackView(views: [finalTagButton])
+        let inputColumn = NSStackView(views: [mediaLabel, drop, placements, coverControls, extraOptions,
+                                             ideaLabel, ideaPanel, inputHint, actions, secondaryActions])
+        inputColumn.orientation = .vertical
+        inputColumn.alignment = .leading
+        inputColumn.spacing = 8
+        let inputSpacer = NSView()
+        inputSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .vertical)
+        inputColumn.addArrangedSubview(inputSpacer)
+        for view in [drop, placements, coverControls, ideaPanel, inputHint, actions, secondaryActions] {
+            view.widthAnchor.constraint(equalTo: inputColumn.widthAnchor).isActive = true
+        }
+        let planColumn = NSStackView(views: [planHeader, captionToolbar, planPanel])
+        planColumn.orientation = .vertical
+        planColumn.alignment = .leading
+        planColumn.spacing = 8
+        for view in [planHeader, captionToolbar, planPanel] {
+            view.widthAnchor.constraint(equalTo: planColumn.widthAnchor).isActive = true
+        }
+        let body = NSStackView(views: [inputColumn, planColumn])
+        body.alignment = .top
+        body.spacing = 22
+        inputColumn.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.43, constant: -11).isActive = true
+        inputColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        planColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        let main = NSStackView(views: [header, steps, stats, body, footer])
         main.orientation = .vertical
         main.alignment = .leading
-        main.spacing = 9
-        main.edgeInsets = NSEdgeInsets(top: 34, left: inset, bottom: 16, right: inset)
-        main.setCustomSpacing(13, after: header)
-        main.setCustomSpacing(14, after: stats)
-        for label in [mediaLabel, ideaLabel] { main.setCustomSpacing(6, after: label) }
-        main.setCustomSpacing(13, after: actions)
-        main.setCustomSpacing(12, after: planPanel)
-        main.setCustomSpacing(6, after: planHeader)
+        main.spacing = 12
+        main.edgeInsets = NSEdgeInsets(top: 32, left: inset, bottom: 16, right: inset)
         main.translatesAutoresizingMaskIntoConstraints = false
-        for view in [header, steps, stats, drop, coverControls, ideaPanel, actions, planHeader, planPanel, footer] {
+        for view in [header, steps, stats, body, footer] {
             view.widthAnchor.constraint(equalTo: main.widthAnchor, constant: -2 * inset).isActive = true
         }
-
         root.addSubview(main)
         NSLayoutConstraint.activate([
             main.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -3283,6 +3361,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             main.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
         window.contentView = root
+        updateCoverControls()
     }
 
     func add(_ urls: [URL]) {
@@ -3314,7 +3393,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     func invalidateReviewedPlan() {
         inputRevision += 1
+        textOnlyNetworks = nil
         selectedVersion = nil
+        savedVersions.removeAll()
+        captionRange = nil
         canGenerateVariant = false
         lastReport = nil
         reviewedCaption = nil
@@ -3326,16 +3408,18 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
+        result.alphaValue = 0.5
         coverLocked = false
         updateCoverControls()
         updateCaptionVersions()
     }
 
     func updateCoverControls() {
-        chooseCover.isEnabled = !coverLocked && !working
-        coverSecond.isEnabled = !coverLocked && !working
+        let hasVideo = media.contains { ["mp4", "mov", "m4v", "webm", "mkv", "avi", "3gp"].contains($0.pathExtension.lowercased()) }
+        chooseCover.isEnabled = hasVideo && !coverLocked && !working
+        coverSecond.isEnabled = hasVideo && !coverLocked && !working
         clearCover.isEnabled = !coverLocked && !working
-        clearCover.isHidden = coverLocked
+        clearCover.isHidden = coverLocked || (coverURL == nil && coverSecond.stringValue.isEmpty)
         changeCover.isHidden = !coverLocked || !coverAvailable
         changeCover.isEnabled = !working
     }
@@ -3371,30 +3455,28 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     func updateCaptionVersions() {
-        captionVersions.removeAllItems()
-        captionVersions.addItem(withTitle: t("Previous versions…", "Versiones anteriores…"))
-        for index in savedVersions.indices {
-            captionVersions.addItem(withTitle: t("Version \(index + 1)", "Versión \(index + 1)"))
-        }
-        captionVersions.selectItem(at: selectedVersion.map { $0 + 1 } ?? 0)
-        captionVersions.isHidden = savedVersions.isEmpty
-        captionVersions.isEnabled = !working
+        let visible = previewed && !savedVersions.isEmpty
+        captionVersionLabel.stringValue = visible ? t("\((selectedVersion ?? 0) + 1) of \(savedVersions.count)",
+                                                       "\((selectedVersion ?? 0) + 1) de \(savedVersions.count)") : ""
+        for view in [captionPrevious, captionNext, captionVersionLabel] { view.isHidden = !visible }
+        captionPrevious.isEnabled = previewed && !working && (selectedVersion ?? 0) > 0
+        captionNext.isEnabled = previewed && !working && (selectedVersion ?? -1) < savedVersions.count - 1
         alternateCaption.isHidden = !canGenerateVariant
         alternateCaption.isEnabled = !working
         editCaption.isHidden = !previewed
         editCaption.isEnabled = !working
+        clearWork.isEnabled = !working
         schedule.isEnabled = previewed && canScheduleSocials && reviewedWhen != nil && !working
     }
 
-    @objc func restoreCaptionVersion() {
-        let index = captionVersions.indexOfSelectedItem - 1
+    @objc func previousCaption() { restoreCaptionVersion(at: (selectedVersion ?? 0) - 1) }
+    @objc func nextCaption() { restoreCaptionVersion(at: (selectedVersion ?? -1) + 1) }
+
+    func restoreCaptionVersion(at index: Int) {
         guard !working, savedVersions.indices.contains(index) else { return }
-        let entry = savedVersions[index]
-        instruction.string = entry.instruction
-        placeholder.isHidden = !entry.instruction.isEmpty
-        inputRevision += 1
         selectedVersion = index
-        report(entry.output, dryRun: true, exitCode: 0)
+        applyCaptionOnly(savedVersions[index].output)
+        updateCaptionVersions()
     }
 
     @objc func runAlternateCaption() {
@@ -3448,8 +3530,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                 defer { self.updateCaptionVersions() }
                 guard revision == self.inputRevision else { return }
                 if code == 0 {
-                    self.report(output, dryRun: true, exitCode: code)
-                    if self.previewed { self.rememberVersion(request, output: output) }
+                    self.applyCaptionOnly(output)
+                    if self.previewed { self.rememberVersion(request, output: self.lastReport?.0 ?? output) }
                 } else {
                     self.create.isEnabled = self.previewed
                     (NSApp.delegate as? AppDelegate)?.alert(
@@ -3499,6 +3581,108 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         if panel.runModal() == .OK { add(panel.urls) }
     }
 
+    func resetComposer() {
+        media.removeAll()
+        instruction.string = ""
+        instruction.undoManager?.removeAllActions()
+        placeholder.isHidden = false
+        coverURL = nil
+        coverFile.stringValue = ""
+        coverSecond.stringValue = ""
+        acceptedNoCover = false
+        pendingStatusID = nil
+        statusApproval.isHidden = true
+        calendar.isHidden = true
+        files.stringValue = t("No files yet", "Sin archivos")
+        invalidateReviewedPlan()
+        result.string = ""
+        emptyState.isHidden = false
+        resizeRequestField()
+    }
+
+    func runCleanup(_ arguments: [String], completion: @escaping (Int32, [String: Any]) -> Void) {
+        working = true
+        preview.isEnabled = false
+        create.isEnabled = false
+        updateCaptionVersions()
+        spinner.startAnimation(nil)
+        (NSApp.delegate as? AppDelegate)?.planningWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(["/usr/bin/python3", self.project + "/scripts/manage_posts.py"] + arguments,
+                                            in: self.project, timeout: 180, quietErrors: true)
+            let json = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any] ?? [:]
+            DispatchQueue.main.async {
+                self.working = false
+                self.preview.isEnabled = true
+                self.create.isEnabled = self.previewed
+                self.spinner.stopAnimation(nil)
+                self.updateCaptionVersions()
+                if let delegate = NSApp.delegate as? AppDelegate {
+                    delegate.planningWork -= 1
+                    delegate.poll()
+                }
+                completion(code, json)
+            }
+        }
+    }
+
+    @objc func clearWorkspace() {
+        guard !working else { return }
+        let options = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 28))
+        options.addItems(withTitles: [
+            t("Clear this composer", "Limpiar este formulario"),
+            t("Delete Postiz drafts and failed posts", "Eliminar borradores y publicaciones fallidas"),
+            t("Cancel queued posts and WhatsApp Status", "Cancelar la cola y los Estados de WhatsApp"),
+            t("Drafts, failed posts and queue", "Borradores, publicaciones fallidas y cola"),
+        ])
+        let alert = NSAlert()
+        alert.messageText = t("What would you like to clear?", "¿Qué quieres limpiar?")
+        alert.informativeText = t("Choose the scope. Stored work is counted before you confirm deletion.",
+                                  "Elige el alcance. Se contarán los elementos guardados antes de confirmar su eliminación.")
+        alert.accessoryView = options
+        alert.addButton(withTitle: t("Continue", "Continuar"))
+        alert.addButton(withTitle: t("Cancel", "Cancelar"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let selection = options.indexOfSelectedItem
+        if selection == 0 { resetComposer(); return }
+        let scope = ["drafts", "queue", "all"][selection - 1]
+        runCleanup(["--scope", scope]) { code, snapshot in
+            guard let delegate = NSApp.delegate as? AppDelegate else { return }
+            guard code == 0, let posts = snapshot["post_count"] as? Int,
+                  let statuses = snapshot["whatsapp_count"] as? Int else {
+                delegate.alert(self.t("Couldn’t read the queue", "No se pudo leer la cola"),
+                               self.t("Try again when Postiz is available.", "Vuelve a intentar cuando Postiz esté disponible."))
+                return
+            }
+            guard posts + statuses > 0 else {
+                delegate.alert(self.t("Nothing to clear", "No hay nada que limpiar"),
+                               self.t("No matching unpublished work was found.", "No se encontraron elementos pendientes con ese alcance."))
+                return
+            }
+            guard delegate.ask(self.t("Clear the selected work?", "¿Eliminar los elementos seleccionados?"),
+                               self.t("\(posts) Postiz entries and \(statuses) WhatsApp plans. Work already being sent may finish. Shared media follows the retention setting.",
+                                      "\(posts) elementos de Postiz y \(statuses) planes de WhatsApp. Un envío que ya empezó podría completarse. Los archivos compartidos siguen la retención configurada."),
+                               safe: self.t("Keep", "Conservar"), risky: self.t("Clear", "Eliminar")) else { return }
+            let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("postforge-cleanup-" + UUID().uuidString + ".json")
+            guard let data = try? JSONSerialization.data(withJSONObject: snapshot),
+                  FileManager.default.createFile(atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+                delegate.alert(self.t("Cleanup couldn’t start", "No se pudo iniciar la limpieza"), "")
+                return
+            }
+            self.runCleanup(["--apply-snapshot", file.path]) { code, outcome in
+                try? FileManager.default.removeItem(at: file)
+                let deleted = outcome["deleted"] as? Int ?? 0
+                let cancelled = outcome["cancelled_whatsapp"] as? Int ?? 0
+                let skipped = outcome["skipped"] as? Int ?? 0
+                if code == 0 { self.resetComposer() }
+                delegate.alert(self.t(code == 0 ? "Cleanup finished" : "Cleanup needs review",
+                                      code == 0 ? "Limpieza terminada" : "Revisa la limpieza"),
+                               self.t("\(deleted) Postiz entries cleared; \(cancelled) WhatsApp plans cancelled. \(skipped) changed entries were kept. Check the calendar before trying again.",
+                                      "Se eliminaron \(deleted) elementos de Postiz y se cancelaron \(cancelled) planes de WhatsApp. Se conservaron \(skipped) elementos que habían cambiado. Revisa el calendario antes de volver a intentar."))
+            }
+        }
+    }
+
     @objc func clearFiles() {
         media = []
         clearCoverImage()
@@ -3515,22 +3699,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         guard let layout = instruction.layoutManager, let container = instruction.textContainer else { return }
         layout.ensureLayout(for: container)
         let needed = ceil(layout.usedRect(for: container).height + 2 * instruction.textContainerInset.height + 6)
-        let height = min(180, max(previewed ? 64 : 86, needed))
+        let height = min(160, max(86, needed))
         ideaHeight?.constant = height
-        if height > largestRequestHeight {
-            expandComposer(by: height - largestRequestHeight)
-            largestRequestHeight = height
-        }
-    }
-
-    private func expandComposer(by amount: CGFloat) {
-        guard let bounds = window.screen?.visibleFrame else { return }
-        var frame = window.frame
-        let extra = max(0, min(amount, bounds.height - frame.height))
-        guard extra > 0 else { return }
-        frame.origin.y = max(bounds.minY, frame.minY - extra)
-        frame.size.height += extra
-        window.setFrame(frame, display: true)
     }
 
     @objc func startDictation() {
@@ -3544,6 +3714,37 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         guard let delegate = NSApp.delegate as? AppDelegate, delegate.busy == nil,
               delegate.state?.state == "off" || delegate.state?.state == "partial" else { return }
         delegate.turnOn()
+    }
+
+    func confirmTextAnnouncement(_ request: String) -> Bool {
+        let words = request.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_EC"))
+        let all = ["everywhere", "all networks", "all platforms", "todo lado", "todas las redes"].contains { words.contains($0) }
+        let names = [("facebook", "Facebook post", "Publicación de Facebook"),
+                     ("threads", "Threads post", "Publicación de Threads"),
+                     ("whatsapp", "WhatsApp Status", "Estado de WhatsApp")]
+        let choices = names.map { network, english, spanish -> NSButton in
+            let button = NSButton(checkboxWithTitle: t(english, spanish), target: nil, action: nil)
+            button.state = all || words.contains(network) ? .on : .off
+            return button
+        }
+        let stack = NSStackView(views: choices)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 370, height: 90)
+        let alert = NSAlert()
+        alert.messageText = t("Text-only announcement", "Anuncio solo de texto")
+        alert.informativeText = t(
+            "No photo or video is attached. Choose the destinations for this announcement. Facebook and Threads use regular posts. WhatsApp uses Status. Instagram posts and Stories require media.",
+            "No adjuntaste fotos ni videos. Elige los destinos de este anuncio. Facebook y Threads usarán publicaciones. WhatsApp usará un Estado. Las publicaciones e historias de Instagram requieren un archivo.")
+        alert.accessoryView = stack
+        alert.addButton(withTitle: t("Review announcement", "Revisar anuncio"))
+        alert.addButton(withTitle: t("Add media or cancel", "Adjuntar archivos o cancelar"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return false }
+        let selected = zip(names, choices).filter { $0.1.state == .on }.map { $0.0.0 }
+        guard !selected.isEmpty else { return false }
+        textOnlyNetworks = selected
+        return true
     }
 
     @objc func runPreview() { run(dryRun: true) }
@@ -3596,6 +3797,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         }
         let text = instruction.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return show("Say where, when, and your idea first.") }
+        if dryRun && media.isEmpty && textOnlyNetworks == nil && !confirmTextAnnouncement(text) { return }
         let revision = inputRevision
         var args = [project + "/scripts/plan-post.sh", "--json", "--ui-lang", t("English", "Spanish")]
         switch placementMenu.indexOfSelectedItem {
@@ -3604,10 +3806,14 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         case 3: args += ["--placement", "both"]
         default: break
         }
+        if let textOnlyNetworks { args += ["--text-networks", textOnlyNetworks.joined(separator: ",")] }
         if let url = coverURL { args += ["--cover-image", url.path] }
         let second = coverSecond.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if !second.isEmpty { args += ["--cover-second=\(second)"] }
         if dryRun {
+            savedVersions.removeAll()
+            selectedVersion = nil
+            captionRange = nil
             args.append("--dry-run")
         } else if let reviewedCaption {
             args.append("--reviewed-caption=\(reviewedCaption)")
@@ -3657,6 +3863,65 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                 }
                 self.updateCaptionVersions()
             }
+        }
+    }
+
+    func captionContent(_ json: [String: Any]) -> NSAttributedString {
+        let document = NSMutableAttributedString(string: "")
+        func line(_ value: String, heading: Bool = false, secondary: Bool = false) {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacing = 6
+            style.paragraphSpacingBefore = heading ? 9 : 0
+            style.lineSpacing = 2
+            document.append(NSAttributedString(string: value + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: secondary ? 11 : 13, weight: heading ? .semibold : .regular),
+                .foregroundColor: secondary ? NSColor.secondaryLabelColor : NSColor.labelColor,
+                .paragraphStyle: style,
+            ]))
+        }
+        if let text = json["caption"] as? String {
+            line(t("✍️  Caption", "✍️  Texto"), heading: true)
+            let source = json["caption_source"] as? String ?? ""
+            line(source == "your text" ? t("Your exact words", "Tus palabras exactas")
+                 : source.hasPrefix("written by ") ? t("Written from your idea", "Redactado a partir de tu idea")
+                 : t("Your selected caption", "El texto que elegiste"), secondary: true)
+            line(text)
+        }
+        if let title = json["youtube_title"] as? String {
+            line(t("▶  YouTube title", "▶  Título de YouTube"), heading: true)
+            line(title)
+        }
+        if let text = json["threads_caption"] as? String {
+            line(t("✍️  Threads caption", "✍️  Texto para Threads"), heading: true)
+            line(text)
+        }
+        return document
+    }
+
+    func applyCaptionOnly(_ output: String) {
+        guard let range = captionRange, let storage = result.textStorage,
+              NSMaxRange(range) <= storage.length,
+              let previous = lastReport,
+              var current = (try? JSONSerialization.jsonObject(with: Data(previous.0.utf8))) as? [String: Any],
+              let revised = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any],
+              revised["caption"] is String else { return }
+        for key in ["caption", "caption_source", "threads_caption", "youtube_title"] {
+            current[key] = revised[key]
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: current),
+              let snapshot = String(data: data, encoding: .utf8) else { return }
+        let position = result.enclosingScrollView?.contentView.bounds.origin
+        let copy = captionContent(current)
+        storage.replaceCharacters(in: range, with: copy)
+        captionRange = NSRange(location: range.location, length: copy.length)
+        reviewedCaption = current["caption"] as? String
+        reviewedThreadsCaption = current["threads_caption"] as? String
+        reviewedYouTubeTitle = current["youtube_title"] as? String
+        lastReport = (snapshot, previous.1, previous.2)
+        create.isEnabled = previewed && !working
+        if let position, let scroll = result.enclosingScrollView {
+            scroll.contentView.scroll(to: position)
+            scroll.reflectScrolledClipView(scroll.contentView)
         }
     }
 
@@ -3714,26 +3979,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             let channel = network == "whatsapp" ? t("WhatsApp Status", "Estado de WhatsApp") : target["channel"] as? String ?? ""
             line(network == "whatsapp" ? channel : "\(names[network] ?? network) · \(channel)\(short)\(label)\(cover)")
         }
-        if let caption = json["caption"] as? String {
-            var source = json["caption_source"] as? String ?? ""
-            if source == "your text" { source = t("your text", "tu texto") }
-            else if source == "reviewed caption" { source = t("reviewed caption", "texto revisado") }
-            else if source.hasPrefix("written by ") && source.hasSuffix(" from your idea") {
-                let model = String(source.dropFirst("written by ".count).dropLast(" from your idea".count))
-                source = t("written by \(model) from your idea", "redactado por \(model) a partir de tu idea")
-            }
-            line(t("✍️  Caption", "✍️  Texto"), weight: .semibold, before: 9)
-            if !source.isEmpty { line(source, size: 11, color: .secondaryLabelColor) }
-            line(caption)
-        }
-        if let title = json["youtube_title"] as? String {
-            line(t("▶  YouTube title", "▶  Título de YouTube"), weight: .semibold, before: 9)
-            line(title)
-        }
-        if let threadsCaption = json["threads_caption"] as? String {
-            line(t("✍️  Threads caption", "✍️  Texto para Threads"), weight: .semibold, before: 9)
-            line(threadsCaption)
-        }
+        let copy = captionContent(json)
+        captionRange = NSRange(location: document.length, length: copy.length)
+        document.append(copy)
         let notes = json["notes"] as? [String] ?? []
         let warnings = json["warnings"] as? [String] ?? []
         if !notes.isEmpty || !warnings.isEmpty {
@@ -3777,19 +4025,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             previewed = reviewedCaption != nil
             coverLocked = previewed
             coverAvailable = json["video_cover_available"] as? Bool == true
-            preview.bezelColor = nil
+            preview.bezelColor = .systemBlue
             create.isEnabled = previewed
             line(t("Create drafts when you’re ready to continue.", "Cuando esté todo listo, pulsa Crear borradores."),
                  weight: .medium, color: .secondaryLabelColor, before: 9)
         }
+        result.alphaValue = 1
         result.textStorage?.setAttributedString(document)
         result.scrollRangeToVisible(NSRange(location: 0, length: 0))
         emptyState.isHidden = true
         resizeRequestField()
-        if !planExpanded {
-            planExpanded = true
-            expandComposer(by: 140)
-        }
     }
 }
 
@@ -4788,7 +5033,7 @@ let uiSpanish: [String: String] = [
     "WhatsApp disconnected": "WhatsApp se desconectó",
     "When": "Cuándo",
     "Where": "Dónde",
-    "Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm: fresh sourdough”": "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm: pan de masa madre”",
+    "Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm; idea: our new launch”": "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm; idea: nuestro lanzamiento”",
     "Window": "Ventana",
     "Working…": "Procesando…",
     "You can finish by deleting ~/postforge by hand.": "Puedes terminar borrando ~/postforge a mano.",
@@ -4796,6 +5041,15 @@ let uiSpanish: [String: String] = [
     "Your idea": "Tu idea",
     "Your request": "Tu pedido",
     "Another Caption…": "Otra versión del texto…",
+    "Try Another Caption": "Probar otro texto",
+    "Previous caption": "Texto anterior",
+    "Next caption": "Texto siguiente",
+    "Clear…": "Limpiar…",
+    "Written from your idea": "Redactado a partir de tu idea",
+    "Your exact words": "Tus palabras exactas",
+    "Your selected caption": "El texto que elegiste",
+    "idea: a brief to write from · caption: your exact words. Quoted text stays as written.": "idea: un tema para redactar · texto: tus palabras exactas. Lo que va entre comillas se conserva.",
+
     "Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.": "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.",
     "Your plan appears here": "Tu plan aparecerá aquí",
     "• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The PostForge Docker containers and installer files\n": "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores de Docker y los archivos de instalación de PostForge\n",
@@ -4931,24 +5185,37 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(composer.instruction.allowsUndo)
     precondition(composer.preview.keyEquivalent == "\r" && composer.preview.keyEquivalentModifierMask == .command)
     precondition(!composer.schedule.isEnabled)
+    composer.media = [URL(fileURLWithPath: "/tmp/synthetic-ui-video.mp4")]
     let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","video_cover_available":true,"warnings":["Sample warning"]}"#
     composer.report(planFixture, dryRun: true, exitCode: 0)
     precondition(composer.result.string.contains("Plan ready to review"))
     precondition(composer.result.string.contains("Destinations"))
     precondition(composer.result.string.contains("Things to check"))
+    precondition(composer.window.frame.width > composer.window.frame.height)
+    precondition(composer.create.controlSize == .large && composer.create.bezelColor == .systemBlue)
+    let rangeBefore = composer.captionRange!
+    let planPrefix = (composer.result.string as NSString).substring(to: rangeBefore.location)
+    let planSuffix = (composer.result.string as NSString).substring(from: NSMaxRange(rangeBefore))
+    let changedCopy = #"{"when_local":"wrong time","caption":"Revised caption ✨","caption_source":"written by hidden-model from your idea","targets":[]}"#
+    composer.applyCaptionOnly(changedCopy)
+    let rangeAfter = composer.captionRange!
+    precondition((composer.result.string as NSString).substring(to: rangeAfter.location) == planPrefix)
+    precondition((composer.result.string as NSString).substring(from: NSMaxRange(rangeAfter)) == planSuffix)
+    precondition(composer.result.string.contains("Revised caption ✨") && !composer.result.string.contains("hidden-model"))
     precondition((composer.ideaHeight?.constant ?? 0) >= 64 && composer.create.isEnabled)
     precondition(!composer.chooseCover.isEnabled && !composer.coverSecond.isEnabled && !composer.changeCover.isHidden)
     composer.editCover()
     precondition(composer.chooseCover.isEnabled && composer.coverSecond.isEnabled && !composer.create.isEnabled)
     let variant = #"{"when_local":"19:15","caption":"Earlier version","caption_source":"written by test from your idea"}"#
+    composer.report(variant, dryRun: true, exitCode: 0)
     composer.savedVersions = [(instruction: "Earlier idea", output: variant)]
     composer.updateCaptionVersions()
-    composer.captionVersions.selectItem(at: 1)
-    composer.restoreCaptionVersion()
-    precondition(composer.instruction.string == "Earlier idea")
+    let requestBeforeVersion = composer.instruction.string
+    composer.restoreCaptionVersion(at: 0)
+    precondition(composer.instruction.string == requestBeforeVersion)
     precondition(composer.reviewedCaption == "Earlier version" && !composer.alternateCaption.isHidden)
     composer.draftOptionsChanged()
-    precondition(composer.captionVersions.isHidden)
+    precondition(composer.captionVersionLabel.isHidden)
     precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
     delegate.application(app, open: [URL(string: "postforge://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
