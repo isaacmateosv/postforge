@@ -81,3 +81,34 @@ If Postiz becomes unreachable after a tunnel change, check the log for rollback 
 ./postforge.sh channels
 ./postforge.sh maintenance check
 ```
+
+### Media delivery through the gateway
+
+PostForge gives each attached file a signed download URL for the social platform.
+The link permits GET and HEAD for that exact file and expires 48 hours after the
+planned publication time. Scheduling through this route supports up to 30 days
+ahead. If you move a draft beyond its link expiry or change the public hostname,
+prepare fresh drafts before approval. Anyone holding an unexpired link can read
+that file, so treat the link as private. The Postiz dashboard, API, and unsigned
+uploads continue to require gateway sign-in.
+
+Before creating posts, PostForge checks a one-byte download through every signed
+media URL, including cover images. A failed check stops creation and reports the
+problem. The verifier authorizes requests while Postiz streams the bytes directly.
+It creates no second video copy. Existing retention rules still govern deletion.
+
+New gateway setups create a private 32-byte media signing key. On an older gateway,
+create it once with the following command, then apply the updated gateway Compose
+file and Caddy configuration.
+
+    python3 scripts/lib/media_links.py init-key data/gateway/media-signing.key
+
+Keep that key private. Backup & Move includes it in the encrypted gateway archive.
+Older archives receive a fresh key during restore. An expired or revoked provider
+login still requires reconnection in Postiz.
+
+Long single videos are split into balanced Story clips under 60 seconds when
+Facebook or Instagram Stories are selected. The full video stays on feed posts.
+Review each Story draft in order. Direct scheduling spaces Story parts one minute
+apart. Encoded temporary clips are removed after upload, and their uploaded copies
+follow the normal Postiz retention rules.

@@ -81,6 +81,9 @@ def main():
             directory.mkdir(mode=0o700, parents=True, exist_ok=False)
             private_write(directory / "configuration.yml", initial)
             private_write(directory / "users.json", {"users": {}})
+            fd = os.open(directory / "media-signing.key", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(secrets.token_bytes(32))
             return 0
         if directory.stat().st_mode & 0o077:
             raise ValueError("The gateway directory must be private (0700 on macOS and Linux).")

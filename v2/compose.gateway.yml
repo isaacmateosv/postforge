@@ -11,6 +11,25 @@ services:
     security_opt: [no-new-privileges:true]
     depends_on:
       - postforge-auth
+      - postforge-media-auth
+
+  postforge-media-auth:
+    image: python:3.12-alpine@sha256:e6dae589c1c05976188fd3bd019afd091445fc533ed2ea29001beddc7368a9c8
+    restart: unless-stopped
+    command: ["python", "-B", "/app/media_links.py", "serve", "/media.key"]
+    read_only: true
+    mem_limit: 64m
+    pids_limit: 32
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./scripts/lib/media_links.py:/app/media_links.py:ro
+      - type: bind
+        source: ./data/gateway/media-signing.key
+        target: /media.key
+        read_only: true
+        bind:
+          create_host_path: false
 
   postforge-auth:
     image: authelia/authelia:4.39@sha256:bd97cff4fcbf715b5ff1f9ae286afbe6033afce385302520b0368122d43a6f54

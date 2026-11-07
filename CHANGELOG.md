@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.18]
+
+- Restore media delivery through the protected gateway with expiring, file-scoped signed links.
+- Split long single-video Meta Stories into individual clips and space scheduled parts.
+- Verify public byte-range downloads before creating social posts, including cover images.
+- Preserve the media signing key in encrypted gateway backups and restore older backups.
+- Explain media delivery failures and link expiry in English and Ecuadorian Spanish.
+
 ## [2.0.0-rc.17]
 
 - Revise or edit captions without rebuilding the plan, and request revisions in WhatsApp.

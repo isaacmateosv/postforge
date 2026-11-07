@@ -34,6 +34,7 @@ import pmlib  # noqa: E402
 from create_draft import NEEDS_MEDIA, ollama_caption  # noqa: E402
 from pmlib import PMError, info  # noqa: E402
 import whatsapp_pending  # noqa: E402
+import media_links  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -513,13 +514,37 @@ def run(env, p, dry_run, schedule=False):
         has_social_posts = any(network != "whatsapp" for network, _, _ in usable)
         gated_media = bool(ready) and str(env.get("FRONTEND_URL", "")).startswith("https://") and os.path.isfile(
             os.path.join(pmlib.ROOT, "data", "gateway", "configuration.yml"))
+        media_key = media_links.load_key(os.path.join(pmlib.ROOT, "data", "gateway", "media-signing.key")) if gated_media else None
+        media_blocked = gated_media and not media_key
+        if has_social_posts and media_key:
+            result["notes"].append(
+                "Los enlaces de descarga vencen 48 horas después de la hora planificada. Si mueves la publicación más allá, vuelve a preparar sus borradores."
+                if es else
+                "Media download links expire 48 hours after the planned time. Recreate the drafts if you move publication beyond that time.")
+        if has_social_posts and media_blocked:
+            result["warnings"].append(
+                "El acceso seguro bloquea la descarga de archivos por las redes sociales. "
+                "Puedes guardar los borradores, pero no los apruebes en Postiz hasta corregir la entrega."
+                if es else
+                "The secure gateway blocks social platforms from downloading media. "
+                "You can save drafts, but wait to approve them in Postiz until media delivery is fixed.")
         if schedule:
             if not has_social_posts:
                 raise PMError("El Estado de WhatsApp requiere su propia aprobación." if es else
                               "WhatsApp Status requires its own approval.")
-            if gated_media:
+            if media_blocked:
                 raise PMError("La programación directa de archivos está pausada mientras se corrige la entrega por el acceso seguro."
                               if es else "Direct scheduling of media is paused until delivery through the secure gateway is fixed.")
+
+        story_part_count = 1
+        if kinds == ["video"] and any(place == "story" for _, _, place in usable):
+            duration = pmlib.ffprobe(ready[0][1])[0]
+            if duration > 60:
+                story_part_count = math.ceil(duration / 59.5)
+                result["warnings"].append(
+                    f"Facebook e Instagram: se crearán {story_part_count} borradores de historias de menos de un minuto. Revisa y aprueba cada parte en orden."
+                    if es else
+                    f"Facebook and Instagram: this video creates {story_part_count} Story drafts under one minute. Review and approve each part in order.")
 
         video_networks = {network for network, _, _ in usable} & {"youtube", "whatsapp"}
         if kinds == ["video"] and any(network == "instagram" and place == "feed" for network, _, place in usable):
@@ -575,8 +600,8 @@ def run(env, p, dry_run, schedule=False):
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "final_tag": tag,
                        "can_rewrite": bool(p["idea"] and not p["exact"]),
-                       "direct_schedule_available": has_social_posts and not gated_media,
-                       "direct_schedule_blocked_by_gateway": has_social_posts and gated_media,
+                       "direct_schedule_available": has_social_posts and not media_blocked,
+                       "direct_schedule_blocked_by_gateway": has_social_posts and media_blocked,
                        "youtube_title": youtube_title,
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
@@ -591,6 +616,13 @@ def run(env, p, dry_run, schedule=False):
         for kind, path in ready:
             uploaded = postiz.upload(path)
             media.append({"id": uploaded["id"], "path": uploaded["path"]})
+        story_media = []
+        if story_part_count > 1:
+            story_dir = os.path.join(tmp, "stories")
+            os.mkdir(story_dir)
+            for path in pmlib.split_story_video(ready[0][1], story_dir):
+                uploaded = postiz.upload(path)
+                story_media.append({"id": uploaded["id"], "path": uploaded["path"]})
         cover_upload = None
         if (normalized_cover and "image" in modes) or "frame-image" in modes:
             cover_file = os.path.join(tmp, "post-cover.jpg")
@@ -604,6 +636,23 @@ def run(env, p, dry_run, schedule=False):
                               "Could not prepare a JPEG cover smaller than 2 MB.")
             cover_upload = postiz.upload(cover_file)
         when_utc = p["when"].astimezone(timezone.utc)
+        library_media = media
+        library_story_media = story_media
+        if media_key and has_social_posts:
+            expiry = int((max(when_utc, datetime.now(timezone.utc)) + timedelta(days=2)).timestamp())
+            try:
+                signed = [dict(item, path=media_links.signed_url(
+                    media_key, env["FRONTEND_URL"], item["path"], expiry))
+                    for item in media + story_media + ([cover_upload] if cover_upload else [])]
+            except ValueError as exc:
+                raise PMError(str(exc)) from exc
+            if not all(media_links.serves_media(item["path"]) for item in signed):
+                raise PMError("No se pudo verificar la descarga segura de los archivos. No se crearon publicaciones."
+                              if es else "Secure media delivery could not be verified. No posts were created.")
+            if cover_upload:
+                cover_upload = signed.pop()
+            media = signed[:len(media)]
+            story_media = signed[len(media):]
         whatsapp_requested = any(network == "whatsapp" for network, _, _ in usable)
         whatsapp_post_ids = []
         for (network, channel, item_placement), mode in zip(usable, modes):
@@ -622,18 +671,23 @@ def run(env, p, dry_run, schedule=False):
                 target_media = [dict(media[0], thumbnail=cover_upload["path"])]
             elif mode == "frame":
                 target_media = [dict(media[0], thumbnailTimestamp=round(second * 1000))]
-            created = postiz.create_draft(channel, target_caption, target_media, when=when_utc,
-                                         settings=settings, short=(network == "youtube" and short),
-                                         **({"schedule": True} if schedule else {}))
-            post_id = created[0]["postId"] if created else None
-            if post_id:
-                whatsapp_post_ids.append(post_id)
-            result["drafts"].append({"network": network, "channel": channel.get("name"),
-                                     "placement": item_placement, "post_id": post_id})
-            pmlib.append_log("drafts.jsonl", {"source": "plan-post", "post_id": post_id,
-                                              "channel": channel.get("identifier"), "placement": item_placement,
-                                              "integration_id": channel.get("id"), "when": result["when_utc"],
-                                              "media": [m["path"] for m in media], "caption": target_caption[:500]})
+            batches = [[item] for item in story_media] if item_placement == "story" and story_media else [target_media]
+            for part_index, part_media in enumerate(batches):
+                part_time = when_utc + timedelta(minutes=part_index)
+                created = postiz.create_draft(channel, target_caption, part_media, when=part_time,
+                                             settings=settings, short=(network == "youtube" and short),
+                                             **({"schedule": True} if schedule else {}))
+                post_id = created[0]["postId"] if created else None
+                if post_id:
+                    whatsapp_post_ids.append(post_id)
+                result["drafts"].append({"network": network, "channel": channel.get("name"),
+                                         "placement": item_placement, "post_id": post_id,
+                                         "part": part_index + 1, "parts": len(batches)})
+                pmlib.append_log("drafts.jsonl", {"source": "plan-post", "post_id": post_id,
+                                                  "channel": channel.get("identifier"), "placement": item_placement,
+                                                  "integration_id": channel.get("id"), "when": part_time.isoformat(),
+                                                  "media": ([library_story_media[part_index]["path"]] if item_placement == "story" and library_story_media
+                                                            else [m["path"] for m in library_media]), "caption": target_caption[:500]})
         if whatsapp_requested and not dry_run:
             pending_id = whatsapp_pending.enqueue(caption, [path for _, path in ready], whatsapp_post_ids, when_utc)
             result["whatsapp_pending_id"] = pending_id
