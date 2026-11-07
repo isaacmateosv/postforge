@@ -28,7 +28,7 @@ NEEDS_MEDIA = {"instagram": "Instagram", "instagram-standalone": "Instagram", "t
 
 PROMPT = """Write one social media caption in {lang} about: {topic}
 - Write like a person talking to their audience. Use at most two short sentences. Lead with a specific detail from the topic, then ask at most one question. Avoid stock openings such as “Enjoy our delicious”.
-- Use zero to two emojis only if they fit the subject. Put them after a complete sentence.
+- Use two or three emojis if they fit the subject. Put them after a complete sentence.
 - Use only the facts in the topic. Do not invent a business name, prices, dates, locations or contact details.
 - Leave one blank line, then add 2 to 4 specific hashtags on one line. Every tag starts with # and contains no spaces, for example #WeekendHike. Skip generic tags and locations not given.
 Return only the caption."""
@@ -37,7 +37,7 @@ PROMPT_ES = """Escribe una publicación en español de Ecuador sobre: {topic}
 - Escribe máximo 28 palabras antes de los hashtags. Una o dos frases naturales, sin saludo ni introducción. Abre con el producto o la ocasión. Una sola pregunta, si aporta.
 - Usa el nombre del equipo o la marca tal como se indicó. Evita frases de cajón como «Disfruta de nuestros deliciosos», «la combinación perfecta» o «el regalo perfecto». Cuida la concordancia.
 - Ejemplo de tono para otro tema: «¿Qué planta pondrías junto a tu ventana? 🌿». No copies el ejemplo.
-- Usa hasta dos emojis solo si aportan al texto. Ponlos al final de una frase completa.
+- Usa dos o tres emojis si aportan al texto. Ponlos al final de una frase completa.
 - Usa solo los datos del tema. No inventes frescura, ingredientes, capas, disponibilidad, regalos, precios, fechas, lugares ni datos de contacto.
 - Deja una línea en blanco y añade de 2 a 4 hashtags concretos en una sola línea. Cada etiqueta empieza con # y va sin espacios, por ejemplo #RutaDeMontaña. Evita etiquetas genéricas y lugares que no se mencionaron.
 Devuelve solo la publicación."""
@@ -116,7 +116,7 @@ def split_hashtags(text):
 
 
 def fitting_emojis(text, topic=""):
-    """Swap or drop emojis that don't fit (EMOJI_* above); keep at most 2."""
+    """Swap or drop emojis that don't fit (EMOJI_* above); keep at most 3."""
     words = (topic or text).lower()
     kept = []
 
@@ -126,7 +126,7 @@ def fitting_emojis(text, topic=""):
         if base == "🎂" and any(term in words for term in ("frutilla", "fresa", "strawberr")):
             emoji = base = "🍓"
         fits = base in EMOJI_ALWAYS or any(re.search(r"(?<!\w)" + re.escape(w), words) for w in EMOJI_IF.get(base, ()))
-        if not fits or emoji in kept or len(kept) >= 2:
+        if not fits or emoji in kept or len(kept) >= 3:
             return ""
         kept.append(emoji)
         return emoji
@@ -162,10 +162,10 @@ def finish(text, lang="English", env=None, topic=""):
         return ""  # nothing but emojis or punctuation survived
     if not EMOJI.search(body) and topic:
         words = topic.lower()
-        for emoji, terms in EMOJI_IF.items():
-            if any(re.search(r"(?<!\w)" + re.escape(term), words) for term in terms):
-                body += " " + emoji
-                break
+        matches = [emoji for emoji, terms in EMOJI_IF.items()
+                   if any(re.search(r"(?<!\w)" + re.escape(term), words) for term in terms)]
+        if matches:
+            body += " " + "".join(matches[:2])
     lang = language(lang)
     cta = (env or {}).get(CTA_SETTING.get(lang, ""), "").strip()
     if cta or not ORDER_CHANNEL.search(topic):
@@ -198,7 +198,7 @@ def ollama_caption(env, topic, lang, *, previous=None):
         try:
             status, data = pmlib.http("POST", base + "/api/generate", body={
                 "model": model,
-                "prompt": prompt,
+                **pmlib.ollama_text_prompt(model, prompt),
                 "stream": False,
                 "keep_alive": 0,  # evict from unified memory as soon as the caption is done
                 # captions need < 1k tokens; a 2048 context halves the KV cache (target: 8 GB MacBook Air)
@@ -214,7 +214,7 @@ def ollama_caption(env, topic, lang, *, previous=None):
                 return fallback, model, round(seconds, 1)
             raise PMError("Ollama returned HTTP %s: %s" % (status, str(data)[:300]))
         seconds += data.get("total_duration", 0) / 1e9
-        text = finish(data.get("response", ""), lang, env, topic)
+        text = finish(pmlib.ollama_final_text(data), lang, env, topic)
         if text and (not previous or text.casefold() != previous.casefold()):
             _, tags = split_hashtags(text)
             if len(tags) >= 2:

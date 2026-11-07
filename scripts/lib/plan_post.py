@@ -293,7 +293,7 @@ def threads_caption(env, caption, lang, limit=500):
     for attempt in (1, 2):
         status, data = pmlib.http("POST", base + "/api/generate", body={
             "model": model,
-            "prompt": prompt + ("\n\nBe more concise than the previous attempt." if attempt == 2 else ""),
+            **pmlib.ollama_text_prompt(model, prompt + ("\n\nBe more concise than the previous attempt." if attempt == 2 else "")),
             "stream": False,
             "keep_alive": 0,
             "options": {"temperature": 0.3, "num_predict": 220, "num_ctx": 2048},
@@ -301,7 +301,7 @@ def threads_caption(env, caption, lang, limit=500):
         if status != 200 or not isinstance(data, dict):
             raise PMError("Ollama returned HTTP %s while shortening the Threads caption: %s"
                           % (status, str(data)[:300]))
-        shortened = (data.get("response") or "").strip().strip('"')
+        shortened = pmlib.ollama_final_text(data).strip('"')
         if shortened and len(shortened) <= limit:
             return shortened
     raise PMError("The model could not produce a complete Threads caption within 500 characters.")
@@ -319,13 +319,14 @@ def reviewed_youtube_title(env, caption, idea, lang, short):
         "Return only the title.\n"
         f"Topic: {(idea or '')[:350]}\nCaption: {caption[:600]}"
     )
+    model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")
     try:
         status, data = pmlib.http("POST", env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/") + "/api/generate",
-                                  body={"model": env.get("LOCAL_LLM_MODEL", "llama3.2:3b"), "prompt": prompt,
+                                  body={"model": model, **pmlib.ollama_text_prompt(model, prompt),
                                         "stream": False, "keep_alive": 0,
                                         "options": {"temperature": 0.2, "num_predict": 55, "num_ctx": 2048}}, timeout=45)
         if status == 200 and isinstance(data, dict):
-            suggestion = pmlib.youtube_title_line((data.get("response") or "").strip().strip('"“”'))
+            suggestion = pmlib.youtube_title_line(pmlib.ollama_final_text(data).strip('"“”'))
             if pmlib.youtube_title_fits(suggestion, short):
                 return pmlib.youtube_title(suggestion, short)
     except PMError:
@@ -339,6 +340,30 @@ def tagged_threads_caption(env, caption, lang, tag):
     body = pmlib.remove_final_tag(caption, tag)
     shortened = threads_caption(env, body, lang, 500 - len(tag) - 2)
     return pmlib.apply_final_tag(shortened, tag)
+
+
+def revise_copy(env, snapshot, instruction, edited=None):
+    """Update only caption fields on a previously calculated preview."""
+    _, _, idea = split_instruction(instruction)
+    lang = snapshot["lang"]
+    tag = pmlib.final_tag(snapshot.get("final_tag"))
+    if edited is None:
+        if not idea:
+            raise PMError("No hay una idea para reescribir." if lang == "Spanish" else "There is no idea to rewrite.")
+        caption, model, _ = ollama_caption(env, idea, lang, previous=snapshot["caption"])
+        source = "written by %s from your idea" % model
+    else:
+        caption = edited.strip()
+        if not caption:
+            raise PMError("El texto está vacío." if lang == "Spanish" else "The caption is empty.")
+        source = "edited caption"
+    caption = pmlib.apply_final_tag(caption, tag)
+    networks = {target["network"] for target in snapshot.get("targets", [])}
+    threads = tagged_threads_caption(env, caption, lang, tag) if "threads" in networks else caption
+    title = (reviewed_youtube_title(env, caption, idea, lang, snapshot.get("short", False))
+             if "youtube" in networks else None)
+    return dict(snapshot, caption=caption, caption_source=source,
+                threads_caption=threads if threads != caption else None, youtube_title=title)
 
 
 def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cover_image=None,
@@ -398,10 +423,10 @@ def video_warnings(networks, durations, lang, short=False):
     return warnings
 
 
-def run(env, p, dry_run):
+def run(env, p, dry_run, schedule=False):
     result = {"when_local": p["when"].strftime("%a %d %b %Y %H:%M"), "when_utc": p["when"].astimezone(timezone.utc).isoformat(),
               "networks": p["networks"], "lang": p["lang"], "notes": list(p["notes"]), "warnings": [], "drafts": [],
-              "dry_run": dry_run}
+              "dry_run": dry_run, "scheduled": schedule}
     es = p.get("ui_lang", p["lang"]) == "Spanish"
     requested = p.get("placement") or placement(p["command"])
     image = p.get("cover_image")
@@ -485,6 +510,16 @@ def run(env, p, dry_run):
         if not usable:
             raise PMError(("No se pueden crear borradores. " if es else "No drafts can be created. ")
                           + " · ".join(result["warnings"]))
+        has_social_posts = any(network != "whatsapp" for network, _, _ in usable)
+        gated_media = bool(ready) and str(env.get("FRONTEND_URL", "")).startswith("https://") and os.path.isfile(
+            os.path.join(pmlib.ROOT, "data", "gateway", "configuration.yml"))
+        if schedule:
+            if not has_social_posts:
+                raise PMError("El Estado de WhatsApp requiere su propia aprobación." if es else
+                              "WhatsApp Status requires its own approval.")
+            if gated_media:
+                raise PMError("La programación directa de archivos está pausada mientras se corrige la entrega por el acceso seguro."
+                              if es else "Direct scheduling of media is paused until delivery through the secure gateway is fixed.")
 
         video_networks = {network for network, _, _ in usable} & {"youtube", "whatsapp"}
         if kinds == ["video"] and any(network == "instagram" and place == "feed" for network, _, place in usable):
@@ -539,6 +574,9 @@ def run(env, p, dry_run):
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "final_tag": tag,
+                       "can_rewrite": bool(p["idea"] and not p["exact"]),
+                       "direct_schedule_available": has_social_posts and not gated_media,
+                       "direct_schedule_blocked_by_gateway": has_social_posts and gated_media,
                        "youtube_title": youtube_title,
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
@@ -585,7 +623,8 @@ def run(env, p, dry_run):
             elif mode == "frame":
                 target_media = [dict(media[0], thumbnailTimestamp=round(second * 1000))]
             created = postiz.create_draft(channel, target_caption, target_media, when=when_utc,
-                                         settings=settings, short=(network == "youtube" and short))
+                                         settings=settings, short=(network == "youtube" and short),
+                                         **({"schedule": True} if schedule else {}))
             post_id = created[0]["postId"] if created else None
             if post_id:
                 whatsapp_post_ids.append(post_id)
@@ -633,6 +672,10 @@ def main():
     parser.add_argument("--placement", choices=("both", "feed", "story"), help="override the instruction's placement")
     parser.add_argument("--cover-image", help="image file to use as the video cover")
     parser.add_argument("--cover-second", help="video timestamp in seconds")
+    parser.add_argument("--revise-copy", help=argparse.SUPPRESS)
+    parser.add_argument("--edited-caption", help=argparse.SUPPRESS)
+    parser.add_argument("--reviewed-when", help=argparse.SUPPRESS)
+    parser.add_argument("--schedule", action="store_true", help="schedule reviewed social posts for publication")
     parser.add_argument("--alternate-caption", help=argparse.SUPPRESS)
     parser.add_argument("--final-tag", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
@@ -647,12 +690,24 @@ def main():
     if args.json:
         sys.stdout = sys.stderr  # progress lines (e.g. "Transcoding video...") must not mix with the JSON
     env = pmlib.load_env()
+    if args.revise_copy:
+        if not args.json or args.schedule:
+            raise PMError("Caption revision requires JSON preview mode.")
+        try:
+            snapshot = json.loads(args.revise_copy)
+        except ValueError as exc:
+            raise PMError("Invalid reviewed plan.") from exc
+        out.write(json.dumps(revise_copy(env, snapshot, args.instruction, args.edited_caption), ensure_ascii=False) + "\n")
+        return 0
+    if args.schedule and (args.dry_run or not args.reviewed_caption or not args.reviewed_when):
+        raise PMError("Scheduling requires a reviewed caption and time.")
     for path in args.media:
         if not os.path.isfile(os.path.expanduser(path)):
             raise PMError("Media file not found: " + path)
     zone = env.get("PM_TIMEZONE", "America/Guayaquil")
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
-    p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz), placement_override=args.placement,
+    now = datetime.now(tz)
+    p = plan(env, args.instruction, args.media, args.lang, now, placement_override=args.placement,
              cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
     if args.final_tag is not None:
         p["final_tag"] = args.final_tag
@@ -662,7 +717,17 @@ def main():
         p["reviewed_caption"] = args.reviewed_caption
         p["reviewed_threads_caption"] = args.reviewed_threads_caption
         p["reviewed_youtube_title"] = args.reviewed_youtube_title
-    result = run(env, p, args.dry_run)
+    if args.reviewed_when and not args.dry_run:
+        try:
+            when = datetime.fromisoformat(args.reviewed_when.replace("Z", "+00:00"))
+            if when.tzinfo is None or when < now + MIN_SCHEDULE_LEAD:
+                raise ValueError
+        except ValueError as exc:
+            raise PMError("La hora revisada ya pasó o faltan menos de 5 minutos. Vuelve a hornear el plan."
+                          if p["ui_lang"] == "Spanish" else
+                          "The reviewed time is past or less than 5 minutes away. Bake the plan again.") from exc
+        p["when"] = when.astimezone(tz)
+    result = run(env, p, args.dry_run, schedule=args.schedule)
     if args.json:
         out.write(json.dumps(result, ensure_ascii=False, indent=1) + "\n")
     else:

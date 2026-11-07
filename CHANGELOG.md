@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.17]
+
+- Revise or edit captions without rebuilding the plan, and request revisions in WhatsApp.
+- Add the Mac bake shortcut, undo support, and an expanding request field.
+- Offer explicit direct scheduling for eligible social posts.
+- Improve local caption model support and contextual emojis.
+
 ## [2.0.0-rc.16]
 
 - Put each channel name above its countdown and prevent text selection in the connection popover.

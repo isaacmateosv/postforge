@@ -59,6 +59,7 @@ APPROVE_WHATSAPP = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:whatsapp|wa)(?
                               re.IGNORECASE)
 APPROVE_PLAN = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                           re.IGNORECASE)
+IMPROVE_PLAN = re.compile(r"^(?:mejora|improve)\s+plan\s+([a-f0-9]{12}|\d+)$", re.IGNORECASE)
 TAG_PLAN = re.compile(r"^(?:etiqueta|tag)\s+plan\s+([a-f0-9]{12}|\d+)\s+(#?\w{1,60})$", re.IGNORECASE)
 REJECT_PLAN = re.compile(r"^(?:rechazar|rechaza|reject|decline)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                          re.IGNORECASE)
@@ -312,17 +313,21 @@ def change_plan_tag(path, confirmation, value, env, dry_run=False):
     result.update(caption=caption, final_tag=tag)
     confirmation.pop("caption_override", None)
     if not dry_run:
-        metadata = os.stat(path)
-        fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".plan-tag-")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(confirmation, fh, ensure_ascii=False, indent=1)
-            os.utime(temporary, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+        write_confirmation(path, confirmation)
     return result
+
+
+def write_confirmation(path, confirmation):
+    metadata = os.stat(path)
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".plan-edit-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(confirmation, fh, ensure_ascii=False, indent=1)
+        os.utime(temporary, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def remove_confirmation(path):
@@ -412,6 +417,9 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
         else:
             lines += ["", (f"Keep {tag} at the end?" if tag else "Want to add a final hashtag?"),
                       f"To change it, reply `tag plan {confirmation_id} #MyBusiness`."]
+        if result.get("can_rewrite", (result.get("caption_source") or "").startswith("written by ")):
+            lines.append(f"Para probar otro texto, responde `mejora plan {confirmation_id}`."
+                         if es else f"To try another caption, reply `improve plan {confirmation_id}`.")
         if es:
             lines += ["", f"Responde `aprobar plan {confirmation_id}` para continuar.",
                       f"Para cambiarlo, responde `rechazar plan {confirmation_id}` y vuelve a enviar tu pedido "
@@ -479,6 +487,27 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
         reply(env, name, number, number, text, state, dry_run)
         if item_id and not dry_run:
             whatsapp_pending.process(env)
+        return True
+    improvement = IMPROVE_PLAN.fullmatch(normalized_instruction)
+    if improvement:
+        path, confirmation = resolve_confirmation_ref(improvement[1])
+        es = ui_language() == "Spanish"
+        if not path or not confirmation:
+            reply(env, name, number, number, "No encontré ese plan." if es else "I couldn’t find that plan.", state, dry_run)
+            return True
+        try:
+            result = plan_post.revise_copy(env, confirmation["result"], confirmation["instruction"])
+            confirmation["result"] = result
+            confirmation.pop("caption_override", None)
+            if not dry_run:
+                write_confirmation(path, confirmation)
+        except (PMError, OSError, KeyError, ValueError):
+            reply(env, name, number, number, "No pude mejorar el texto. Conservé la versión anterior." if es else
+                  "I couldn’t improve the caption. The previous version is still saved.", state, dry_run)
+            return True
+        reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
+                                                confirmation_id=improvement[1]), state, dry_run)
+        reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
         return True
     tag_change = TAG_PLAN.fullmatch(normalized_instruction)
     if tag_change:

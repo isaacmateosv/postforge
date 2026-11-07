@@ -148,6 +148,37 @@ class Operations(unittest.TestCase):
         self.assertEqual(create_draft.finish("Torta de frutillas 🍓.", "Spanish", topic="torta de frutillas"),
                          "Torta de frutillas. 🍓")
 
+    def test_copy_revision_keeps_plan_and_skips_media_processing(self):
+        snapshot = {"lang": "Spanish", "when_utc": "2026-11-07T01:00:00+00:00",
+                    "targets": [{"network": "instagram", "placement": "feed", "cover_second": 8}],
+                    "warnings": ["Original warning"], "caption": "Texto anterior", "final_tag": "#Negocio"}
+        with patch.object(pmlib, "Postiz") as postiz, patch.object(pmlib, "normalize_media") as normalize, \
+             patch.object(plan_post, "ollama_caption", return_value=("Otro texto 🍓", "test", 0)) as model:
+            revised = plan_post.revise_copy({}, snapshot, "Instagram mañana 7pm; idea: torta de frutillas")
+            edited = plan_post.revise_copy({}, snapshot, "Instagram mañana 7pm; idea: torta", "Texto editado")
+        for result in (revised, edited):
+            for key in ("when_utc", "targets", "warnings"):
+                self.assertEqual(result[key], snapshot[key])
+            self.assertTrue(result["caption"].endswith("#Negocio"))
+        postiz.assert_not_called()
+        normalize.assert_not_called()
+        model.assert_called_once()
+
+    def test_postiz_schedules_only_when_explicitly_requested(self):
+        client = pmlib.Postiz.__new__(pmlib.Postiz)
+        client.env = {}
+        with patch.object(client, "_call") as call:
+            channel = {"id": "test", "identifier": "threads"}
+            client.create_draft(channel, "Caption")
+            self.assertEqual(call.call_args.args[2]["type"], "draft")
+            client.create_draft(channel, "Caption", schedule=True)
+            self.assertEqual(call.call_args.args[2]["type"], "schedule")
+
+    def test_ollama_reasoning_is_excluded_from_caption(self):
+        self.assertEqual(pmlib.ollama_final_text({"response": "<think>analysis</think>Texto"}), "Texto")
+        self.assertEqual(pmlib.ollama_final_text({"response": "<think>unfinished"}), "")
+        self.assertFalse(pmlib.ollama_text_prompt("qwen3:4b", "Caption")["think"])
+
     def test_topic_first_colloquial_post_everywhere(self):
         now = datetime(2026, 11, 5, 12, tzinfo=plan_post.ZoneInfo("America/Guayaquil"))
         text = "galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias"
