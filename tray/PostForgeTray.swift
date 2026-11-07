@@ -91,6 +91,15 @@ struct ChannelAlert: Decodable {
     }
 }
 
+struct ConnectionDetail: Equatable {
+    let network: String?
+    let message: String
+
+    var menuText: String {
+        network.map { "\($0): \(message)" } ?? message
+    }
+}
+
 struct ChannelInfo: Decodable {
     let provider: String
     let network: String
@@ -1957,23 +1966,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     func connectionLines(_ state: MachineState) -> [String] {
+        connectionRows(state).map(\.menuText)
+    }
+
+    func connectionRows(_ state: MachineState) -> [ConnectionDetail] {
         let channels = state.channels ?? []
         let manual = channels.filter { !$0.renews }.sorted { ($0.expires ?? "~") < ($1.expires ?? "~") }
-        var lines = manual.map { channel -> String in
+        let now = Date()
+        var rows = manual.map { channel -> ConnectionDetail in
             let network = uiNetwork(channel.network)
             guard let expiry = channel.expires.flatMap({ isoParser.date(from: $0) }) else {
-                return text("\(network): expiry unavailable", "\(network): vencimiento no disponible")
+                return ConnectionDetail(network: network, message: text("Expiry unavailable", "Vencimiento no disponible"))
             }
-            let minutes = Int(expiry.timeIntervalSinceNow / 60)
-            if minutes <= 0 { return text("\(network): reconnect now", "\(network): vuelve a conectar ahora") }
-            let remaining = "\(minutes / 1440)d \((minutes % 1440) / 60)h \(minutes % 60)m"
-            return text("\(network): reconnect in \(remaining)", "\(network): vuelve a conectar en \(remaining)")
+            let minutes = Int(expiry.timeIntervalSince(now) / 60)
+            if expiry <= now {
+                return ConnectionDetail(network: network, message: text("Reconnect now", "Vuelve a conectar ahora"))
+            }
+            let remaining = minutes == 0 ? text("less than 1 min", "menos de 1 min")
+                : "\(minutes / 1440)d \((minutes % 1440) / 60)h \(minutes % 60)m"
+            let estimated = channel.provider == "facebook" || channel.provider == "instagram"
+            let message = estimated
+                ? text("Estimated expiry in \(remaining)", "Vencimiento estimado en \(remaining)")
+                : text("Reconnect in \(remaining)", "Vuelve a conectar en \(remaining)")
+            return ConnectionDetail(network: network, message: message)
         }
         if channels.contains(where: { $0.renews }) {
-            lines.append(text("Automatic renewal available for other channels", "Otros canales admiten renovación automática"))
+            rows.append(ConnectionDetail(network: nil, message: text(
+                "Automatic renewal available for other channels", "Otros canales admiten renovación automática")))
         }
-        if state.channelsFromCache == true { lines.append(text("Connection dates from saved status", "Fechas de conexión del último estado guardado")) }
-        return lines
+        if state.channelsFromCache == true && !rows.isEmpty {
+            rows.append(ConnectionDetail(network: nil, message: text(
+                "Connection dates from saved status", "Fechas de conexión del último estado guardado")))
+        }
+        return rows
     }
 
     @objc func showAbout() {
@@ -2736,8 +2761,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let status = NSTextField(labelWithString: "")
     let turnOnButton = NSButton(title: "", target: nil, action: nil)
     let connectionsButton = NSButton()
-    private let connectionsPopover = NSPopover()
-    private var connectionDetails: [String] = []
+    let connectionsPopover = NSPopover()
+    private var connectionDetails: [ConnectionDetail] = []
     let instruction = NSTextView()
     private let steps = ComposerSteps()
     let result = NSTextView()
@@ -2845,7 +2870,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         default: break
         }
         let delegate = NSApp.delegate as? AppDelegate
-        let details = state.map { delegate?.connectionLines($0) ?? [] } ?? []
+        let details = state.map { delegate?.connectionRows($0) ?? [] } ?? []
         if details != connectionDetails {
             connectionDetails = details
             if connectionsPopover.isShown { updateConnectionsPopover() }
@@ -2867,31 +2892,58 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         updateConnectionsPopover()
         connectionsPopover.behavior = .transient
         connectionsPopover.show(relativeTo: connectionsButton.bounds, of: connectionsButton, preferredEdge: .maxY)
+        (NSApp.delegate as? AppDelegate)?.poll()
     }
 
-    private func updateConnectionsPopover() {
+    func updateConnectionsPopover() {
+        let width: CGFloat = 318
+        let horizontalPadding: CGFloat = 24
+        let verticalPadding: CGFloat = 18
+        let innerWidth = width - 2 * horizontalPadding
         let title = NSTextField(labelWithString: t("Channel connections", "Conexiones de canales"))
-        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.alignment = .center
         let details = connectionDetails.isEmpty
-            ? [t("No connection details available yet.", "Todavía no hay datos de conexión.")]
+            ? [ConnectionDetail(network: nil, message: t("No connection details available yet.", "Todavía no hay datos de conexión."))]
             : connectionDetails
         let rows = details.map { detail in
-            let label = NSTextField(wrappingLabelWithString: detail)
-            label.font = .systemFont(ofSize: 12)
-            label.textColor = .secondaryLabelColor
-            label.preferredMaxLayoutWidth = 254
+            let label = NSTextField(wrappingLabelWithString: detail.menuText)
+            label.alignment = .center
+            label.preferredMaxLayoutWidth = innerWidth
+            let style = NSMutableParagraphStyle()
+            style.alignment = .center
+            style.lineBreakMode = .byWordWrapping
+            let text = NSMutableAttributedString(string: detail.menuText, attributes: [
+                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: style,
+            ])
+            if let network = detail.network {
+                text.addAttributes([.font: NSFont.systemFont(ofSize: 12, weight: .bold),
+                                    .foregroundColor: NSColor.labelColor],
+                                   range: NSRange(location: 0, length: network.utf16.count))
+            }
+            label.attributedStringValue = text
             return label
         }
         let stack = NSStackView(views: [title] + rows)
         stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 7
-        stack.edgeInsets = NSEdgeInsets(top: 13, left: 15, bottom: 13, right: 15)
-        for row in rows { row.widthAnchor.constraint(equalToConstant: 254).isActive = true }
+        stack.alignment = .centerX
+        stack.spacing = 9
+        for row in rows { row.widthAnchor.constraint(equalToConstant: innerWidth).isActive = true }
+        let size = NSSize(width: width, height: ceil(stack.fittingSize.height) + 2 * verticalPadding)
+        let root = NSView(frame: NSRect(origin: .zero, size: size))
+        root.addSubview(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: horizontalPadding),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -horizontalPadding),
+            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: verticalPadding),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -verticalPadding),
+        ])
         let controller = NSViewController()
-        controller.view = stack
+        controller.view = root
         connectionsPopover.contentViewController = controller
-        connectionsPopover.contentSize = stack.fittingSize
+        connectionsPopover.contentSize = size
     }
 
     func caption(_ text: String) -> NSTextField {
@@ -4715,6 +4767,18 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(steps.stringValue.hasPrefix("1. Bake your idea"))
     precondition(composer.connectionsButton.title == "Connections")
     precondition(composer.connectionsButton.action == #selector(NewPostWindow.showConnections))
+    let connectionFixture = #"{"state":"on","docker":true,"services":{"postiz":true,"evolution":true,"scheduler":true,"tunnel":true},"pending":{"total":0,"scheduled":0,"overdue":0,"jobs":[],"fromCache":false},"scheduled":[],"channels":[{"provider":"facebook","network":"Facebook Page","channel":"Example","renews":false,"expires":"2099-12-30T20:02:10Z"}],"channelsFromCache":false,"postizUrl":"https://example.org"}"#
+    composer.refreshState(try! JSONDecoder().decode(MachineState.self, from: Data(connectionFixture.utf8)))
+    composer.updateConnectionsPopover()
+    let popoverRoot = composer.connectionsPopover.contentViewController!.view
+    popoverRoot.layoutSubtreeIfNeeded()
+    let connectionStack = popoverRoot.subviews[0] as! NSStackView
+    precondition(connectionStack.frame.minX == 24 && popoverRoot.frame.width - connectionStack.frame.maxX == 24)
+    let connectionLabel = connectionStack.arrangedSubviews[1] as! NSTextField
+    let connectionStyle = connectionLabel.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+    let networkFont = connectionLabel.attributedStringValue.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
+    precondition(connectionStyle?.alignment == .center && NSFontManager.shared.traits(of: networkFont).contains(.boldFontMask))
+    precondition(connectionLabel.stringValue.contains("Estimated expiry"))
     let serviceHeader = composerStack.arrangedSubviews[0] as! NSStackView
     let serviceControls = serviceHeader.arrangedSubviews.last as! NSStackView
     precondition(serviceControls.arrangedSubviews.contains { $0 === composer.connectionsButton })

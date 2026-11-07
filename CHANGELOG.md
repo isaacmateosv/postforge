@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.15]
+
+- Add padding and centered connection details with bold network names.
+- Label Postiz’s estimated Meta expiry dates and refresh the snapshot when opening Connections.
+
 ## [2.0.0-rc.14]
 
 - Move channel reconnection countdowns into a Connections popover beside the service status.
