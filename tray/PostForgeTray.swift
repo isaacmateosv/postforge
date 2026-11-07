@@ -2906,30 +2906,31 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let details = connectionDetails.isEmpty
             ? [ConnectionDetail(network: nil, message: t("No connection details available yet.", "Todavía no hay datos de conexión."))]
             : connectionDetails
-        let rows = details.map { detail in
-            let label = NSTextField(wrappingLabelWithString: detail.menuText)
+        func rowLabel(_ text: String, weight: NSFont.Weight, color: NSColor) -> NSTextField {
+            let label = NSTextField(wrappingLabelWithString: text)
+            label.isEditable = false
+            label.isSelectable = false
             label.alignment = .center
+            label.font = .systemFont(ofSize: 12, weight: weight)
+            label.textColor = color
             label.preferredMaxLayoutWidth = innerWidth
-            let style = NSMutableParagraphStyle()
-            style.alignment = .center
-            style.lineBreakMode = .byWordWrapping
-            let text = NSMutableAttributedString(string: detail.menuText, attributes: [
-                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor,
-                .paragraphStyle: style,
-            ])
-            if let network = detail.network {
-                text.addAttributes([.font: NSFont.systemFont(ofSize: 12, weight: .bold),
-                                    .foregroundColor: NSColor.labelColor],
-                                   range: NSRange(location: 0, length: network.utf16.count))
-            }
-            label.attributedStringValue = text
+            label.widthAnchor.constraint(equalToConstant: innerWidth).isActive = true
             return label
+        }
+        let rows = details.map { detail -> NSView in
+            let message = rowLabel(detail.message, weight: .regular, color: .secondaryLabelColor)
+            guard let network = detail.network else { return message }
+            let name = rowLabel(network, weight: .bold, color: .labelColor)
+            let row = NSStackView(views: [name, message])
+            row.orientation = .vertical
+            row.alignment = .centerX
+            row.spacing = 2
+            return row
         }
         let stack = NSStackView(views: [title] + rows)
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 9
-        for row in rows { row.widthAnchor.constraint(equalToConstant: innerWidth).isActive = true }
         let size = NSSize(width: width, height: ceil(stack.fittingSize.height) + 2 * verticalPadding)
         let root = NSView(frame: NSRect(origin: .zero, size: size))
         root.addSubview(stack)
@@ -4774,11 +4775,12 @@ if CommandLine.arguments.contains("--verify-ui") {
     popoverRoot.layoutSubtreeIfNeeded()
     let connectionStack = popoverRoot.subviews[0] as! NSStackView
     precondition(connectionStack.frame.minX == 24 && popoverRoot.frame.width - connectionStack.frame.maxX == 24)
-    let connectionLabel = connectionStack.arrangedSubviews[1] as! NSTextField
-    let connectionStyle = connectionLabel.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
-    let networkFont = connectionLabel.attributedStringValue.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
-    precondition(connectionStyle?.alignment == .center && NSFontManager.shared.traits(of: networkFont).contains(.boldFontMask))
-    precondition(connectionLabel.stringValue.contains("Estimated expiry"))
+    let networkRow = connectionStack.arrangedSubviews[1] as! NSStackView
+    let nameLabel = networkRow.arrangedSubviews[0] as! NSTextField
+    let detailLabel = networkRow.arrangedSubviews[1] as! NSTextField
+    precondition(nameLabel.stringValue == "Facebook Page" && detailLabel.stringValue.contains("Estimated expiry"))
+    precondition([nameLabel, detailLabel].allSatisfy { $0.alignment == .center && !$0.isSelectable && !$0.isEditable })
+    precondition(NSFontManager.shared.traits(of: nameLabel.font!).contains(.boldFontMask))
     let serviceHeader = composerStack.arrangedSubviews[0] as! NSStackView
     let serviceControls = serviceHeader.arrangedSubviews.last as! NSStackView
     precondition(serviceControls.arrangedSubviews.contains { $0 === composer.connectionsButton })

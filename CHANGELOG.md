@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.16]
+
+- Put each channel name above its countdown and prevent text selection in the connection popover.
+
 ## [2.0.0-rc.15]
 
 - Add padding and centered connection details with bold network names.
