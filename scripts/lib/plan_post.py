@@ -277,18 +277,18 @@ def cover_mode(env, network, place, image, second, short):
     return None
 
 
-def threads_caption(env, caption, lang):
+def threads_caption(env, caption, lang, limit=500):
     """Condense a caption with the local model while preserving complete thoughts and hashtags."""
-    if len(caption) <= 500:
+    if len(caption) <= limit:
         return caption
     base = env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/")
     model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")
     prompt = (
         "Rewrite the caption below for a Threads post. Return only the finished caption, no quotes "
-        "or explanation. It must be at most 500 characters, use complete sentences, preserve the "
+        "or explanation. It must be at most %d characters, use complete sentences, preserve the "
         "language, product facts, call to action, and the most relevant hashtags. Remove repetition "
         "and less important details rather than cutting a sentence or hashtag in half.\n\n"
-        "Language: %s\nCaption:\n%s" % (lang, caption)
+        "Language: %s\nCaption:\n%s" % (limit, lang, caption)
     )
     for attempt in (1, 2):
         status, data = pmlib.http("POST", base + "/api/generate", body={
@@ -302,9 +302,17 @@ def threads_caption(env, caption, lang):
             raise PMError("Ollama returned HTTP %s while shortening the Threads caption: %s"
                           % (status, str(data)[:300]))
         shortened = (data.get("response") or "").strip().strip('"')
-        if shortened and len(shortened) <= 500:
+        if shortened and len(shortened) <= limit:
             return shortened
     raise PMError("The model could not produce a complete Threads caption within 500 characters.")
+
+
+def tagged_threads_caption(env, caption, lang, tag):
+    if not tag:
+        return threads_caption(env, caption, lang)
+    body = pmlib.remove_final_tag(caption, tag)
+    shortened = threads_caption(env, body, lang, 500 - len(tag) - 2)
+    return pmlib.apply_final_tag(shortened, tag)
 
 
 def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cover_image=None,
@@ -487,12 +495,17 @@ def run(env, p, dry_run):
                 result["warnings"].append(
                     f"La portada elegida no se aplica a: {names}." if es else
                     f"The selected cover does not apply to: {names}.")
+        tag = pmlib.final_tag(p.get("final_tag", env.get("CAPTION_FINAL_TAG", "")))
+        caption = pmlib.apply_final_tag(caption, tag)
         thread_caption = caption
         if any(network == "threads" for network, _, _ in usable):
-            thread_caption = p.get("reviewed_threads_caption") or threads_caption(env, caption, p["lang"])
+            reviewed_threads = p.get("reviewed_threads_caption")
+            thread_caption = (pmlib.apply_final_tag(reviewed_threads, tag) if reviewed_threads else
+                              tagged_threads_caption(env, caption, p["lang"], tag))
         cover_available = kinds == ["video"] and any(
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
+                       "final_tag": tag,
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
@@ -587,6 +600,7 @@ def main():
     parser.add_argument("--cover-image", help="image file to use as the video cover")
     parser.add_argument("--cover-second", help="video timestamp in seconds")
     parser.add_argument("--alternate-caption", help=argparse.SUPPRESS)
+    parser.add_argument("--final-tag", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-caption", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-threads-caption", help=argparse.SUPPRESS)
     parser.add_argument("--ui-lang", choices=("English", "Spanish"), help="language for placement and cover messages")
@@ -605,6 +619,8 @@ def main():
     tz = ZoneInfo(zone) if ZoneInfo else timezone(timedelta(hours=-5))
     p = plan(env, args.instruction, args.media, args.lang, datetime.now(tz), placement_override=args.placement,
              cover_image=args.cover_image, cover_second=args.cover_second, ui_lang=args.ui_lang)
+    if args.final_tag is not None:
+        p["final_tag"] = args.final_tag
     if args.dry_run and args.alternate_caption:
         p["alternate_caption"] = args.alternate_caption
     if not args.dry_run and args.reviewed_caption:
