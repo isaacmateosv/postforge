@@ -78,6 +78,28 @@ class Operations(unittest.TestCase):
             self.assertEqual([call.args[1] for call in postiz.create_draft.call_args_list],
                              ["Reviewed Threads text", "Reviewed caption", "Reviewed caption"])
 
+    def test_final_tag_moves_to_footer_and_whatsapp_can_change_it(self):
+        tag = pmlib.final_tag("MiNegocio")
+        caption = pmlib.apply_final_tag("Mi texto\n\n#minegocio #OtraEtiqueta", tag)
+        self.assertEqual(caption, "Mi texto\n\n#OtraEtiqueta\n\n#MiNegocio")
+        self.assertEqual(pmlib.apply_final_tag(caption, tag), caption)
+        self.assertEqual(pmlib.apply_final_tag(caption, ""), caption)
+        with self.assertRaises(pmlib.PMError):
+            pmlib.final_tag("dos etiquetas")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "plan.json"
+            confirmation = {"lang": "Spanish", "result": {
+                "caption": caption, "final_tag": tag, "networks": ["threads"],
+                "threads_caption": "Texto corto\n\n#MiNegocio",
+            }}
+            path.write_text(json.dumps(confirmation))
+            mtime = path.stat().st_mtime_ns
+            result = wa_inbox.change_plan_tag(str(path), confirmation, "#OtroNegocio", {})
+            self.assertEqual(result["caption"], "Mi texto\n\n#OtraEtiqueta\n\n#OtroNegocio")
+            self.assertEqual(result["threads_caption"], "Texto corto\n\n#OtroNegocio")
+            self.assertEqual(json.loads(path.read_text())["result"]["final_tag"], "#OtroNegocio")
+            self.assertEqual(path.stat().st_mtime_ns, mtime)
+
     def test_youtube_title_respects_limit_without_trimming_description(self):
         caption = "#Opening\nA title " + "🍓" * 80 + "\n\nThe full description."
         for short in (False, True):

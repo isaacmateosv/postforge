@@ -59,6 +59,7 @@ APPROVE_WHATSAPP = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:whatsapp|wa)(?
                               re.IGNORECASE)
 APPROVE_PLAN = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                           re.IGNORECASE)
+TAG_PLAN = re.compile(r"^(?:etiqueta|tag)\s+plan\s+([a-f0-9]{12}|\d+)\s+(#?\w{1,60})$", re.IGNORECASE)
 REJECT_PLAN = re.compile(r"^(?:rechazar|rechaza|reject|decline)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                          re.IGNORECASE)
 ES_DATES = {"Mon": "lun", "Tue": "mar", "Wed": "mié", "Thu": "jue", "Fri": "vie", "Sat": "sáb", "Sun": "dom",
@@ -297,6 +298,35 @@ def resolve_confirmation_ref(reference):
     return None, None
 
 
+def change_plan_tag(path, confirmation, value, env, dry_run=False):
+    result = confirmation["result"]
+    old_tag = result.get("final_tag", "")
+    tag = pmlib.final_tag(value)
+    body = pmlib.remove_final_tag(confirmation.get("caption_override") or result["caption"], old_tag)
+    caption = pmlib.apply_final_tag(body, tag)
+    if "threads" in result.get("networks", []):
+        thread_body = (body if confirmation.get("caption_override") else
+                       pmlib.remove_final_tag(result.get("threads_caption") or body, old_tag))
+        thread_text = plan_post.tagged_threads_caption(env, thread_body, confirmation["lang"], tag)
+        result["threads_caption"] = thread_text if thread_text != caption else None
+    result.update(caption=caption, final_tag=tag)
+    if result.get("youtube_title"):
+        result["youtube_title"] = pmlib.youtube_title(caption, result.get("short", False))
+    confirmation.pop("caption_override", None)
+    if not dry_run:
+        metadata = os.stat(path)
+        fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".plan-tag-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(confirmation, fh, ensure_ascii=False, indent=1)
+            os.utime(temporary, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    return result
+
+
 def remove_confirmation(path):
     try:
         shutil.rmtree(os.path.splitext(path)[0], ignore_errors=True)
@@ -380,6 +410,13 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
         lines += ["", ("Nada se publica sin tu aprobación: revísalos en %s" if es else
                        "Nothing is published without your approval: review them at %s") % result["review_url"]]
     if confirmation_id:
+        tag = result.get("final_tag")
+        if es:
+            lines += ["", (f"¿Dejamos {tag} al final?" if tag else "¿Quieres añadir una etiqueta al final?"),
+                      f"Para cambiarla, responde `etiqueta plan {confirmation_id} #MiNegocio`."]
+        else:
+            lines += ["", (f"Keep {tag} at the end?" if tag else "Want to add a final hashtag?"),
+                      f"To change it, reply `tag plan {confirmation_id} #MyBusiness`."]
         if es:
             lines += ["", f"Responde `aprobar plan {confirmation_id}` para continuar.",
                       f"Para cambiarlo, responde `rechazar plan {confirmation_id}` y vuelve a enviar tu pedido "
@@ -448,6 +485,23 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
         if item_id and not dry_run:
             whatsapp_pending.process(env)
         return True
+    tag_change = TAG_PLAN.fullmatch(normalized_instruction)
+    if tag_change:
+        confirmation_path, confirmation = resolve_confirmation_ref(tag_change[1])
+        es = ui_language() == "Spanish"
+        if not confirmation_path or not confirmation:
+            reply(env, name, number, number, "No encontré ese plan." if es else "I couldn’t find that plan.", state, dry_run)
+            return True
+        try:
+            result = change_plan_tag(confirmation_path, confirmation, tag_change[2], env, dry_run)
+        except (PMError, OSError, KeyError, ValueError):
+            reply(env, name, number, number, "No pude cambiar la etiqueta. El plan sigue pendiente."
+                  if es else "I couldn’t change the hashtag. The plan is still pending.", state, dry_run)
+            return True
+        reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
+                                                confirmation_id=tag_change[1]), state, dry_run)
+        reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
+        return True
     plan_approval = APPROVE_PLAN.fullmatch(normalized_instruction)
     if plan_approval:
         confirmation_path, confirmation = resolve_confirmation_ref(plan_approval.group(1))
@@ -467,6 +521,8 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
                 p["when"] = scheduled.astimezone(tz)
             override = (confirmation.get("caption_override") or "").strip()
             saved_result = confirmation.get("result") or {}
+            if "final_tag" in saved_result:
+                p["final_tag"] = saved_result["final_tag"]
             if override:  # edited in the PostForge app's WhatsApp window: use it as the exact caption
                 p["exact"] = override
             elif saved_result.get("caption"):

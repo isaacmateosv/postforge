@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.12]
+
+- Add an editable final hashtag and a WhatsApp review step for changing it per plan.
+
 ## [2.0.0-rc.11]
 
 - Place the composer steps near the top and add a brief, interruptible opening highlight.

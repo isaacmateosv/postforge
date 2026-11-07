@@ -282,6 +282,31 @@ PROVIDER_DEFAULTS = {
 }
 
 
+def final_tag(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    tag = "#" + value.removeprefix("#")
+    if not re.fullmatch(r"#\w{1,60}", tag):
+        raise PMError("Use one hashtag of up to 60 letters, numbers or underscores, without spaces.")
+    return tag
+
+
+def remove_final_tag(caption, tag):
+    if not tag:
+        return caption
+    pattern = r"(?<![\w#])" + re.escape(tag) + r"(?!\w)"
+    caption = re.sub(r"^[ \t]*" + pattern + r"[ \t]+", "", caption, flags=re.IGNORECASE | re.MULTILINE)
+    return re.sub(r"[ \t]*" + pattern, "", caption, flags=re.IGNORECASE).rstrip()
+
+
+def apply_final_tag(caption, tag):
+    if not tag:
+        return caption
+    caption = remove_final_tag(caption, tag)
+    return caption + ("\n\n" if caption else "") + tag
+
+
 YOUTUBE_TITLE_LIMIT = 100
 
 

@@ -1497,6 +1497,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         updateEnvValue(key: "WA_TEST_RECIPIENTS", value: numbers.joined(separator: ","))
     }
 
+    @objc func editCaptionFinalTag() {
+        let contents = (try? String(contentsOfFile: project + "/.env", encoding: .utf8)) ?? ""
+        let current = contents.split(separator: "\n").first { $0.hasPrefix("CAPTION_FINAL_TAG=") }
+            .map { String($0.dropFirst("CAPTION_FINAL_TAG=".count)).trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) } ?? ""
+        let field = NSTextField(string: current)
+        field.placeholderString = "#MiNegocio"
+        field.frame = NSRect(x: 0, y: 0, width: 250, height: 24)
+        let dialog = NSAlert()
+        dialog.messageText = text("Final hashtag", "Etiqueta final")
+        dialog.informativeText = text("This hashtag goes at the end of new captions. Leave it blank to skip it.",
+                                      "Esta etiqueta va al final de los textos nuevos. Déjala en blanco si prefieres omitirla.")
+        dialog.accessoryView = field
+        dialog.addButton(withTitle: text("Save", "Guardar"))
+        dialog.addButton(withTitle: text("Cancel", "Cancelar"))
+        dialog.window.initialFirstResponder = field
+        guard dialog.runModal() == .alertFirstButtonReturn else { return }
+        let raw = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tag = raw.isEmpty || raw.hasPrefix("#") ? raw : "#" + raw
+        guard tag.isEmpty || tag.range(of: #"^#[\p{L}\p{N}_]{1,60}$"#, options: .regularExpression) != nil else {
+            alert(text("Invalid hashtag", "Etiqueta no válida"),
+                  text("Use one hashtag with letters, numbers or underscores, without spaces.",
+                       "Usa una sola etiqueta con letras, números o guiones bajos, sin espacios."))
+            return
+        }
+        updateEnvValue(key: "CAPTION_FINAL_TAG", value: "\"\(tag)\"")
+        newPost?.draftOptionsChanged()
+    }
+
     func updateEnvValue(key: String, value: String) {
         let path = project + "/.env"
         guard var contents = try? String(contentsOfFile: path, encoding: .utf8) else {
@@ -2726,6 +2754,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var previewed = false
     var reviewedCaption: String?
     var reviewedThreadsCaption: String?
+    var reviewedFinalTag: String?
     let captionVersions = NSPopUpButton()
     let alternateCaption = NSButton()
     var savedVersions: [(instruction: String, output: String)] = []
@@ -2936,7 +2965,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         refreshPlacementLabels()
         placementMenu.target = self
         placementMenu.action = #selector(draftOptionsChanged)
-        let placements = NSStackView(views: [placementLabel, placementMenu])
+        let finalTagButton = NSButton(title: t("Final hashtag…", "Etiqueta final…"),
+                                      target: NSApp.delegate, action: #selector(AppDelegate.editCaptionFinalTag))
+        finalTagButton.controlSize = .small
+        let placements = NSStackView(views: [placementLabel, placementMenu, finalTagButton])
         placements.spacing = 8
 
         chooseCover.title = t("Choose image…", "Elegir imagen…")
@@ -3157,6 +3189,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         lastReport = nil
         reviewedCaption = nil
         reviewedThreadsCaption = nil
+        reviewedFinalTag = nil
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
@@ -3345,6 +3378,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         } else if let reviewedCaption {
             args.append("--reviewed-caption=\(reviewedCaption)")
             if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
+            if let reviewedFinalTag { args.append("--final-tag=\(reviewedFinalTag)") }
         }
         for url in media { args += ["--media", url.path] }
         args.append(text)
@@ -3490,6 +3524,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             reviewedCaption = json["caption"] as? String
             canGenerateVariant = (json["caption_source"] as? String)?.hasPrefix("written by ") == true
             reviewedThreadsCaption = json["threads_caption"] as? String
+            reviewedFinalTag = json["final_tag"] as? String
             previewed = reviewedCaption != nil
             coverLocked = previewed
             coverAvailable = json["video_cover_available"] as? Bool == true
@@ -4317,6 +4352,7 @@ let uiSpanish: [String: String] = [
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
     "Approve Status…": "Aprobar Estado…",
+    "Final hashtag…": "Etiqueta final…",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",

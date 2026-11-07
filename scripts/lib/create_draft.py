@@ -265,6 +265,7 @@ def main():
         info("[2/4] Drafting caption with local %s (Metal GPU, evicted after use)..."
              % env.get("LOCAL_LLM_MODEL", "llama3.2:3b"))
         caption, model, seconds = ollama_caption(env, args.topic, lang)
+    caption = pmlib.apply_final_tag(caption, pmlib.final_tag(env.get("CAPTION_FINAL_TAG")))
     info("\n--- CAPTION ---\n%s\n---------------\n" % caption)
 
     if args.dry_run:
