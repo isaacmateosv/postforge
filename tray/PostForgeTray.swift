@@ -2768,6 +2768,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let result = NSTextView()
     let preview = NSButton(title: "Preview", target: nil, action: nil)
     let create = NSButton(title: "Create Drafts", target: nil, action: nil)
+    let schedule = NSButton()
+    let editCaption = NSButton()
+    var reviewedWhen: String?
+    var canScheduleSocials = false
     let calendar = NSButton(title: "Open Postiz Calendar", target: nil, action: nil)
     let statusApproval = NSButton(title: "", target: nil, action: nil)
     var pendingStatusID: String?
@@ -2790,6 +2794,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     var coverURL: URL?
     var inputRevision = 0
     var ideaHeight: NSLayoutConstraint?
+    private var largestRequestHeight: CGFloat = 86
     var planExpanded = false
     var reviewURL: URL?
     var previewed = false
@@ -2807,7 +2812,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
     init(project: String) {
         self.project = project
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 790),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 820),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
@@ -3108,6 +3113,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
 
         // Idea
         instruction.delegate = self
+        instruction.allowsUndo = true
         let ideaPanel = Panel(scroll(instruction, editable: true), insets: NSEdgeInsets(), style: .input)
         ideaHeight = ideaPanel.heightAnchor.constraint(equalToConstant: 86)
         ideaHeight?.isActive = true
@@ -3132,6 +3138,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         preview.title = t("👨‍🍳 Bake idea", "👨‍🍳 Hornea la idea")
         preview.target = self
         preview.action = #selector(runPreview)
+        preview.keyEquivalent = "\r"
+        preview.keyEquivalentModifierMask = .command
+        preview.toolTip = t("Bake idea (⌘↵)", "Hornea la idea (⌘↵)")
         preview.controlSize = .large
         preview.font = .systemFont(ofSize: 14, weight: .semibold)
         preview.bezelColor = .systemBlue
@@ -3140,15 +3149,18 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         create.title = t("Create Drafts", "Crear borradores")
         create.target = self
         create.action = #selector(runCreate)
-        create.keyEquivalent = "\r"
         create.isEnabled = false
+        schedule.title = t("Schedule Directly…", "Programar directamente…")
+        schedule.target = self
+        schedule.action = #selector(scheduleReviewedPlan)
+        schedule.isEnabled = false
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         let actionSpacer = NSView()
         actionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         mixer.isHidden = true
-        let actions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, preview, create])
+        let actions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, preview, create, schedule])
         actions.spacing = 10
         actions.alignment = .centerY
 
@@ -3240,8 +3252,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         alternateCaption.target = self
         alternateCaption.action = #selector(runAlternateCaption)
         alternateCaption.controlSize = .small
+        editCaption.title = t("Edit Caption…", "Editar texto…")
+        editCaption.target = self
+        editCaption.action = #selector(editReviewedCaption)
+        editCaption.controlSize = .small
         updateCaptionVersions()
-        let planHeader = NSStackView(views: [planLabel, planSpacer, captionVersions, alternateCaption, statusApproval, calendar])
+        let planHeader = NSStackView(views: [planLabel, planSpacer, captionVersions, editCaption, alternateCaption, statusApproval, calendar])
         planHeader.alignment = .centerY
         let main = NSStackView(views: [header, steps, stats, mediaLabel, drop, placements, coverControls, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
         main.orientation = .vertical
@@ -3305,6 +3321,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         reviewedThreadsCaption = nil
         reviewedFinalTag = nil
         reviewedYouTubeTitle = nil
+        reviewedWhen = nil
+        canScheduleSocials = false
         previewed = false
         preview.bezelColor = .systemBlue
         create.isEnabled = false
@@ -3363,6 +3381,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         captionVersions.isEnabled = !working
         alternateCaption.isHidden = !canGenerateVariant
         alternateCaption.isEnabled = !working
+        editCaption.isHidden = !previewed
+        editCaption.isEnabled = !working
+        schedule.isEnabled = previewed && canScheduleSocials && reviewedWhen != nil && !working
     }
 
     @objc func restoreCaptionVersion() {
@@ -3377,8 +3398,73 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     @objc func runAlternateCaption() {
-        guard canGenerateVariant, let reviewedCaption else { return }
-        run(dryRun: true, previousCaption: reviewedCaption)
+        guard canGenerateVariant else { return }
+        reviseReviewedCopy()
+    }
+
+    @objc func editReviewedCaption() {
+        guard !working, previewed, let reviewedCaption else { return }
+        let editor = NSTextView(frame: NSRect(x: 0, y: 0, width: 390, height: 145))
+        editor.string = reviewedCaption
+        editor.allowsUndo = true
+        let scrollView = scroll(editor, editable: true)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 390, height: 145)
+        let alert = NSAlert()
+        alert.messageText = t("Edit the caption", "Edita el texto")
+        alert.informativeText = t("Your channels and schedule stay the same.", "Se conservan los canales y la hora del plan.")
+        alert.accessoryView = scrollView
+        alert.addButton(withTitle: t("Apply", "Aplicar"))
+        alert.addButton(withTitle: t("Cancel", "Cancelar"))
+        alert.window.initialFirstResponder = editor
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let edited = editor.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !edited.isEmpty, edited != reviewedCaption else { return }
+        reviseReviewedCopy(edited: edited)
+    }
+
+    func reviseReviewedCopy(edited: String? = nil) {
+        guard !working, previewed, let snapshot = lastReport?.0 else { return }
+        let revision = inputRevision
+        let request = instruction.string
+        var args = [project + "/scripts/plan-post.sh", "--json", "--revise-copy=\(snapshot)"]
+        if let edited { args.append("--edited-caption=\(edited)") }
+        args += ["--", request]
+        working = true
+        updateCaptionVersions()
+        create.isEnabled = false
+        preview.isEnabled = false
+        mixer.start()
+        (NSApp.delegate as? AppDelegate)?.planningWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(args, in: self.project, timeout: 900, quietErrors: true)
+            DispatchQueue.main.async {
+                if let delegate = NSApp.delegate as? AppDelegate {
+                    delegate.planningWork -= 1
+                    delegate.poll()
+                }
+                self.mixer.stop()
+                self.working = false
+                self.preview.isEnabled = true
+                defer { self.updateCaptionVersions() }
+                guard revision == self.inputRevision else { return }
+                if code == 0 {
+                    self.report(output, dryRun: true, exitCode: code)
+                    if self.previewed { self.rememberVersion(request, output: output) }
+                } else {
+                    self.create.isEnabled = self.previewed
+                    (NSApp.delegate as? AppDelegate)?.alert(
+                        self.t("Couldn’t update the caption", "No se pudo actualizar el texto"),
+                        self.t("Your previous caption is still selected.", "Tu texto anterior sigue seleccionado."))
+                }
+            }
+        }
+    }
+
+    func rememberVersion(_ request: String, output: String) {
+        savedVersions.append((instruction: request, output: output))
+        if savedVersions.count > 8 { savedVersions.removeFirst() }
+        selectedVersion = savedVersions.count - 1
+        updateCaptionVersions()
     }
 
     @objc func chooseCoverImage() {
@@ -3422,6 +3508,29 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     func textDidChange(_ notification: Notification) {
         placeholder.isHidden = !instruction.string.isEmpty
         invalidateReviewedPlan()
+        resizeRequestField()
+    }
+
+    func resizeRequestField() {
+        guard let layout = instruction.layoutManager, let container = instruction.textContainer else { return }
+        layout.ensureLayout(for: container)
+        let needed = ceil(layout.usedRect(for: container).height + 2 * instruction.textContainerInset.height + 6)
+        let height = min(180, max(previewed ? 64 : 86, needed))
+        ideaHeight?.constant = height
+        if height > largestRequestHeight {
+            expandComposer(by: height - largestRequestHeight)
+            largestRequestHeight = height
+        }
+    }
+
+    private func expandComposer(by amount: CGFloat) {
+        guard let bounds = window.screen?.visibleFrame else { return }
+        var frame = window.frame
+        let extra = max(0, min(amount, bounds.height - frame.height))
+        guard extra > 0 else { return }
+        frame.origin.y = max(bounds.minY, frame.minY - extra)
+        frame.size.height += extra
+        window.setFrame(frame, display: true)
     }
 
     @objc func startDictation() {
@@ -3446,6 +3555,17 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         run(dryRun: false)
     }
 
+    @objc func scheduleReviewedPlan() {
+        guard previewed, canScheduleSocials, let when = reviewedWhen,
+              let delegate = NSApp.delegate as? AppDelegate else { return }
+        let time = shortDate(iso: when)
+        guard delegate.ask(t("Schedule these posts?", "¿Programar estas publicaciones?"),
+                           t("Social posts will publish automatically at \(time). WhatsApp Status still needs its own approval.",
+                             "Las publicaciones de redes saldrán automáticamente a las \(time). El Estado de WhatsApp requiere su propia aprobación."),
+                           safe: t("Cancel", "Cancelar"), risky: t("Schedule Posts", "Programar publicaciones")) else { return }
+        run(dryRun: false, scheduleDirectly: true)
+    }
+
     @objc func openWhatsAppFromWindow() { (NSApp.delegate as? AppDelegate)?.reviewWhatsAppPlans() }
     @objc func openBackupFromWindow() { (NSApp.delegate as? AppDelegate)?.openBackupWindow() }
 
@@ -3465,7 +3585,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         emptyState.isHidden = !text.isEmpty
     }
 
-    func run(dryRun: Bool, previousCaption: String? = nil) {
+    func run(dryRun: Bool, scheduleDirectly: Bool = false) {
         guard !working else { return }
         if (NSApp.delegate as? AppDelegate)?.state?.state == "off" {
             show(t("Turn on PostForge to prepare a plan.", "Enciende PostForge para preparar un plan."))
@@ -3489,12 +3609,13 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         if !second.isEmpty { args += ["--cover-second=\(second)"] }
         if dryRun {
             args.append("--dry-run")
-            if let previousCaption { args.append("--alternate-caption=\(previousCaption)") }
         } else if let reviewedCaption {
             args.append("--reviewed-caption=\(reviewedCaption)")
             if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
             if let reviewedFinalTag { args.append("--final-tag=\(reviewedFinalTag)") }
             if let reviewedYouTubeTitle { args.append("--reviewed-youtube-title=\(reviewedYouTubeTitle)") }
+            if let reviewedWhen { args.append("--reviewed-when=\(reviewedWhen)") }
+            if scheduleDirectly { args.append("--schedule") }
         }
         for url in media { args += ["--media", url.path] }
         args.append(text)
@@ -3529,9 +3650,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
                 if dryRun && code == 0 && !self.confirmPlanWithoutCover(output) { return }
                 self.report(output, dryRun: dryRun, exitCode: code)
                 if dryRun && self.previewed {
-                    self.savedVersions.append((instruction: text, output: output))
-                    if self.savedVersions.count > 8 { self.savedVersions.removeFirst() }
-                    self.selectedVersion = self.savedVersions.count - 1
+                    self.rememberVersion(text, output: output)
                 } else if !dryRun && code == 0 {
                     self.savedVersions.removeAll()
                     self.selectedVersion = nil
@@ -3554,7 +3673,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         }
         if let error = json["error"] as? String {
             return show("✖ \(dryRun ? t("Preview", "Vista previa") : t("Draft creation", "Creación de borradores")) \(t("failed", "falló")):\n" + error
-                        + t("\n\nNothing was created. Correct the request or retry.", "\n\nNo se creó nada. Corrige la solicitud o vuelve a intentar."))
+                        + (dryRun ? "" : t("\n\nCheck the Postiz calendar before retrying.", "\n\nRevisa el calendario de Postiz antes de volver a intentar.")))
         }
         let names = ["instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
                      "threads": "Threads", "whatsapp": "WhatsApp Status"]
@@ -3572,8 +3691,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         }
         let scheduled = (json["when_utc"] as? String).map { shortDate(iso: $0) }
             ?? (json["when_local"] as? String ?? "")
-        line(dryRun ? t("🗓  Plan ready to review", "🗓  Plan listo para revisar")
-                    : t("✓  Drafts prepared", "✓  Borradores preparados"), size: 18, weight: .bold)
+        let scheduledDirectly = json["scheduled"] as? Bool == true
+        let readyTitle = scheduledDirectly ? t("✓  Posts scheduled", "✓  Publicaciones programadas")
+            : t("✓  Drafts prepared", "✓  Borradores preparados")
+        line(dryRun ? t("🗓  Plan ready to review", "🗓  Plan listo para revisar") : readyTitle,
+             size: 18, weight: .bold)
         line(scheduled + t(" · local time", " · hora local"), weight: .medium, color: .secondaryLabelColor)
         line(t("📍  Destinations", "📍  Destinos"), weight: .semibold, before: 9)
         for target in json["targets"] as? [[String: Any]] ?? [] {
@@ -3620,7 +3742,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             for warning in warnings { line(warning, color: .systemOrange) }
         }
         if !dryRun {
-            line(t("Review and approve social drafts in the Postiz calendar.", "Revisa y aprueba los borradores en el calendario de Postiz."),
+            line(scheduledDirectly ? t("Check scheduled posts in the Postiz calendar.", "Revisa las publicaciones programadas en el calendario de Postiz.")
+                 : t("Review and approve social drafts in the Postiz calendar.", "Revisa y aprueba los borradores en el calendario de Postiz."),
                  weight: .medium, color: .secondaryLabelColor, before: 9)
             reviewURL = (json["review_url"] as? String).flatMap(URL.init(string:))
             calendar.isHidden = reviewURL == nil
@@ -3636,10 +3759,21 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         } else {
             statusApproval.isHidden = true
             reviewedCaption = json["caption"] as? String
-            canGenerateVariant = (json["caption_source"] as? String)?.hasPrefix("written by ") == true
+            canGenerateVariant = json["can_rewrite"] as? Bool
+                ?? ((json["caption_source"] as? String)?.hasPrefix("written by ") == true)
             reviewedThreadsCaption = json["threads_caption"] as? String
             reviewedFinalTag = json["final_tag"] as? String
             reviewedYouTubeTitle = json["youtube_title"] as? String
+            reviewedWhen = json["when_utc"] as? String
+            canScheduleSocials = json["direct_schedule_available"] as? Bool == true
+            let gated = json["direct_schedule_blocked_by_gateway"] as? Bool == true
+            schedule.toolTip = gated ? t("Direct scheduling of media is paused while gateway delivery is being fixed.",
+                                         "La programación directa de archivos está pausada mientras se corrige la entrega por el acceso seguro.") : nil
+            if gated {
+                line(t("Direct scheduling is unavailable for this media through the secure gateway.",
+                       "Este archivo todavía no se puede programar directamente a través del acceso seguro."),
+                     weight: .medium, color: .systemOrange, before: 6)
+            }
             previewed = reviewedCaption != nil
             coverLocked = previewed
             coverAvailable = json["video_cover_available"] as? Bool == true
@@ -3651,16 +3785,10 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         result.textStorage?.setAttributedString(document)
         result.scrollRangeToVisible(NSRange(location: 0, length: 0))
         emptyState.isHidden = true
-        ideaHeight?.constant = 64
-        if !planExpanded, let bounds = window.screen?.visibleFrame {
+        resizeRequestField()
+        if !planExpanded {
             planExpanded = true
-            var frame = window.frame
-            let extra = max(0, min(140, bounds.height - frame.height))
-            if extra > 0 {
-                frame.origin.y = max(bounds.minY, frame.minY - extra)
-                frame.size.height += extra
-                window.setFrame(frame, display: true, animate: window.isVisible)
-            }
+            expandComposer(by: 140)
         }
     }
 }
@@ -4469,6 +4597,9 @@ let uiSpanish: [String: String] = [
     "Approve Status…": "Aprobar Estado…",
     "Final hashtag…": "Etiqueta final…",
     "Connections": "Conexiones",
+    "Edit Caption…": "Editar texto…",
+    "Schedule Directly…": "Programar directamente…",
+    "Bake idea (⌘↵)": "Hornea la idea (⌘↵)",
     "Create drafts for": "Crear borradores de",
     "Video cover": "Portada del video",
     "Choose image…": "Elegir imagen…",
@@ -4797,12 +4928,15 @@ if CommandLine.arguments.contains("--verify-ui") {
     steps.stopSweep()
     precondition(!steps.isAnimating)
     precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
+    precondition(composer.instruction.allowsUndo)
+    precondition(composer.preview.keyEquivalent == "\r" && composer.preview.keyEquivalentModifierMask == .command)
+    precondition(!composer.schedule.isEnabled)
     let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","video_cover_available":true,"warnings":["Sample warning"]}"#
     composer.report(planFixture, dryRun: true, exitCode: 0)
     precondition(composer.result.string.contains("Plan ready to review"))
     precondition(composer.result.string.contains("Destinations"))
     precondition(composer.result.string.contains("Things to check"))
-    precondition(composer.ideaHeight?.constant == 64 && composer.create.isEnabled)
+    precondition((composer.ideaHeight?.constant ?? 0) >= 64 && composer.create.isEnabled)
     precondition(!composer.chooseCover.isEnabled && !composer.coverSecond.isEnabled && !composer.changeCover.isHidden)
     composer.editCover()
     precondition(composer.chooseCover.isEnabled && composer.coverSecond.isEnabled && !composer.create.isEnabled)

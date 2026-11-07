@@ -23,6 +23,8 @@ You can also put the idea first, followed by a semicolon, such as “Cookies and
 
 Use `idea:` or `write about` to ask PostForge to write a caption. Use `caption:` or `text:` to supply the final wording. For generated text, choose **Another Caption…** to try a new version. **Previous versions…** restores a saved request and its preview. Versions are kept while you work in the composer with the same files and draft options. The selected preview is the one used to create drafts.
 
+On macOS, press **⌘ Return** to bake the plan. Use **Edit Caption…** or **Another Caption…** to revise the copy while keeping the time, destinations and cover. In WhatsApp, reply `improve plan 1` when the bot offers it. **Schedule Directly…** queues eligible social posts for automatic publication after you confirm. WhatsApp Status stays separate. Protected media delivery must be available before you can schedule media directly.
+
 ## Choose formats and a cover
 
 Use **Draft Options** in the menu bar for shortcuts to the formats and cover controls.

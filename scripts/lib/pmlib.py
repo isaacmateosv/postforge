@@ -282,6 +282,20 @@ PROVIDER_DEFAULTS = {
 }
 
 
+def ollama_text_prompt(model, prompt):
+    if model.startswith("qwen3:"):
+        return {"prompt": prompt + "\n/no_think", "think": False}
+    return {"prompt": prompt}
+
+
+def ollama_final_text(data):
+    value = (data.get("response") or "").strip()
+    value = re.sub(r"<think>.*?</think>", "", value, flags=re.DOTALL | re.IGNORECASE).strip()
+    leaked = re.match(r"^(?:(?:okay|alright)[, ]*\s*)?(?:I need to|let me (?:think|break|tackle)|let's tackle)\b",
+                      value, flags=re.IGNORECASE)
+    return "" if "<think>" in value.lower() or leaked else value
+
+
 def final_tag(value):
     value = (value or "").strip()
     if not value:
@@ -407,16 +421,15 @@ class Postiz:
             raise PMError("%s (file %s, %.1f MB; Postiz takes images up to 10 MB and videos up to 1 GB)"
                           % (exc, os.path.basename(path), os.path.getsize(path) / 1048576.0))
 
-    def create_draft(self, integration, content, media=None, when=None, settings=None, short=False):
-        """Stage a DRAFT (HITL guardrail: type is always 'draft'; Postiz starts no publish
-        workflow for DRAFT posts). `integration` is an item from integrations();
-        `settings` overrides the provider defaults. Returns the created post list."""
+    def create_draft(self, integration, content, media=None, when=None, settings=None, short=False, *, schedule=False):
+        """Stage a draft, or schedule a post when explicitly requested by a caller.
+        Settings override the provider defaults. Returns the created post list."""
         merged = draft_settings(integration.get("identifier") or "", content, self.env, short)
         merged.update(settings or {})
         if when is None:
             when = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
         body = {
-            "type": "draft",
+            "type": "schedule" if schedule else "draft",
             "date": when.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "shortLink": False,
             "tags": [],
