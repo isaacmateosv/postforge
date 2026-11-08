@@ -197,8 +197,9 @@ debe tener un solo receptor.
 
 Usa v2/telegram_setup.py localmente con --language es o en y, si deseas,
 --heartbeat 15. Rechaza un webhook existente, valida el token, identifica un
-/start privado, pide confirmar al propietario y registra comandos. Los ajustes
-están en run/telegram y deben ser privados. Reinicia después de cambiarlos.
+/start privado, pide confirmar al propietario y registra comandos. El .env privado es la fuente principal de los ajustes y el token de Telegram;
+run/telegram contiene cachés derivadas. La UI de Rust valida y reinicia el agente
+al guardar. Los archivos anteriores se incluyen al exportar credenciales cifradas.
 Configura por separado el inicio automático del sistema. Un equipo apagado o
 suspendido no avisa de su propia caída; hace falta un monitor externo para
 detectar la ausencia de avisos de actividad.
@@ -215,3 +216,27 @@ Siri, inicio de sesión, actualizaciones, notificaciones y desinstalación sigue
 en el controlador del Mac. Los ZIP de escritorio del Mac tienen firma ad hoc;
 los de Windows carecen de firma de publicación. La firma de producción y las
 pruebas de instalación son verificaciones separadas.
+
+## Configuración de Telegram y contrato de migración
+
+Telegram es opcional y propio de cada instalación: un bot dedicado y una cuenta
+privada autorizada. Desde la cabecera de Rust se valida el token, se busca y
+selecciona la cuenta y se configura idioma, avisos de actividad y activación.
+La respuesta de ajustes nunca incluye el token guardado. Las claves del .env
+son TELEGRAM_ENABLED, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_ID, TELEGRAM_BOT_USERNAME,
+TELEGRAM_OWNER_ID, TELEGRAM_LANGUAGE, TELEGRAM_HEARTBEAT_MINUTES,
+TELEGRAM_TRANSPORT y TELEGRAM_MIGRATION_HOLD. El token es secreto y sigue la
+protección de archivos privados y respaldos cifrados del resto de credenciales.
+Nunca se incluye en los paquetes públicos.
+
+La exportación incorpora los ajustes anteriores en la copia cifrada del .env
+sin cambiar el origen. La importación añade TELEGRAM_MIGRATION_HOLD=true antes
+de guardar el archivo restaurado. La migración detiene al agente del destino
+antes de reemplazar las credenciales. Se conservan la preferencia de activación
+y los ajustes detallados, pero el receptor queda bloqueado hasta activarlo
+desde la UI después de detener el equipo anterior. Al cambiar el bot o su
+propietario, o activar una migración, se reinician los índices y la conversación
+y se omiten los comandos anteriores. Si falla el inicio, se restauran los
+ajustes y los archivos previos de conversación. Desactivar no llama a la API.
+Una validación fallida no cambia credenciales. El respaldo cifrado requiere
+OpenSSL en todos los sistemas operativos.

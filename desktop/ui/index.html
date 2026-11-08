@@ -14,7 +14,7 @@
   <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
   <div class="tools">
     <select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select>
-    <button id="reconnect"></button><button id="help"></button><button id="workspace"></button>
+    <button id="telegram-open">Telegram</button><button id="reconnect"></button><button id="help"></button><button id="workspace"></button>
   </div>
 </header>
 <nav id="steps" aria-label="Workflow"></nav>
@@ -115,9 +115,36 @@
 </section>
 </main>
 <footer><span id="workspace-status"></span><div><button id="cleanup"></button><button id="new"></button></div></footer>
-<dialog id="modal">
+<dialog id="modal" aria-labelledby="modal-title">
   <h2 id="modal-title"></h2><div id="modal-body"></div>
   <div class="actions end"><button id="modal-cancel"></button><button id="modal-confirm" class="primary"></button></div>
 </dialog>
+<dialog id="telegram-settings" aria-labelledby="telegram-title">
+  <h2 id="telegram-title" data-en="Telegram · your installation" data-es="Telegram · tu instalación"></h2>
+  <p data-en="Optional. Use your own dedicated bot; PostForge has no shared global bot. Only the private owner selected here can control it." data-es="Opcional. Usa tu propio bot dedicado; PostForge no tiene un bot global compartido. Solo la cuenta privada que elijas aquí podrá controlarlo."></p>
+  <div id="telegram-summary" class="callout" role="status"></div>
+  <label class="toggle"><input id="telegram-enabled" type="checkbox"><span data-en="Enable Telegram on this computer" data-es="Activar Telegram en este equipo"></span></label>
+  <div class="settings-field">
+    <label for="telegram-token" data-en="BotFather token" data-es="Token de BotFather"></label>
+    <input id="telegram-token" type="password" autocomplete="new-password" spellcheck="false">
+    <small data-en="Create a dedicated bot with /newbot in @BotFather. Leave this field empty to keep a saved token. The saved token is never displayed." data-es="Crea un bot dedicado con /newbot en @BotFather. Deja este campo vacío para conservar el token guardado. El token guardado nunca se muestra."></small>
+    <button id="telegram-inspect" data-en="Validate bot" data-es="Validar bot"></button>
+  </div>
+  <div class="settings-field">
+    <label for="telegram-owner" data-en="Authorized private owner · Telegram numeric ID" data-es="Cuenta privada autorizada · ID numérico de Telegram"></label>
+    <input id="telegram-owner" inputmode="numeric" autocomplete="off">
+    <small data-en="Open your bot in Telegram, send /start, then find your account below. If changing an active bot's owner, disable and save first. Groups are not authorized." data-es="Abre tu bot en Telegram, envía /start y busca tu cuenta aquí abajo. Para cambiar el propietario de un bot activo, primero desactívalo y guarda. No se autorizan grupos."></small>
+    <button id="telegram-detect" data-en="Find my private account" data-es="Buscar mi cuenta privada"></button>
+    <select id="telegram-owners" aria-label="Detected private accounts" hidden></select>
+  </div>
+  <div class="form-grid">
+    <label><span data-en="Bot language" data-es="Idioma del bot"></span><select id="telegram-language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></label>
+    <label><span data-en="Heartbeat · minutes" data-es="Aviso de actividad · minutos"></span><input id="telegram-heartbeat" type="number" min="0" max="1440" step="1"><small data-en="0 = off. Otherwise 5–1440 minutes." data-es="0 = apagado. Si lo activas, de 5 a 1440 minutos."></small></label>
+  </div>
+  <p class="hint" data-en="Settings, including the secret token, are stored in the private .env and included in encrypted credentials backups. Restores keep Telegram paused until you confirm the old host is stopped. Keep group privacy enabled; no public webhook or inline mode is required." data-es="Los ajustes, incluido el token secreto, se guardan en el .env privado y viajan en los respaldos cifrados de credenciales. Al restaurar, Telegram queda en pausa hasta confirmar que el equipo anterior está detenido. Mantén activa la privacidad de grupos; no necesitas webhook público ni modo inline."></p>
+  <div id="telegram-feedback" role="status"></div>
+  <div class="actions end"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
+</dialog>
+
 </body>
 </html>

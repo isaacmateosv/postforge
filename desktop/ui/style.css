@@ -114,3 +114,12 @@ dialog select { width: 100%; margin-bottom: 16px; }
 #media-list:empty { display: none; }
 footer > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tools { flex-wrap: wrap; justify-content: flex-end; }
+
+#telegram-settings { max-width: 760px; max-height: 90vh; overflow: auto; }
+#telegram-settings .settings-field { margin: 20px 0; }
+#telegram-settings .settings-field > label { display: block; font-weight: 600; margin-bottom: 7px; }
+#telegram-settings .settings-field > input { display: block; width: 100%; }
+#telegram-settings small { display: block; margin: 7px 0; }
+#telegram-settings .toggle { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+#telegram-settings .settings-field button { margin: 4px 0; }
+#telegram-feedback { white-space: pre-wrap; color: #b9daff; margin: 15px 0; }

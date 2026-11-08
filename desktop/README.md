@@ -66,29 +66,51 @@ It opens no command HTTP listener. Credentials stay out of renderer responses,
 and a strict CSP protects the embedded frontend. Models are unloaded after use
 by the existing planner; the client has no periodic background polling.
 
-## Telegram
+## Telegram · per-installation settings
 
-Create a dedicated bot with **/newbot** in **@BotFather**, then configure it locally.
-The helper discovers the private owner, registers commands and stores the token
-privately. Keep group privacy enabled. Inline mode and a public webhook are
-unnecessary.
+Each installation uses its own operator-owned bot. PostForge provides no global
+bot and ships no bot token. This version supports one authorized private
+Telegram owner per installation. Other users and groups are ignored.
 
-~~~text
-python3 v2/telegram_setup.py --language en --heartbeat 15
-python3 scripts/host_agent.py restart
-python3 scripts/host_agent.py status
-~~~
+1. Open **Telegram** in the app header, on any workflow screen.
+2. Create a dedicated bot with **/newbot** in **@BotFather** and paste its token
+   into the masked local field. Choose **Validate bot**.
+3. Open that bot in Telegram, send **/start**, then choose **Find my private
+   account**. Select and verify your numeric account ID. A numeric ID can also
+   be entered directly; saving verifies that the bot can access that private chat.
+4. Choose English or Ecuadorian Spanish, enable/disable the bot, and set a
+   heartbeat interval: **0** disables unsolicited heartbeats; otherwise use
+   **5–1440 minutes**. Confirm the bot and authorized owner, then save.
+5. Send **/new** for guided posting buttons. **/status** checks services and
+   **/cancel** discards an unfinished plan. Submission and WhatsApp Status
+   approval remain explicit.
 
-Use **--language es** for Ecuadorian Spanish. Use **/new** for guided buttons,
-**/status** for health and **/cancel** to discard an unfinished plan. A second
-confirmation is required for submission, and WhatsApp Status is approved separately.
+A blank token field keeps the saved secret; saved tokens are never returned to
+the renderer. To change the active bot's owner through discovery, disable and
+save first, send a new **/start**, then select the intended owner and re-enable.
+Disabling works without contacting Telegram and retains credentials/preferences.
+Keep group privacy enabled. Inline mode and a public webhook are unnecessary.
+A bot already using a webhook is rejected rather than silently reconfigured.
 
-One bot requires one poller. The host agent takes over from legacy Docker health
-polling. Restart it after settings changes. Start it after reboot or configure OS
-autostart. Keep the host awake and the stack running when jobs are due. A sleeping
-host cannot receive a command.
+The private **.env** is the portable source of truth for enabled state, bot
+identity/token, private owner, language and heartbeat. Runtime token files are
+derived caches, with legacy settings imported on save or encrypted export.
+Settings saves validate first, restart the host agent and roll back on failure.
+The terminal helper remains optional for advanced use.
 
-The cloud Bot API downloads up to 20 MB per file; use the desktop path for larger
-videos. Completed/cancelled Telegram intake is removed after staging. Abandoned
-intake and review records follow retention. Before migration, stop the old agent,
-configure the bot on the new host and start a fresh conversation.
+Encrypted credential exports include these granular settings and the token.
+Treat the backup and passphrase as secrets. On restore **TELEGRAM_MIGRATION_HOLD=true**
+pauses Telegram while preserving the previous enabled preference. Stop the old
+host agent, open Telegram settings on the destination, review the bot/owner and
+explicitly enable it. Only one machine may poll the bot. Activation after
+migration or a bot/owner change ignores older commands and starts a fresh
+conversation. Conversation state and in-flight approvals are not migrated as
+new commands. Migration requires no new bot or token unless you choose to rotate it.
+
+Opening the Rust app resumes an enabled bot automatically, except after a
+migration hold. For unattended use before opening the app after reboot,
+configure OS autostart for the host agent. A sleeping host
+cannot receive commands. The cloud Bot API downloads up to 20 MB per file;
+use the desktop path for larger videos. Completed/cancelled intake is removed
+after staging; abandoned intake/review records follow retention. Encrypted
+backup/restore uses OpenSSL on PATH, including on Windows.

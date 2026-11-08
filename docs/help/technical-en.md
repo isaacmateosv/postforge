@@ -187,8 +187,9 @@ the host agent takes over. Only one poller may use a bot.
 
 Use v2/telegram_setup.py locally with --language en or es and optionally
 --heartbeat 15. It refuses an existing webhook, validates the token, discovers
-a private /start, confirms the owner and registers commands. Settings are under
-run/telegram and must remain private. Restart after changes. Configure OS
+a private /start, confirms the owner and registers commands. The private .env is the canonical source for Telegram settings and the token;
+run/telegram holds derived caches. The Rust UI validates and restarts the agent
+on save. Legacy token/settings files are included when exporting encrypted credentials. Configure OS
 autostart separately. A stopped or sleeping host cannot send its own outage
 notice; external monitoring is required to detect missed heartbeats.
 
@@ -203,3 +204,25 @@ approval. Siri, OS-login integration, auto-updates, notifications and uninstall
 remain the existing Mac controller's features. macOS desktop ZIPs are ad-hoc
 signed; Windows builds are unsigned. Production signing and installation tests
 are separate release checks.
+
+## Telegram configuration and migration contract
+
+Telegram is optional and installation-owned: one dedicated bot and one private
+operator. The Rust header opens token validation, private-account discovery,
+owner selection, language, heartbeat and enable/disable. API responses exclude
+the saved token. .env keys are TELEGRAM_ENABLED, TELEGRAM_BOT_TOKEN,
+TELEGRAM_BOT_ID, TELEGRAM_BOT_USERNAME, TELEGRAM_OWNER_ID, TELEGRAM_LANGUAGE,
+TELEGRAM_HEARTBEAT_MINUTES, TELEGRAM_TRANSPORT and TELEGRAM_MIGRATION_HOLD.
+The token is a secret with the same private-file and encrypted-backup handling
+as the other credentials. It is never included in public packages.
+
+Credential export snapshots legacy settings into encrypted .env content without
+changing the source. Credential import adds TELEGRAM_MIGRATION_HOLD=true before
+committing the restored file. Migration stops the destination host agent before
+replacing credentials. The original enabled preference and detailed settings
+survive, but polling is blocked until explicit UI activation after the old
+receiver has stopped. Bot/owner changes and migrated activation reset offsets
+and conversation state, dropping older commands. Saved settings and runtime
+conversation files are restored on startup failure. Disabling requires no API
+call. A failed validation changes no credentials. OpenSSL is needed for the
+encrypted credentials workflow on every OS.

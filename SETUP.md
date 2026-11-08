@@ -488,3 +488,14 @@ For Telegram, create a private BotFather bot, run the local setup helper and
 start the host agent. It registers commands and restricts messages and buttons
 to the configured private owner. Full English and Ecuadorian Spanish setup
 steps, file limits and approval flow are bundled in Technical Help.
+
+### Telegram UI settings and migration
+
+In the Rust client, open Telegram in the header. Supply your own dedicated bot,
+validate its token, send /start privately, find/select your owner account, and
+set language, heartbeat and enabled state. Confirm the owner before saving.
+No terminal is required for normal bot setup. The private .env holds the
+portable configuration; encrypted credentials exports include it, including
+legacy bot settings. On restore, Telegram remains paused. Stop the old host
+agent and explicitly enable the restored configuration in the destination UI.
+One bot must have only one receiver. See desktop/README.md for the complete flow.

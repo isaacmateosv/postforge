@@ -44,6 +44,7 @@ function localize() {
   $("final-tag").placeholder = text("#MyBusiness", "#MiNegocio");
   $("previous").setAttribute("aria-label", text("Previous caption", "Texto anterior"));
   $("next").setAttribute("aria-label", text("Next caption", "Texto siguiente"));
+  $("telegram-owners").setAttribute("aria-label", text("Detected private accounts", "Cuentas privadas encontradas"));
   updateModeHint();
   renderMedia();
   renderSteps();
@@ -96,14 +97,14 @@ async function work(message, action) {
   if (state.busy) return;
   state.busy = true;
   renderSteps();
-  const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button");
+  const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
   controls.forEach(node => node.disabled = true);
   notice(message, true);
   try {
     await action();
     notice();
   } catch (error) {
-    notice(text("Please review this before continuing.\n", "Revisa esto antes de continuar.\n") + String(error));
+    notice(text("Please review this before continuing.\n", "Revisa esto antes de continuar.\n") + friendlyError(error));
   } finally {
     state.busy = false;
     controls.forEach(node => node.disabled = false);
@@ -401,6 +402,43 @@ async function reset() {
   notice();
 }
 
+function friendlyError(error) {
+  const parts = String(error).split(" / ");
+  return parts.length === 2 ? parts[state.language === "es" ? 1 : 0] : String(error);
+}
+
+function renderTelegramStatus(config) {
+  $("telegram-open").textContent = "Telegram";
+  $("telegram-enabled").checked = config.enabled && !config.migration_hold;
+  $("telegram-owner").value = config.owner_id;
+  $("telegram-language").value = config.language;
+  $("telegram-heartbeat").value = config.heartbeat;
+  $("telegram-owners").hidden = true;
+  $("telegram-summary").textContent = (config.username ? "@" + config.username + " · " : "") + (config.migration_hold
+    ? text("Restored settings · paused. Stop the old host, then enable this one.", "Ajustes restaurados · en pausa. Detén el equipo anterior y activa este.")
+    : config.running ? text("Connected · owner ", "Conectado · cuenta ") + config.owner_id
+    : config.configured ? text("Configured · paused", "Configurado · en pausa")
+    : text("Not configured · bring your own bot", "Sin configurar · usa tu propio bot"));
+  $("telegram-token").placeholder = config.has_token
+    ? text("Saved token · leave empty to keep", "Token guardado · deja vacío para conservarlo")
+    : text("Paste the token from BotFather", "Pega el token de BotFather");
+}
+
+async function telegramSettings() {
+  $("telegram-token").value = "";
+  $("telegram-feedback").textContent = "";
+  renderTelegramStatus(await engine("telegram_status"));
+  $("telegram-settings").showModal();
+}
+
+async function telegramAction(action) {
+  const buttons = $("telegram-settings").querySelectorAll("button, input, select");
+  buttons.forEach(node => node.disabled = true);
+  try { await action(); }
+  catch (error) { $("telegram-feedback").textContent = friendlyError(error); }
+  finally { buttons.forEach(node => node.disabled = false); }
+}
+
 async function help() {
   const choices = document.createElement("select");
   for (const [value, label] of [["quick", text("Quick guide", "Guía rápida")],
@@ -527,11 +565,66 @@ bind("new-plan", reset);
 bind("new", reset);
 bind("cleanup", cleanup);
 bind("help", help);
-bind("telegram-info", () => modal(text("Telegram setup", "Configurar Telegram"),
-  text("Create a private bot with @BotFather. In the PostForge folder run:\npython3 v2/telegram_setup.py\nThen start the local agent:\npython3 scripts/host_agent.py start\nEnter the token only in the local setup prompt.",
-       "Crea un bot privado con @BotFather. En la carpeta de PostForge ejecuta:\npython3 v2/telegram_setup.py\nLuego inicia el agente local:\npython3 scripts/host_agent.py start\nIngresa el token solo en el formulario local."), text("Done", "Listo")));
+bind("telegram-info", telegramSettings);
+bind("telegram-open", telegramSettings);
+bind("telegram-inspect", () => telegramAction(async () => {
+  const bot = await engine("telegram_inspect", { token: $("telegram-token").value });
+  $("telegram-feedback").textContent = text("Validated bot: @", "Bot validado: @") + bot.username;
+}));
+bind("telegram-detect", () => telegramAction(async () => {
+  const result = await engine("telegram_detect", { token: $("telegram-token").value });
+  const choices = $("telegram-owners");
+  choices.replaceChildren();
+  if (result.owners.length > 1) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = text("Choose your account…", "Elige tu cuenta…");
+    choices.append(placeholder);
+  }
+  for (const owner of result.owners) {
+    const option = document.createElement("option");
+    option.value = owner.id;
+    option.textContent = owner.name + (owner.username ? " · @" + owner.username : "") + " · " + owner.id;
+    choices.append(option);
+  }
+  choices.hidden = result.owners.length === 0;
+  if (result.owners.length === 1) $("telegram-owner").value = result.owners[0].id;
+  else $("telegram-owner").value = "";
+  $("telegram-feedback").textContent = result.owners.length
+    ? text("Choose your account and review its ID before saving.", "Elige tu cuenta y revisa su ID antes de guardar.")
+    : text("No private /start found. Send /start to your bot, then try again.", "No se encontró un /start privado. Envía /start a tu bot y vuelve a intentar.");
+}));
+$("telegram-owners").onchange = () => { $("telegram-owner").value = $("telegram-owners").value; };
+bind("telegram-close", () => { $("telegram-token").value = ""; $("telegram-settings").close(); });
+$("telegram-settings").oncancel = () => { $("telegram-token").value = ""; };
+bind("telegram-save", async () => {
+  const payload = { token: $("telegram-token").value, owner_id: $("telegram-owner").value,
+    enabled: $("telegram-enabled").checked, language: $("telegram-language").value,
+    heartbeat: $("telegram-heartbeat").value };
+  let bot = null;
+  if (payload.enabled) {
+    try { bot = await engine("telegram_inspect", { token: payload.token }); }
+    catch (error) { $("telegram-feedback").textContent = friendlyError(error); return; }
+  }
+  const message = payload.enabled
+    ? text("Enable @", "¿Activar @") + bot.username + text(" for private owner ", " para la cuenta privada ") + payload.owner_id
+      + text("? Ensure the previous receiver is stopped. New bot/owner or migrated setups ignore messages sent before activation. Heartbeat: ",
+             "? Confirma que el receptor anterior esté detenido. Al cambiar el bot o propietario, o al migrar, se omiten los mensajes anteriores a la activación. Aviso de actividad: ")
+      + payload.heartbeat + text(" minutes (0 = off).", " minutos (0 = apagado).")
+    : text("Disable Telegram on this computer? Your saved credentials and preferences are kept.",
+           "¿Desactivar Telegram en este equipo? Se conservan tus credenciales y preferencias guardadas.");
+  if (!await modal(text("Confirm Telegram settings", "Confirma los ajustes de Telegram"), message, text("Save", "Guardar"))) return;
+  await telegramAction(async () => {
+    const saved = await engine("telegram_save", payload);
+    $("telegram-token").value = "";
+    renderTelegramStatus(saved);
+    $("telegram-feedback").textContent = text("Settings saved. ", "Ajustes guardados. ") + (saved.running
+      ? text("Your bot is ready for /new.", "Tu bot está listo para /new.")
+      : text("Telegram is paused on this computer.", "Telegram está en pausa en este equipo."));
+  });
+});
 document.addEventListener("keydown", event => {
-  if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !state.busy) {
+  if (!$("telegram-settings").open && (event.metaKey || event.ctrlKey) && event.key === "Enter" && !state.busy) {
     event.preventDefault();
     if (state.page === "compose") delivery();
     else if (state.page === "delivery") bake();
@@ -548,3 +641,6 @@ if (window.__TAURI__?.event) {
 }
 localize();
 loadOptions();
+engine("telegram_resume").catch(() => {
+  $("telegram-open").textContent = text("Telegram · paused", "Telegram · en pausa");
+});

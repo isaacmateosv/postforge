@@ -55,7 +55,12 @@ def export_credentials(path, include_gateway=False):
     fd, temporary = tempfile.mkstemp(prefix=".credentials-", dir=os.path.dirname(path))
     os.close(fd)
     try:
-        run_openssl("encrypt", password, ENV, temporary)
+        from telegram_settings import export_env
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(path)) as workspace:
+            snapshot = Path(workspace) / 'credentials'
+            snapshot.write_text(export_env(Path(ENV).read_text(encoding='utf-8'), Path(ROOT)), encoding='utf-8')
+            snapshot.chmod(0o600)
+            run_openssl("encrypt", password, str(snapshot), temporary)
         os.chmod(temporary, 0o600)
         if include_gateway:
             from gateway_backup import export_gateway
@@ -81,6 +86,9 @@ def import_credentials(path, output=None, gateway_stage=None):
     try:
         run_openssl("decrypt", password, path, temporary)
         os.chmod(temporary, 0o600)
+        from telegram_settings import hold_restored
+        staged = Path(temporary)
+        staged.write_text(hold_restored(staged.read_text(encoding='utf-8')), encoding='utf-8')
         if gateway_stage:
             from gateway_backup import restore_gateway
 

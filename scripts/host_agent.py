@@ -24,14 +24,8 @@ STOP = FOLDER / "stop"
 
 
 def settings():
-    result = {}
-    path = ROOT / "run/telegram/settings.env"
-    if path.is_file():
-        for line in path.read_text().splitlines():
-            key, separator, value = line.partition("=")
-            if separator and key.startswith("TELEGRAM_"):
-                result[key] = value
-    return result
+    from telegram_settings import configuration
+    return configuration(ROOT)
 
 
 def running():
@@ -53,22 +47,22 @@ def start():
     if running():
         return
     STOP.unlink(missing_ok=True)
-    config = ROOT / "run/telegram/settings.env"
-    if config.is_file():
-        import re
-        text = config.read_text()
-        text = re.sub(r"(?m)^TELEGRAM_TRANSPORT=.*\n?", "", text)
+    from telegram_settings import active, atomic_write
+    config = settings()
+    if active(config):
         try:
             check = subprocess.run(["docker", "ps", "--filter", "label=com.docker.compose.project=postforge",
                                     "--filter", "label=com.docker.compose.service=postforge-telegram",
                                     "--format", "{{.ID}}"], capture_output=True, text=True, timeout=5)
+            if check.returncode != 0:
+                raise pmlib.PMError("Docker must be reachable to verify the legacy Telegram poller is stopped.")
+            import re
             legacy = [line for line in check.stdout.splitlines() if re.fullmatch(r"[a-f0-9]{12,64}", line)]
             if legacy:
                 subprocess.run(["docker", "stop", *legacy], check=True, capture_output=True, timeout=30)
         except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
             raise pmlib.PMError("Verify that the old Docker Telegram poller is stopped before starting the host agent.") from None
-        from telegram_setup import private_write
-        private_write(config, "TELEGRAM_TRANSPORT=host\n" + text.rstrip(), 0o600)
+        atomic_write(ROOT / "run/telegram/token", config["TELEGRAM_BOT_TOKEN"] + "\n")
     # The child also locks for its full lifetime, including concurrent launch attempts.
     log = FOLDER / "worker.log"
     fd = os.open(log, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
@@ -94,7 +88,10 @@ def run():
             try:
                 config = settings()
                 token = ROOT / "run/telegram/token"
-                if token.is_file() and config.get("TELEGRAM_OWNER_ID"):
+                from telegram_settings import active, atomic_write
+                if active(config):
+                    atomic_write(token, config["TELEGRAM_BOT_TOKEN"] + "\n")
+                if token.is_file() and active(config):
                     import telegram_worker
                     import postforge_v2
                     env = pmlib.load_env()
@@ -103,7 +100,7 @@ def run():
                         "Evolution API": "http://localhost:8080/",
                         "Ollama": env.get("OLLAMA_HOST_URL", "http://localhost:11434") + "/api/version"
                     })
-                    os.environ.update(config)
+                    os.environ.update({key: value for key, value in config.items() if key != "TELEGRAM_BOT_TOKEN"})
                     os.environ["TELEGRAM_TOKEN_FILE"] = str(token)
                     os.environ["POSTFORGE_HOST_WORKER"] = "1"
                     os.environ["POSTFORGE_STOP_FILE"] = str(STOP)

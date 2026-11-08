@@ -10,17 +10,15 @@ words, then attach optional media. Choose destinations and a local date/time
 on the next screen. Review the baked plan before finishing. Cover and business
 hashtag settings live in one options section. Caption versions preserve delivery.
 
-Create a bot with **/newbot** in **@BotFather**. Enter the token in the local
-setup prompt. It identifies your private owner account and registers commands.
-Keep group privacy enabled. Inline mode and public webhooks are unnecessary.
+Open **Telegram** in the app header. Each installation uses its own dedicated
+bot and one authorized private owner; there is no shared global bot. Create it
+with **/newbot** in **@BotFather**, paste the token into the masked field and
+choose **Validate bot**. Send **/start** to your bot, then use **Find my private
+account**, select your account and verify its numeric ID. Choose the bot language
+and a heartbeat interval (**0** = off, otherwise **5–1440 minutes**), enable it
+and confirm **Save settings**. No terminal is required. Keep group privacy enabled;
+inline mode and public webhooks are unnecessary. Send **/new** to your bot.
 
-```text
-python3 v2/telegram_setup.py --language en --heartbeat 15
-python3 scripts/host_agent.py restart
-python3 scripts/host_agent.py status
-```
-
-Use **py -3** instead of python3 on Windows. Send **/new** to the private bot.
 The buttons guide caption mode, media, destinations, formats, time and review.
 Use **Try another caption**, arrows or **Edit caption** to refine the copy.
 Submit only after the final confirmation. WhatsApp Status has its own approval.
@@ -29,6 +27,13 @@ Submit only after the final confirmation. WhatsApp Status has its own approval.
 The bot's cloud download limit is 20 MB per file. Use the desktop app for larger
 videos. Keep the host awake and services running when jobs are due. Start the
 agent after reboot or configure your OS startup manager.
+
+Your private .env and encrypted credential backups include the bot token,
+owner, language, heartbeat and enabled preference. After migration Telegram
+is paused: stop the old receiver, review the saved settings on the new host
+and explicitly enable it. Keep the backup and passphrase private. A blank
+token field keeps the saved token. Disabling retains your settings and works
+even when Telegram is unavailable.
 
 ## Legacy Swift Mac workflow
 

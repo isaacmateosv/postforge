@@ -54,6 +54,11 @@ or get the matching version from https://github.com/isaacmateosv/postforge/relea
 Open Docker Desktop, then use PostForge > Backup & Move > Restore.
 Terminal: ~/postforge/scripts/migrate.sh import <this folder> --skip-installer
 
+Telegram bot token, private owner, language, heartbeat and enabled preference travel
+inside credentials.env.enc. Telegram restores paused. Stop the old host agent,
+then open Telegram settings in the Rust app and explicitly enable it on this host.
+Do not run two receivers for the same bot. Conversation state is not migrated.
+
 Link WhatsApp again by QR. Verify pending posts in Postiz after moving:
 the archive carries Postiz records and media, and excludes Temporal jobs.
 EOF
@@ -126,6 +131,8 @@ import_bundle() (
       exit 1
     fi
   fi
+  # The restored .env holds Telegram paused. Stop this host's old receiver first.
+  python3 "$target/scripts/host_agent.py" stop
   step 2 3 "Restoring Postiz and gateway data"
   if [ -e "$target/.env" ]; then cp -p "$target/.env" "$work/previous"; fi
   trap '

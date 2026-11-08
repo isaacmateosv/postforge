@@ -29,7 +29,7 @@ fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Val
         return Err("Choose the PostForge project folder to connect this client.".into());
     }
     let allowed = ["options", "preview", "revise", "submit", "cleanup_preview", "cleanup",
-                   "help", "telegram_status", "approve_status"];
+                   "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
     }
