@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0-rc.21
+## [2.0.0-rc.21]
 
 - Add per-installation Telegram configuration in the Rust UI: private token entry, bot validation, private owner discovery, language, heartbeat and enable/disable.
 - Store portable settings in the private .env; carry legacy and new bot secrets in encrypted credential exports. Restores pause Telegram until explicit activation, preserving preferences without two pollers.
