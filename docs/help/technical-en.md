@@ -1,5 +1,7 @@
 # PostForge Technical Guide
 
+Current v2 development uses the Rust desktop client. Earlier Mac-controller sections describe legacy Swift behavior and are not Rust feature claims. See Rust and Telegram implementation below for the current beta scope.
+
 PostForge is a local macOS controller for a self-hosted publishing stack. It prepares plans and drafts. Postiz and Temporal handle approved social schedules. Evolution and Baileys link the operator’s WhatsApp session.
 
 ```text

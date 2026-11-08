@@ -55,9 +55,11 @@ remain separate release requirements. The native CI matrix builds all three OSes
 
 ## Swift and Rust
 
-The Swift/AppKit Mac app retains its tray, Siri, login, update and maintenance
-integrations. The Rust client provides a shared composer across OSes. It does
-not yet replicate every Mac-specific system feature.
+Rust/Tauri is the active desktop development target and the only client needed
+for this beta's composer workflow. Close the legacy Swift app before using it.
+Swift remains in source history and compatibility code, rather than a companion
+application. Tray, Siri, OS-login, automatic updates and maintenance integration
+are still being ported; the beta does not yet offer their full existing Mac behavior.
 
 The Rust bridge invokes a fixed list of local Python operations over stdin/stdout.
 It opens no command HTTP listener. Credentials stay out of renderer responses,
