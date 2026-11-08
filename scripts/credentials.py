@@ -88,7 +88,7 @@ def import_credentials(path, output=None, gateway_stage=None):
         os.chmod(temporary, 0o600)
         from telegram_settings import hold_restored
         staged = Path(temporary)
-        staged.write_text(hold_restored(staged.read_text(encoding='utf-8')), encoding='utf-8')
+        staged.write_text(hold_restored(staged.read_text(encoding='utf-8'), Path(ROOT)), encoding='utf-8')
         if gateway_stage:
             from gateway_backup import restore_gateway
 

@@ -85,10 +85,16 @@ def export_env(content, root=ROOT):
     return merge_env(content, config)
 
 
-def hold_restored(content):
+def hold_restored(content, root=None):
     if re.search(r'^TELEGRAM_(?:BOT_TOKEN|OWNER_ID)=\S+', content, re.M):
         content = re.sub(r'^TELEGRAM_MIGRATION_HOLD=.*\n?', '', content, flags=re.M)
         content += '\nTELEGRAM_MIGRATION_HOLD=true\n'
+    elif root is not None and (configuration(root)['TELEGRAM_BOT_TOKEN'] or configuration(root)['TELEGRAM_OWNER_ID']):
+        # An older/non-Telegram backup must not inherit the destination's old cache.
+        cleared = {key: '' for key in KEYS}
+        cleared.update(TELEGRAM_ENABLED='false', TELEGRAM_MIGRATION_HOLD='true',
+                       TELEGRAM_LANGUAGE='en', TELEGRAM_HEARTBEAT_MINUTES='0', TELEGRAM_TRANSPORT='host')
+        content = merge_env(content, cleared)
     return content
 
 

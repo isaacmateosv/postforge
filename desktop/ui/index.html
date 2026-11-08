@@ -121,6 +121,8 @@
 </dialog>
 <dialog id="telegram-settings" aria-labelledby="telegram-title">
   <h2 id="telegram-title" data-en="Telegram · your installation" data-es="Telegram · tu instalación"></h2>
+  <div id="telegram-feedback" role="status"></div>
+  <div class="telegram-body">
   <p data-en="Optional. Use your own dedicated bot; PostForge has no shared global bot. Only the private owner selected here can control it." data-es="Opcional. Usa tu propio bot dedicado; PostForge no tiene un bot global compartido. Solo la cuenta privada que elijas aquí podrá controlarlo."></p>
   <div id="telegram-summary" class="callout" role="status"></div>
   <label class="toggle"><input id="telegram-enabled" type="checkbox"><span data-en="Enable Telegram on this computer" data-es="Activar Telegram en este equipo"></span></label>
@@ -142,8 +144,8 @@
     <label><span data-en="Heartbeat · minutes" data-es="Aviso de actividad · minutos"></span><input id="telegram-heartbeat" type="number" min="0" max="1440" step="1"><small data-en="0 = off. Otherwise 5–1440 minutes." data-es="0 = apagado. Si lo activas, de 5 a 1440 minutos."></small></label>
   </div>
   <p class="hint" data-en="Settings, including the secret token, are stored in the private .env and included in encrypted credentials backups. Restores keep Telegram paused until you confirm the old host is stopped. Keep group privacy enabled; no public webhook or inline mode is required." data-es="Los ajustes, incluido el token secreto, se guardan en el .env privado y viajan en los respaldos cifrados de credenciales. Al restaurar, Telegram queda en pausa hasta confirmar que el equipo anterior está detenido. Mantén activa la privacidad de grupos; no necesitas webhook público ni modo inline."></p>
-  <div id="telegram-feedback" role="status"></div>
-  <div class="actions end"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
+  </div>
+  <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
 </dialog>
 
 </body>

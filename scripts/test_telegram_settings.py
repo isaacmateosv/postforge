@@ -130,6 +130,19 @@ class TelegramSettingsTest(unittest.TestCase):
         self.assertEqual(config['TELEGRAM_ENABLED'], 'false')
         self.assertFalse(settings.active(config))
 
+    def test_non_telegram_backup_does_not_inherit_destination_bot(self):
+        self.save()
+        restored = settings.hold_restored('KEEP_ME=incoming-snapshot\n', self.root)
+        self.env.write_text(restored)
+        old_token = self.root / 'run/telegram/token'
+        old_token.parent.mkdir(parents=True, exist_ok=True)
+        old_token.write_text(TOKEN)
+        config = settings.configuration(self.root)
+        self.assertEqual(config['TELEGRAM_BOT_TOKEN'], '')
+        self.assertEqual(config['TELEGRAM_OWNER_ID'], '')
+        self.assertFalse(settings.active(config))
+        self.assertNotIn(TOKEN, restored)
+
     def test_detect_only_private_owner_starts(self):
         updates = [
             {'message': {'chat': {'id': 7, 'type': 'private'}, 'from': {'id': 7, 'first_name': 'Owner'}, 'text': '/start'}},

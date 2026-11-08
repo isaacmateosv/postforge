@@ -429,6 +429,7 @@ async function telegramSettings() {
   $("telegram-feedback").textContent = "";
   renderTelegramStatus(await engine("telegram_status"));
   $("telegram-settings").showModal();
+  $("telegram-settings").querySelector(".telegram-body").scrollTop = 0;
 }
 
 async function telegramAction(action) {
