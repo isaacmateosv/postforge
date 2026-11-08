@@ -67,6 +67,18 @@ Open **Help → PostForge Help** in the Mac app to read either guide offline in 
   health checks, watchdog validation, rollback snapshots, and sanitized release
   packages.
 
+## Rust desktop and Telegram
+
+The new Rust/Tauri composer has structured Compose, Delivery and Review steps
+and shares the existing Python planner. See the [desktop setup guide](desktop/README.md).
+The Swift Mac controller retains its existing system integrations. Native
+Windows/Linux build and installation validation remain separate release checks.
+
+The private Telegram bot now guides caption mode, media, destinations, formats,
+time, cover/tag options, revisions and final confirmation through buttons.
+Configure its token and private owner locally with **python3 v2/telegram_setup.py**
+and start the host agent. Full bilingual setup instructions are in Technical Help.
+
 ## How it works
 
 ![From idea through human approval to scheduled publishing](docs/images/publishing-flow.svg)
@@ -250,7 +262,7 @@ Authoritative references: [Google OAuth expiry](https://developers.google.com/id
 ## Roadmap
 
 **Release 1 (`v1.0.x`)** provides the publishing foundation described here.
-**Release 2 (`v2.0.0`)** adds a local browser dashboard, a separate MFA gateway for optional remote access, and private Telegram status and heartbeat. See the [v2 release candidate guide](v2/README.md) for setup and acceptance checks.
+**Release 2 (`v2.0.0`)** adds a local browser dashboard, a separate MFA gateway for optional remote access, and private Telegram guided posting, status and heartbeat. See the [v2 release candidate guide](v2/README.md) for setup and acceptance checks.
 Telegram code, credentials and background requests are excluded from release 1.
 See [ROADMAP.md](ROADMAP.md).
 

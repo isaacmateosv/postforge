@@ -31,11 +31,10 @@ def save(directory, token, owner, language, minutes):
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     if directory.is_symlink() or (os.name != "nt" and directory.stat().st_mode & 0o077):
         raise ValueError("The Telegram settings directory must be private (mode 700 on macOS and Linux).")
-    # Compose's file-based secret must be readable by the non-root worker.
-    # The enclosing 0700 directory protects it from other local users.
-    private_write(directory / "token", token, 0o444)
+    # The interactive worker runs as the local user.
+    private_write(directory / "token", token, 0o600)
     private_write(directory / "settings.env",
-                  f"TELEGRAM_BOT_ID={token.split(':', 1)[0]}\nTELEGRAM_OWNER_ID={owner}\nTELEGRAM_LANGUAGE={language}\n"
+                  f"TELEGRAM_TRANSPORT=host\nTELEGRAM_BOT_ID={token.split(':', 1)[0]}\nTELEGRAM_OWNER_ID={owner}\nTELEGRAM_LANGUAGE={language}\n"
                   f"TELEGRAM_HEARTBEAT_MINUTES={minutes}", 0o600)
 
 
@@ -79,8 +78,16 @@ def main():
             owner = owners.pop()
         if input(f"Configure @{bot['username']} for Telegram user {owner}? [y/N] ").strip().lower() != "y":
             return 0
+        commands = [
+            {"command": "start", "description": "Abrir PostForge" if args.language == "es" else "Open PostForge"},
+            {"command": "new", "description": "Nueva publicación o anuncio" if args.language == "es" else "New post or announcement"},
+            {"command": "status", "description": "Revisar servicios" if args.language == "es" else "Check services"},
+            {"command": "cancel", "description": "Descartar el plan actual" if args.language == "es" else "Discard current plan"},
+            {"command": "help", "description": "Mostrar el menú" if args.language == "es" else "Show the menu"},
+        ]
+        telegram(token, "setMyCommands", commands=commands, scope={"type": "chat", "chat_id": owner})
         save(ROOT / "run/telegram", token, owner, args.language, args.heartbeat)
-        print("Telegram settings saved. On macOS run ./postforge.sh telegram start, then send /status in your private chat.")
+        print("Telegram settings saved. On macOS run ./postforge.sh telegram start, then send /new in your private chat.")
         return 0
     except TelegramError:
         parser.exit(1, "Telegram could not validate the bot. Check the token, connectivity, and any other running poller.\n")

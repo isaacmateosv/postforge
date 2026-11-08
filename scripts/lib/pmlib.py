@@ -198,6 +198,25 @@ def active_jobs():
 def pid_alive(pid):
     if not pid:
         return False
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        try:
+            handle = kernel.OpenProcess(0x1000, False, int(pid))
+        except (ValueError, OverflowError):
+            return False
+        if not handle:
+            return ctypes.get_last_error() == 5
+        try:
+            code = wintypes.DWORD()
+            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259
+        finally:
+            kernel.CloseHandle(handle)
     try:
         os.kill(int(pid), 0)
     except PermissionError:
@@ -493,8 +512,13 @@ def youtube_short(identifier, kind, path):
 def to_jpeg(src, out_dir, max_side=1920):
     """Convert/resize any macOS-readable image (PNG/HEIC/WEBP/TIFF...) to an 85% JPEG."""
     out = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".jpg")
-    run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85",
-         "-Z", str(max_side), src, "--out", out])
+    if sys.platform == "darwin" and which("sips"):
+        run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85",
+             "-Z", str(max_side), src, "--out", out])
+    else:
+        run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", src, "-frames:v", "1",
+             "-vf", f"scale={max_side}:{max_side}:force_original_aspect_ratio=decrease",
+             "-q:v", "2", out])
     return out
 
 

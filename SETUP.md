@@ -475,3 +475,16 @@ Copy the resulting package, the export, and `.env` privately to the new Mac. Nev
 upload `.env`, `data/`, `logs/`, `run/`, or `exports/` to a public service.
 
 WhatsApp’s regular intake defaults to **32 MiB per file** (`WA_MAX_MEDIA_MB`, effective range 1–64). PostForge streams larger videos up to **256 MiB** to disk and verifies their size and SHA-256 before planning. Use New Post for bigger files or media with missing download metadata.
+
+
+## Rust desktop and Telegram preview
+
+The Rust/Tauri client uses structured Compose, Delivery and Review screens.
+See [desktop setup](desktop/README.md) for host prerequisites, platform builds,
+artifact signing limitations and the shared Python bridge. The Swift Mac
+controller retains its existing system integrations.
+
+For Telegram, create a private BotFather bot, run the local setup helper and
+start the host agent. It registers commands and restricts messages and buttons
+to the configured private owner. Full English and Ecuadorian Spanish setup
+steps, file limits and approval flow are bundled in Technical Help.

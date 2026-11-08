@@ -23,3 +23,8 @@ __pycache__/
 
 # Session notes kept out of the repository
 .checkpoint/
+
+# Rust desktop build output
+desktop/target/
+desktop/dist/
+desktop/gen/

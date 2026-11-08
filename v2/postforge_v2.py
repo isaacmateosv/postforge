@@ -29,6 +29,8 @@ def reachable(url):
     try:
         with OPENER.open(url, timeout=2) as response:
             return response.status == 200
+    except urllib.error.HTTPError as response:
+        return response.code in (401, 403)
     except (OSError, ValueError):
         return False
 

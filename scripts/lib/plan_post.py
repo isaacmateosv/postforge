@@ -474,6 +474,12 @@ def run(env, p, dry_run, schedule=False):
         image, paths = photos[0], videos
     postiz = pmlib.Postiz(env)
     connected = postiz.integrations()
+    if "reviewed_integrations" in p:
+        wanted = set(p["reviewed_integrations"])
+        if wanted - {channel["id"] for channel in connected}:
+            raise PMError("Un destino revisado ya no está conectado. Prepara otro plan." if es else
+                          "A reviewed account is no longer connected. Prepare a fresh plan.")
+        connected = [channel for channel in connected if channel["id"] in wanted]
     targets = []
     for network in p["networks"]:
         ids = NETWORKS[network][1]
@@ -644,6 +650,7 @@ def run(env, p, dry_run, schedule=False):
                        "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
+                                    "integration_id": c.get("id") if c else None,
                                     "placement": place, "cover": mode, "cover_second": second if mode else None}
                                    for (n, c, place), mode in zip(usable, modes)]})
         if dry_run:
@@ -766,6 +773,7 @@ def main():
     parser.add_argument("--revise-copy", help=argparse.SUPPRESS)
     parser.add_argument("--edited-caption", help=argparse.SUPPRESS)
     parser.add_argument("--reviewed-when", help=argparse.SUPPRESS)
+    parser.add_argument("--reviewed-integrations", help=argparse.SUPPRESS)
     parser.add_argument("--schedule", action="store_true", help="schedule reviewed social posts for publication")
     parser.add_argument("--alternate-caption", help=argparse.SUPPRESS)
     parser.add_argument("--final-tag", help=argparse.SUPPRESS)
@@ -806,6 +814,8 @@ def main():
         p["final_tag"] = args.final_tag
     if args.dry_run and args.alternate_caption:
         p["alternate_caption"] = args.alternate_caption
+    if args.reviewed_integrations is not None:
+        p["reviewed_integrations"] = [item for item in args.reviewed_integrations.split(",") if item]
     if not args.dry_run and args.reviewed_caption:
         p["reviewed_caption"] = args.reviewed_caption
         p["reviewed_threads_caption"] = args.reviewed_threads_caption

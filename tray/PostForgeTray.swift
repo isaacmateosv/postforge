@@ -2095,7 +2095,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let window = makeSecondaryWindow(title: text("How PostForge works", "Cómo funciona PostForge"), height: 560)
         let root = BackgroundView()
         let title = windowLabel("PostForge", size: 24, weight: .bold)
-        let stages = [text("1 · Media or a text announcement\nMac app or WhatsApp self-chat", "1 · Archivos o un anuncio de texto\nApp para Mac o chat contigo en WhatsApp"),
+        let stages = [text("1 · Media or a text announcement\nDesktop, WhatsApp self-chat or Telegram", "1 · Archivos o un anuncio de texto\nApp de escritorio, WhatsApp o Telegram"),
                       text("2 · Keep your words or generate copy → review", "2 · Conserva tu texto o genera uno → revisa"),
                       text("3 · Create drafts or confirm direct scheduling", "3 · Crea borradores o confirma la programación"),
                       text("4 · Scheduled delivery · WhatsApp approved separately", "4 · Envío programado · WhatsApp se aprueba aparte")]
@@ -2185,6 +2185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         newPost?.refreshState(state)
         newPost?.refreshPlacementLabels()
         newPost?.refreshStepLabels()
+        newPost?.refreshOptionsLabel()
         newPost?.updateCaptionVersions()
         if let report = newPost?.lastReport { newPost?.report(report.0, dryRun: report.1, exitCode: report.2) }
         if let state = state { whatsappWindow?.refresh(state) }
@@ -2830,6 +2831,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let captionNext = NSButton()
     let captionVersionLabel = NSTextField(labelWithString: "")
     let clearWork = NSButton()
+    let optionsToggle = NSButton()
+    private var optionsPanel: NSView?
+    private var coverRow: NSView?
     var captionRange: NSRange?
     let alternateCaption = NSButton()
     var savedVersions: [(instruction: String, output: String)] = []
@@ -2868,8 +2872,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     }
 
     func refreshStepLabels() {
-        steps.updateText(t("1. Bake your idea  →  2. Review the plan  →  3. Create drafts",
-                           "1. Hornea la idea  →  2. Revisa el plan  →  3. Crea los borradores"))
+        steps.updateText(t("1. Compose  →  2. Bake and review  →  3. Create drafts",
+                           "1. Redacta  →  2. Hornea y revisa  →  3. Crea los borradores"))
     }
 
     func t(_ english: String, _ spanish: String) -> String {
@@ -3071,7 +3075,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         ])
         stats.distribution = .fillEqually
         stats.spacing = 12
-        for card in stats.arrangedSubviews { card.heightAnchor.constraint(equalToConstant: 70).isActive = true }
+        for card in stats.arrangedSubviews { card.heightAnchor.constraint(equalToConstant: 52).isActive = true }
 
         // Media
         let drop = DropView()
@@ -3111,7 +3115,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             dropRow.centerYAnchor.constraint(equalTo: drop.centerYAnchor),
         ])
 
-        let placementLabel = caption(t("Create drafts for", "Crear borradores de"))
+        let placementLabel = caption(t("Formats", "Formatos"))
         refreshPlacementLabels()
         placementMenu.target = self
         placementMenu.action = #selector(draftOptionsChanged)
@@ -3139,6 +3143,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         coverFile.lineBreakMode = .byTruncatingMiddle
         coverFile.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let coverControls = NSStackView(views: [coverLabel, chooseCover, coverSecond, clearCover, changeCover, coverFile])
+        coverRow = coverControls
         coverControls.spacing = 6
 
         // Idea
@@ -3194,11 +3199,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         let actionSpacer = NSView()
         actionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         mixer.isHidden = true
-        let actions = NSStackView(views: [preview, create])
+        let actions = NSStackView(views: [preview])
         actions.distribution = .fillEqually
         actions.spacing = 10
         actions.alignment = .centerY
-        let secondaryActions = NSStackView(views: [dictate, actionSpacer, mixer, spinner, schedule])
+        let secondaryActions = NSStackView(views: [mixer, spinner, actionSpacer])
         secondaryActions.spacing = 8
         secondaryActions.alignment = .centerY
 
@@ -3275,11 +3280,11 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         footer.spacing = 8
         footer.alignment = .centerY
 
-        let mediaLabel = caption(t("Photos & videos", "Fotos y videos"))
+        let mediaLabel = caption(t("Media · optional", "Archivos · opcional"))
         let ideaLabel = caption(t("Your request", "Tu pedido"))
         ideaPanel.toolTip = t("Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.",
                               "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.")
-        let planLabel = caption(t("Plan", "Plan"))
+        let planLabel = caption(t("Review and finish", "Revisa y termina"))
         let planSpacer = NSView()
         planSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         statusApproval.title = t("Approve Status…", "Aprobar Estado…")
@@ -3319,23 +3324,44 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             "idea: un tema para redactar · texto: tus palabras exactas. Lo que va entre comillas se conserva."))
         inputHint.font = .systemFont(ofSize: 11)
         inputHint.textColor = .secondaryLabelColor
-        let extraOptions = NSStackView(views: [finalTagButton])
-        let inputColumn = NSStackView(views: [mediaLabel, drop, placements, coverControls, extraOptions,
-                                             ideaLabel, ideaPanel, inputHint, actions, secondaryActions])
+        let requestSpacer = NSView()
+        requestSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let requestHeader = NSStackView(views: [ideaLabel, requestSpacer, dictate])
+        requestHeader.alignment = .centerY
+        finalTagButton.title = t("Configure…", "Configurar…")
+        let extraOptions = NSStackView(views: [caption(t("Final hashtag", "Etiqueta final")), finalTagButton])
+        extraOptions.spacing = 8
+        let optionContents = NSStackView(views: [placements, coverControls, extraOptions])
+        optionContents.orientation = .vertical
+        optionContents.alignment = .leading
+        optionContents.spacing = 12
+        let optionPanel = Panel(optionContents, insets: NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12))
+        optionsPanel = optionPanel
+        optionPanel.isHidden = true
+        optionsToggle.target = self
+        optionsToggle.action = #selector(togglePublishingOptions)
+        optionsToggle.controlSize = .small
+        refreshOptionsLabel()
+        let inputColumn = NSStackView(views: [requestHeader, ideaPanel, inputHint,
+                                             mediaLabel, drop, optionsToggle, optionPanel, actions, secondaryActions])
         inputColumn.orientation = .vertical
         inputColumn.alignment = .leading
-        inputColumn.spacing = 8
+        inputColumn.spacing = 10
         let inputSpacer = NSView()
         inputSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .vertical)
         inputColumn.addArrangedSubview(inputSpacer)
-        for view in [drop, placements, coverControls, ideaPanel, inputHint, actions, secondaryActions] {
+        for view in [requestHeader, drop, optionPanel, ideaPanel, inputHint, actions, secondaryActions] {
             view.widthAnchor.constraint(equalTo: inputColumn.widthAnchor).isActive = true
         }
-        let planColumn = NSStackView(views: [planHeader, captionToolbar, planPanel])
+        let finishActions = NSStackView(views: [create, schedule])
+        finishActions.spacing = 10
+        finishActions.alignment = .centerY
+        finishActions.distribution = .fillEqually
+        let planColumn = NSStackView(views: [planHeader, captionToolbar, planPanel, finishActions])
         planColumn.orientation = .vertical
         planColumn.alignment = .leading
         planColumn.spacing = 8
-        for view in [planHeader, captionToolbar, planPanel] {
+        for view in [planHeader, captionToolbar, planPanel, finishActions] {
             view.widthAnchor.constraint(equalTo: planColumn.widthAnchor).isActive = true
         }
         let body = NSStackView(views: [inputColumn, planColumn])
@@ -3414,8 +3440,23 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         updateCaptionVersions()
     }
 
+    func refreshOptionsLabel() {
+        optionsToggle.title = (optionsPanel?.isHidden == false ? "▾ " : "▸ ")
+            + t("Publishing options", "Opciones de publicación")
+    }
+
+    @objc func togglePublishingOptions() {
+        optionsPanel?.isHidden.toggle()
+        refreshOptionsLabel()
+    }
+
     func updateCoverControls() {
         let hasVideo = media.contains { ["mp4", "mov", "m4v", "webm", "mkv", "avi", "3gp"].contains($0.pathExtension.lowercased()) }
+        coverRow?.isHidden = !hasVideo
+        if hasVideo && !coverLocked {
+            optionsPanel?.isHidden = false
+        }
+        refreshOptionsLabel()
         chooseCover.isEnabled = hasVideo && !coverLocked && !working
         coverSecond.isEnabled = hasVideo && !coverLocked && !working
         clearCover.isEnabled = !coverLocked && !working
@@ -3821,6 +3862,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
             if let reviewedFinalTag { args.append("--final-tag=\(reviewedFinalTag)") }
             if let reviewedYouTubeTitle { args.append("--reviewed-youtube-title=\(reviewedYouTubeTitle)") }
             if let reviewedWhen { args.append("--reviewed-when=\(reviewedWhen)") }
+            if let snapshot = lastReport?.0,
+               let json = (try? JSONSerialization.jsonObject(with: Data(snapshot.utf8))) as? [String: Any],
+               let targets = json["targets"] as? [[String: Any]] {
+                let identifiers = Set(targets.compactMap { $0["integration_id"] as? String })
+                args.append("--reviewed-integrations=" + identifiers.sorted().joined(separator: ","))
+            }
             if scheduleDirectly { args.append("--schedule") }
         }
         for url in media { args += ["--media", url.path] }
@@ -5041,6 +5088,11 @@ let uiSpanish: [String: String] = [
     "Your idea": "Tu idea",
     "Your request": "Tu pedido",
     "Another Caption…": "Otra versión del texto…",
+    "Media · optional": "Archivos · opcional",
+    "Review and finish": "Revisa y termina",
+    "Configure…": "Configurar…",
+    "Formats": "Formatos",
+    "Final hashtag": "Etiqueta final",
     "Try Another Caption": "Probar otro texto",
     "Previous caption": "Texto anterior",
     "Next caption": "Texto siguiente",
@@ -5150,7 +5202,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     let composer = delegate.newPost!
     let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
     let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
-    precondition(steps.stringValue.hasPrefix("1. Bake your idea"))
+    precondition(steps.stringValue.hasPrefix("1. Compose"))
     precondition(composer.connectionsButton.title == "Connections")
     precondition(composer.connectionsButton.action == #selector(NewPostWindow.showConnections))
     let connectionFixture = #"{"state":"on","docker":true,"services":{"postiz":true,"evolution":true,"scheduler":true,"tunnel":true},"pending":{"total":0,"scheduled":0,"overdue":0,"jobs":[],"fromCache":false},"scheduled":[],"channels":[{"provider":"facebook","network":"Facebook Page","channel":"Example","renews":false,"expires":"2099-12-30T20:02:10Z"}],"channelsFromCache":false,"postizUrl":"https://example.org"}"#
@@ -5173,7 +5225,7 @@ if CommandLine.arguments.contains("--verify-ui") {
     precondition(stepStyle?.alignment == .center)
     defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
-    precondition(steps.stringValue.hasPrefix("1. Hornea la idea"))
+    precondition(steps.stringValue.hasPrefix("1. Redacta"))
     precondition(composer.connectionsButton.title == "Conexiones")
     defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()

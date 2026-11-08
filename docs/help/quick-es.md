@@ -73,7 +73,7 @@ la bandeja de TikTok y YouTube Shorts, elige la portada en la plataforma.
 
 Si el plan incluye un video para un destino que admite portada y todavía no elegiste una, PostForge te pregunta si quieres continuar. En un plan listo para revisar, usa **Editar portada…** para habilitar los controles y volver a hornear el plan.
 
-Usa **Etiqueta final…** junto a las opciones de borrador para guardar una etiqueta. Déjala en blanco si prefieres omitirla. El plan la muestra en la última línea, incluso si escribiste el texto exacto. En WhatsApp, usa el comando que te propone el bot, por ejemplo `etiqueta plan 1 #MiNegocio`. Revisa la versión nueva antes de aprobar.
+Abre **Opciones de publicación → Configurar… → Etiqueta final…** para guardar una etiqueta. Déjala en blanco si prefieres omitirla. El plan la muestra en la última línea, incluso si escribiste el texto exacto. En WhatsApp, usa el comando que te propone el bot, por ejemplo `etiqueta plan 1 #MiNegocio`. Revisa la versión nueva antes de aprobar.
 
 ## Usa WhatsApp o Siri
 
@@ -100,3 +100,39 @@ PostForge apaga sus servicios después de una hora sin actividad ni trabajo en c
 - **Buscar actualizaciones** está en el menú principal de la barra.
 - **Respaldo y traslado** permite exportar un respaldo privado.
 - En Ayuda, elige **Técnica** para consultar la instalación, la recuperación y el manejo de datos.
+
+## Escritorio en Rust y Telegram guiado
+
+El cliente Rust/Tauri separa **Redacta**, **Destinos** y **Revisa y termina**.
+Escribe el mensaje sin instrucciones de programación, elige generar un texto
+o conservar tus palabras y adjunta archivos opcionales. En la siguiente pantalla
+elige destinos, fecha y hora local. Revisa el plan horneado antes de continuar.
+La portada y la etiqueta del negocio están en una misma sección de opciones.
+Las versiones del texto conservan la programación.
+
+En el Mac, primero está el pedido y luego los archivos opcionales. **Opciones de
+publicación** agrupa formatos, portada y etiqueta final. Las acciones para
+terminar están debajo del plan revisado. El controlador Swift conserva sus
+integraciones existentes con el Mac.
+
+Crea un bot con **/newbot** en **@BotFather**. Ingresa el token en el asistente
+local. Este identifica al propietario privado y registra los comandos. Mantén
+activa la privacidad de grupos. No necesitas modo inline ni webhooks públicos.
+
+```text
+python3 v2/telegram_setup.py --language es --heartbeat 15
+python3 scripts/host_agent.py restart
+python3 scripts/host_agent.py status
+```
+
+En Windows usa **py -3** en lugar de python3. Envía **/new** al bot privado.
+Los botones guían el tipo de texto, archivos, destinos, formatos, hora y revisión.
+Usa **Probar otro texto**, las flechas o **Editar texto** para refinarlo.
+Envía solo después de la confirmación final. El Estado de WhatsApp se aprueba
+aparte. **/cancel** descarta el plan sin terminar y **/status** revisa si los
+servicios responden.
+
+El bot descarga hasta 20 MB por archivo desde la nube. Usa la app de escritorio
+para videos más grandes. Mantén el equipo despierto y los servicios activos
+cuando corresponda publicar. Inicia el agente después de reiniciar o configura
+el inicio automático del sistema.
