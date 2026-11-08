@@ -15,6 +15,24 @@ if [ -f .env ]; then
   set -a; . ./.env; set +a
 fi
 
+# Include the optional worker in the same Compose project so a normal
+# PostForge start/restart does not remove it as an orphan.
+TELEGRAM_SETTINGS="$DIR/run/telegram/settings.env"
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && [ -s "$DIR/run/telegram/token" ] && [ -s "$TELEGRAM_SETTINGS" ]; then
+  set -a; . "$TELEGRAM_SETTINGS"; set +a
+  if [ "${TELEGRAM_TRANSPORT:-docker}" != host ]; then
+  if [ -z "${COMPOSE_FILE:-}" ]; then
+    COMPOSE_FILE="docker-compose.yml"
+    for override in compose.override.yaml compose.override.yml docker-compose.override.yml docker-compose.override.yaml; do
+      if [ -f "$override" ]; then COMPOSE_FILE="$COMPOSE_FILE:$override"; break; fi
+    done
+  fi
+  case ":$COMPOSE_FILE:" in *:v2/compose.yml:*) ;; *) COMPOSE_FILE="$COMPOSE_FILE:v2/compose.yml" ;; esac
+  case ",${COMPOSE_PROFILES:-}," in *,telegram,*) ;; *) COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}telegram" ;; esac
+  export COMPOSE_FILE COMPOSE_PROFILES
+  fi
+fi
+
 MODEL="${LOCAL_LLM_MODEL:-llama3.2:3b}"
 POSTIZ_URL="${POSTIZ_LOCAL_URL:-http://localhost:4200}"
 EVO_URL="http://localhost:8080"
@@ -515,6 +533,18 @@ case "${1:-}" in
     "$0" start
     ;;
 
+  telegram)
+    if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && { [ ! -s "$DIR/run/telegram/token" ] || [ ! -s "$TELEGRAM_SETTINGS" ]; }; then
+      echo "Configure Telegram first with: python3 v2/telegram_setup.py" >&2
+      exit 1
+    fi
+    case "${2:-}" in
+      start) python3 "$DIR/scripts/host_agent.py" restart ;;
+      status) python3 "$DIR/scripts/host_agent.py" status ;;
+      *) echo "Usage: ./postforge.sh telegram {start|status}" >&2; exit 2 ;;
+    esac
+    ;;
+
   pending)
     python3 "$STATE_PY"
     ;;
@@ -580,7 +610,7 @@ case "${1:-}" in
     ;;
 
   *)
-    echo "Usage: ./postforge.sh {start|stop [--force]|restart|status|pending|state|channels [--reconnect [network]]|retention [--apply]|maintenance {check|snapshot|update --apply}|tunnel-url <https://domain>|patch|doctor}"
+    echo "Usage: ./postforge.sh {start|stop [--force]|restart|status|telegram {start|status}|pending|state|channels [--reconnect [network]]|retention [--apply]|maintenance {check|snapshot|update --apply}|tunnel-url <https://domain>|patch|doctor}"
     echo "Legacy alias still works: ./publish-machine.sh"
     exit 1
     ;;

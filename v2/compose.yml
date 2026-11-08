@@ -1,0 +1,48 @@
+# Add with: docker compose -f docker-compose.yml -f v2/compose.yml ...
+services:
+  postforge-web:
+    build:
+      context: ./v2
+    profiles: [web]
+    command: [python, -m, postforge_v2, web]
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      POSTIZ_BROWSER_URL: ${FRONTEND_URL:-http://localhost:4200}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    restart: unless-stopped
+
+  postforge-telegram:
+    build:
+      context: ./v2
+    profiles: [telegram]
+    command: [python, -m, postforge_v2, telegram]
+    environment:
+      TELEGRAM_TOKEN_FILE: /run/secrets/telegram-token
+      TELEGRAM_BOT_ID: ${TELEGRAM_BOT_ID:-}
+      TELEGRAM_OWNER_ID: ${TELEGRAM_OWNER_ID:-}
+      TELEGRAM_LANGUAGE: ${TELEGRAM_LANGUAGE:-en}
+      TELEGRAM_HEARTBEAT_MINUTES: ${TELEGRAM_HEARTBEAT_MINUTES:-0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    secrets:
+      - telegram-token
+    volumes:
+      - postforge-telegram-state:/state
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    restart: unless-stopped
+
+secrets:
+  telegram-token:
+    file: ./run/telegram/token
+
+volumes:
+  postforge-telegram-state:

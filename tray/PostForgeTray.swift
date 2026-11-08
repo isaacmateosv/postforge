@@ -44,6 +44,7 @@ struct WhatsAppPending: Decodable {
     let pending: Int
     let awaitingApproval: Int
     let approved: Int
+    let needsReview: Int?
     let confirmations: Int
     let next: String?
 }
@@ -87,6 +88,15 @@ struct ChannelAlert: Decodable {
         case "disconnected": return ui("\(network) is disconnected", "\(network) está desconectado")
         default: return ui("\(network) setup isn't finished", "La configuración de \(network) está incompleta")
         }
+    }
+}
+
+struct ConnectionDetail: Equatable {
+    let network: String?
+    let message: String
+
+    var menuText: String {
+        network.map { "\($0): \(message)" } ?? message
     }
 }
 
@@ -205,17 +215,17 @@ func plural(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "
 
 func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { ($0 << 8) | UInt32($1) } }
 
-func postForgeImage(active: Bool) -> NSImage {
-    let size = 21.0
+func postForgeImage() -> NSImage {
+    let size = 18.0
     if let path = Bundle.main.path(forResource: "PostForgeTray", ofType: "png"),
        let image = NSImage(contentsOfFile: path) {
-        // The tightly cropped 54px mask renders at 21pt, with enough pixels for Retina displays.
-        image.size = NSSize(width: 21 * image.size.width / image.size.height, height: 21)
+        // Use the Retina mask at a fixed menu bar size.
+        image.size = NSSize(width: size * image.size.width / image.size.height, height: size)
         image.isTemplate = true  // black template mask: macOS tints it for light and dark menu bars
         return image
     }
 
-    let image = NSImage(size: NSSize(width: size, height: size))
+    let image = NSImage(size: NSSize(width: 24, height: 24))
     image.lockFocus()
     let plane = NSBezierPath()
     plane.move(to: NSPoint(x: 3, y: 12))
@@ -223,7 +233,7 @@ func postForgeImage(active: Bool) -> NSImage {
     plane.line(to: NSPoint(x: 15, y: 5))
     plane.line(to: NSPoint(x: 11, y: 11))
     plane.close()
-    (active ? NSColor.labelColor : NSColor.secondaryLabelColor).setFill()
+    NSColor.black.setFill()
     plane.fill()
     let spark = NSBezierPath()
     spark.move(to: NSPoint(x: 19, y: 22))
@@ -235,10 +245,10 @@ func postForgeImage(active: Bool) -> NSImage {
     spark.line(to: NSPoint(x: 15, y: 18))
     spark.line(to: NSPoint(x: 18, y: 19))
     spark.close()
-    NSColor.systemOrange.setFill()
     spark.fill()
     image.unlockFocus()
-    image.isTemplate = false
+    image.size = NSSize(width: size, height: size)
+    image.isTemplate = true
     return image
 }
 
@@ -403,10 +413,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self
-        statusItem.length = 29
         statusItem.button?.title = ""
         statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.imageScaling = .scaleProportionallyUpOrDown
+        statusItem.button?.imageScaling = .scaleNone
         statusItem.button?.target = self
         statusItem.button?.action = #selector(showStatusMenu)
         statusItem.menu = menu
@@ -1040,7 +1049,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         let image: NSImage?
         if symbol == "paperplane" || symbol == "paperplane.fill" {
-            image = postForgeImage(active: symbol == "paperplane.fill")
+            image = postForgeImage()
         } else {
             let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold)
             image = NSImage(systemSymbolName: symbol, accessibilityDescription: "PostForge")?.withSymbolConfiguration(config)
@@ -1049,7 +1058,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         button.image = image
         button.alphaValue = symbol == "paperplane" ? 0.5 : 1  // the glyph is dimmed while the stack is off
         button.imagePosition = .imageLeading
-        button.imageScaling = .scaleProportionallyUpOrDown
+        button.imageScaling = .scaleNone
         button.title = (active > 0 ? " \(active)" : "") + (updatesAvailable ? " •" : "")
         if active > 0 { tip += text(" · \(active) running", " · \(active) en curso") }
         if updatesAvailable { tip += text(" · Updates available", " · Hay actualizaciones disponibles") }
@@ -1155,7 +1164,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let newPostItem = action(text("New Post…", "Nueva publicación…"), #selector(openNewPost), enabled: up)
         newPostItem.keyEquivalent = "n"
         menu.addItem(newPostItem)
+        let draftOptions = NSMenu()
+        draftOptions.autoenablesItems = false
+        for (index, title) in [
+            text("Posts Only…", "Solo publicaciones…"),
+            text("Stories Only…", "Solo historias…"),
+            text("Posts and Stories…", "Publicaciones e historias…"),
+            text("Choose Cover Image…", "Elegir imagen de portada…"),
+            text("Set Cover Timestamp…", "Indicar segundo de portada…"),
+        ].enumerated() {
+            if index == 3 { draftOptions.addItem(.separator()) }
+            let item = action(title, #selector(openDraftOption(_:)), enabled: up)
+            item.tag = index + 1
+            draftOptions.addItem(item)
+        }
+        let optionsItem = NSMenuItem(title: text("Draft Options", "Opciones de borrador"), action: nil, keyEquivalent: "")
+        optionsItem.submenu = draftOptions
+        optionsItem.isEnabled = up
+        menu.addItem(optionsItem)
         menu.addItem(action(text("Open Postiz Calendar", "Abrir calendario de Postiz"), #selector(openPostiz), enabled: up))
+        menu.addItem(action(text("WhatsApp Plans & Receipts…", "Planes y confirmaciones de WhatsApp…"), #selector(reviewWhatsAppPlans), enabled: true))
         if isOff {
             menu.addItem(action(st?.state == "partial" ? text("Restore All Services", "Restaurar todos los servicios") :
                                 text("Turn On", "Encender"),
@@ -1179,6 +1207,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             }
             if let errors = st.failedPosts, errors > 0 {
                 attention.append(info(text("⚠︎ \(plural(errors, "post")) failed in the last 24 h", "⚠︎ \(errors) publicaciones fallaron en 24 h")))
+            }
+            if let count = st.pending.whatsapp?.needsReview, count > 0 {
+                attention.append(info(text("⚠︎ WhatsApp Status delivery needs review (\(count))",
+                                           "⚠︎ Hay Estados de WhatsApp por revisar (\(count))")))
             }
             if let wa = st.pending.whatsapp, wa.confirmations > 0 {
                 attention.append(action(text("Review WhatsApp Plans (\(wa.confirmations))…", "Revisar planes de WhatsApp (\(wa.confirmations))…"),
@@ -1253,9 +1285,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                       action: nil, keyEquivalent: "")
         audienceItem.submenu = audienceMenu
         menu.addItem(audienceItem)
-        menu.addItem(action(text("WhatsApp Plans & Receipts…", "Planes y confirmaciones de WhatsApp…"), #selector(reviewWhatsAppPlans), enabled: true))
         menu.addItem(action(text("Open WhatsApp Manager", "Abrir WhatsApp Manager"), #selector(openEvolution), enabled: up))
         menu.addItem(action(text("Tunnel URL…", "URL del túnel…"), #selector(editTunnelURL), enabled: busy == nil))
+        menu.addItem(action(text("Gateway Access…", "Acceso a la puerta de enlace…"), #selector(editGatewayAccess), enabled: busy == nil))
 
         menu.addItem(.separator())
         menu.addItem(sectionHeader(text("Maintenance", "Mantenimiento")))
@@ -1298,6 +1330,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 if wa.awaitingApproval > 0 { parts.append(text("\(wa.awaitingApproval) awaiting approval", "\(wa.awaitingApproval) esperando aprobación")) }
                 if wa.approved > 0 { parts.append(text("\(wa.approved) approved", "\(wa.approved) aprobados")) }
                 menu.addItem(info(text("WhatsApp Status: " + parts.joined(separator: ", "), "Estado de WhatsApp: " + parts.joined(separator: ", "))))
+                if st.isUp && wa.awaitingApproval > 0 {
+                    let statusMenu = NSMenu()
+                    statusMenu.autoenablesItems = false
+                    for status in pendingStatusApprovals().suffix(8).reversed() {
+                        guard let id = status["id"] as? String else { continue }
+                        let when = (status["when"] as? String).map { shortDate(iso: $0) } ?? ""
+                        let caption = (status["caption"] as? String ?? "").split(whereSeparator: \.isNewline).joined(separator: " ")
+                        let entry = action("\(when) · \(caption.prefix(36))", #selector(approveStatusFromMenu(_:)), enabled: busy == nil)
+                        entry.representedObject = id
+                        statusMenu.addItem(entry)
+                    }
+                    if !statusMenu.items.isEmpty {
+                        let approval = NSMenuItem(title: text("Approve WhatsApp Status…", "Aprobar Estado de WhatsApp…"),
+                                                  action: nil, keyEquivalent: "")
+                        approval.submenu = statusMenu
+                        menu.addItem(approval)
+                    }
+                }
                 if let next = wa.next { menu.addItem(info(text("Next WhatsApp Status: \(shortDate(iso: next))", "Siguiente estado de WhatsApp: \(shortDate(iso: next))"))) }
             }
         }
@@ -1456,6 +1506,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         updateEnvValue(key: "WA_TEST_RECIPIENTS", value: numbers.joined(separator: ","))
     }
 
+    @objc func editCaptionFinalTag() {
+        let contents = (try? String(contentsOfFile: project + "/.env", encoding: .utf8)) ?? ""
+        let current = contents.split(separator: "\n").first { $0.hasPrefix("CAPTION_FINAL_TAG=") }
+            .map { String($0.dropFirst("CAPTION_FINAL_TAG=".count)).trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) } ?? ""
+        let field = NSTextField(string: current)
+        field.placeholderString = "#MiNegocio"
+        field.frame = NSRect(x: 0, y: 0, width: 250, height: 24)
+        let dialog = NSAlert()
+        dialog.messageText = text("Final hashtag", "Etiqueta final")
+        dialog.informativeText = text("This hashtag goes at the end of new captions. Leave it blank to skip it.",
+                                      "Esta etiqueta va al final de los textos nuevos. Déjala en blanco si prefieres omitirla.")
+        dialog.accessoryView = field
+        dialog.addButton(withTitle: text("Save", "Guardar"))
+        dialog.addButton(withTitle: text("Cancel", "Cancelar"))
+        dialog.window.initialFirstResponder = field
+        guard dialog.runModal() == .alertFirstButtonReturn else { return }
+        let raw = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tag = raw.isEmpty || raw.hasPrefix("#") ? raw : "#" + raw
+        guard tag.isEmpty || tag.range(of: #"^#[\p{L}\p{N}_]{1,60}$"#, options: .regularExpression) != nil else {
+            alert(text("Invalid hashtag", "Etiqueta no válida"),
+                  text("Use one hashtag with letters, numbers or underscores, without spaces.",
+                       "Usa una sola etiqueta con letras, números o guiones bajos, sin espacios."))
+            return
+        }
+        updateEnvValue(key: "CAPTION_FINAL_TAG", value: "\"\(tag)\"")
+        newPost?.draftOptionsChanged()
+    }
+
     func updateEnvValue(key: String, value: String) {
         let path = project + "/.env"
         guard var contents = try? String(contentsOfFile: path, encoding: .utf8) else {
@@ -1586,6 +1664,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 self.updateNoticeShown = false
                 self.notify("PostForge updated", "The Docker stack was refreshed and health was checked.")
             }
+        }
+    }
+
+    @objc func editGatewayAccess() {
+        let command = ["/usr/bin/python3", project + "/v2/gateway_setup.py"]
+        let (code, output) = runCommand(command + ["list-users"], in: project, timeout: 5, quietErrors: true)
+        guard code == 0, let data = output.data(using: .utf8),
+              let users = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              !users.isEmpty else {
+            alert(text("Set up gateway users first", "Primero configura los usuarios de acceso"),
+                  text("Provision users and authenticator codes locally using the gateway setup guide.",
+                       "Configura los usuarios y sus códigos de autenticación en el equipo según la guía de acceso."))
+            return
+        }
+        let choices = users.compactMap { user -> (String, Bool)? in
+            guard let email = user["email"] as? String, let allowed = user["allowed"] as? Bool else { return nil }
+            return (email, allowed)
+        }
+        guard !choices.isEmpty else { return }
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 28), pullsDown: false)
+        popup.addItems(withTitles: choices.map { email, allowed in
+            email + (allowed ? text(" · Allowed", " · Permitido") : text(" · Blocked", " · Bloqueado"))
+        })
+        let dialog = NSAlert()
+        dialog.messageText = text("Gateway allowlist", "Lista de acceso")
+        dialog.informativeText = text("Select a user and choose whether to allow or block them. Restart the identity service to apply the change and clear existing gateway sessions.",
+                                      "Elige un usuario y decide si permitir o bloquear su acceso. Reinicia el servicio de identidad para aplicar el cambio y cerrar las sesiones de acceso actuales.")
+        dialog.accessoryView = popup
+        dialog.addButton(withTitle: text("Cancel", "Cancelar"))
+        dialog.addButton(withTitle: text("Allow", "Permitir"))
+        dialog.addButton(withTitle: text("Block", "Bloquear"))
+        NSApp.activate(ignoringOtherApps: true)
+        let answer = dialog.runModal()
+        guard answer == .alertSecondButtonReturn || answer == .alertThirdButtonReturn,
+              choices.indices.contains(popup.indexOfSelectedItem) else { return }
+        let email = choices[popup.indexOfSelectedItem].0
+        let (result, _) = runCommand(command + ["set-allowed", email, answer == .alertSecondButtonReturn ? "allow" : "deny"],
+                                     in: project, timeout: 5, quietErrors: true)
+        if result == 0 {
+            alert(text("Gateway access saved", "Acceso guardado"),
+                  text("Restart the identity service from the gateway setup to apply it.", "Reinicia el servicio de identidad según la guía de acceso para aplicarlo."))
+        } else {
+            alert(text("Couldn't change gateway access", "No se pudo cambiar el acceso"),
+                  text("Keep at least one user allowed and verify the gateway configuration.", "Mantén al menos un usuario permitido y verifica la configuración de acceso."))
         }
     }
 
@@ -1844,23 +1966,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     func connectionLines(_ state: MachineState) -> [String] {
+        connectionRows(state).map(\.menuText)
+    }
+
+    func connectionRows(_ state: MachineState) -> [ConnectionDetail] {
         let channels = state.channels ?? []
         let manual = channels.filter { !$0.renews }.sorted { ($0.expires ?? "~") < ($1.expires ?? "~") }
-        var lines = manual.map { channel -> String in
+        let now = Date()
+        var rows = manual.map { channel -> ConnectionDetail in
             let network = uiNetwork(channel.network)
             guard let expiry = channel.expires.flatMap({ isoParser.date(from: $0) }) else {
-                return text("\(network): expiry unavailable", "\(network): vencimiento no disponible")
+                return ConnectionDetail(network: network, message: text("Expiry unavailable", "Vencimiento no disponible"))
             }
-            let minutes = Int(expiry.timeIntervalSinceNow / 60)
-            if minutes <= 0 { return text("\(network): reconnect now", "\(network): vuelve a conectar ahora") }
-            let remaining = "\(minutes / 1440)d \((minutes % 1440) / 60)h \(minutes % 60)m"
-            return text("\(network): reconnect in \(remaining)", "\(network): vuelve a conectar en \(remaining)")
+            let minutes = Int(expiry.timeIntervalSince(now) / 60)
+            if expiry <= now {
+                return ConnectionDetail(network: network, message: text("Reconnect now", "Vuelve a conectar ahora"))
+            }
+            let remaining = minutes == 0 ? text("less than 1 min", "menos de 1 min")
+                : "\(minutes / 1440)d \((minutes % 1440) / 60)h \(minutes % 60)m"
+            let estimated = channel.provider == "facebook" || channel.provider == "instagram"
+            let message = estimated
+                ? text("Estimated expiry in \(remaining)", "Vencimiento estimado en \(remaining)")
+                : text("Reconnect in \(remaining)", "Vuelve a conectar en \(remaining)")
+            return ConnectionDetail(network: network, message: message)
         }
         if channels.contains(where: { $0.renews }) {
-            lines.append(text("Automatic renewal available for other channels", "Otros canales admiten renovación automática"))
+            rows.append(ConnectionDetail(network: nil, message: text(
+                "Automatic renewal available for other channels", "Otros canales admiten renovación automática")))
         }
-        if state.channelsFromCache == true { lines.append(text("Connection dates from saved status", "Fechas de conexión del último estado guardado")) }
-        return lines
+        if state.channelsFromCache == true && !rows.isEmpty {
+            rows.append(ConnectionDetail(network: nil, message: text(
+                "Connection dates from saved status", "Fechas de conexión del último estado guardado")))
+        }
+        return rows
     }
 
     @objc func showAbout() {
@@ -1954,13 +2092,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     @objc func showPublishingFlow() {
-        let window = makeSecondaryWindow(title: text("How PostForge works", "Cómo funciona PostForge"), height: 440)
+        let window = makeSecondaryWindow(title: text("How PostForge works", "Cómo funciona PostForge"), height: 560)
         let root = BackgroundView()
         let title = windowLabel("PostForge", size: 24, weight: .bold)
-        let stages = [text("1 · Media + your idea\nMac app or WhatsApp self-chat", "1 · Archivos + tu idea\nApp para Mac o chat contigo en WhatsApp"),
-                      text("2 · Local AI → preview → your approval", "2 · IA local → vista previa → tu aprobación"),
-                      text("3 · Postiz drafts → review & schedule", "3 · Borradores en Postiz → revisión y programación"),
-                      text("4 · Temporal → connected social channels", "4 · Temporal → redes sociales conectadas")]
+        let stages = [text("1 · Media or a text announcement\nDesktop, WhatsApp self-chat or Telegram", "1 · Archivos o un anuncio de texto\nApp de escritorio, WhatsApp o Telegram"),
+                      text("2 · Keep your words or generate copy → review", "2 · Conserva tu texto o genera uno → revisa"),
+                      text("3 · Create drafts or confirm direct scheduling", "3 · Crea borradores o confirma la programación"),
+                      text("4 · Scheduled delivery · WhatsApp approved separately", "4 · Envío programado · WhatsApp se aprueba aparte")]
         var views: [NSView] = [title]
         for (index, stage) in stages.enumerated() {
             if index > 0 { views.append(windowLabel("↓", size: 16, color: .systemTeal)) }
@@ -2031,7 +2169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 if !label.isEditable { label.stringValue = localizedUI(label.stringValue) }
                 if let placeholder = label.placeholderString { label.placeholderString = localizedUI(placeholder) }
             }
-            if let button = view as? NSButton { button.title = localizedUI(button.title) }
+            if let button = view as? NSButton, !(button is NSPopUpButton) {
+                button.title = localizedUI(button.title)
+            }
             if let tip = view.toolTip { view.toolTip = localizedUI(tip) }
             for child in view.subviews { walk(child) }
         }
@@ -2043,6 +2183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         if operationIsUpdateCheck { finishUpdateCheckIfReady() }
         updateButton()
         newPost?.refreshState(state)
+        newPost?.refreshPlacementLabels()
+        newPost?.refreshStepLabels()
+        newPost?.refreshOptionsLabel()
+        newPost?.updateCaptionVersions()
         if let report = newPost?.lastReport { newPost?.report(report.0, dryRun: report.1, exitCode: report.2) }
         if let state = state { whatsappWindow?.refresh(state) }
         if aboutWindow?.isVisible == true { showAbout() }
@@ -2096,6 +2240,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         if newPost == nil { newPost = NewPostWindow(project: project) }
         newPost?.refreshState(state)
         newPost?.show()
+    }
+
+    @objc func openDraftOption(_ sender: NSMenuItem) {
+        openNewPost()
+        guard let composer = newPost else { return }
+        switch sender.tag {
+        case 1...3:
+            composer.placementMenu.selectItem(at: sender.tag)
+            composer.draftOptionsChanged()
+        case 4:
+            composer.chooseCoverImage()
+        case 5:
+            composer.editCover()
+        default:
+            break
+        }
+    }
+
+    func pendingStatusApprovals() -> [[String: Any]] {
+        guard let data = FileManager.default.contents(atPath: project + "/run/whatsapp-pending.json"),
+              let items = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return [] }
+        return items.filter { $0["status"] as? String == "pending" && $0["approved"] as? Bool != true }
+    }
+
+    @objc func approveStatusFromMenu(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? String { approveStatus(id) }
+    }
+
+    func approveStatus(_ id: String, onSuccess: (() -> Void)? = nil) {
+        guard let status = pendingStatusApprovals().first(where: { $0["id"] as? String == id }) else {
+            alert(text("Status unavailable", "Estado no disponible"),
+                  text("This Status has already been approved or is no longer in the queue.",
+                       "Este Estado ya fue aprobado o salió de la cola."))
+            return
+        }
+        let when = (status["when"] as? String).map { shortDate(iso: $0) } ?? ""
+        let caption = String((status["caption"] as? String ?? "").prefix(120))
+        let detail = [when, caption, text("If the scheduled time has passed, it can send as soon as WhatsApp is available.",
+                                          "Si la hora programada ya pasó, el Estado puede enviarse en cuanto WhatsApp esté disponible.")].joined(separator: "\n\n")
+        guard ask(text("Approve this WhatsApp Status?", "¿Aprobar este Estado de WhatsApp?"), detail,
+                  safe: text("Cancel", "Cancelar"), risky: text("Approve Status", "Aprobar Estado")) else { return }
+        let dir = project
+        windowWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(["/usr/bin/python3", dir + "/scripts/lib/wa_inbox.py",
+                                             "--send-status-approval", id], in: dir, timeout: 60)
+            DispatchQueue.main.async {
+                self.windowWork -= 1
+                if code == 0 {
+                    onSuccess?()
+                    self.alert(self.text("Approval sent", "Aprobación enviada"),
+                               self.text("Check your WhatsApp self-chat for confirmation.", "Revisa tu chat contigo en WhatsApp para confirmar."))
+                } else {
+                    self.log("Status approval failed: \(output)")
+                    self.alert(self.text("Couldn’t send the approval", "No se pudo enviar la aprobación"),
+                               self.text("Check that PostForge is on and WhatsApp is linked.", "Verifica que PostForge esté encendido y WhatsApp esté vinculado."))
+                }
+                self.poll()
+            }
+        }
     }
 
     @objc func openPostiz() {
@@ -2414,7 +2618,167 @@ final class UserGuideWindow: NSObject {
 /// "New Post…": files plus one sentence (typed or dictated) become one Postiz draft per network at
 /// that time. Preview shows the plan; Create Drafts makes them. Nothing publishes until approved in
 /// Postiz (HITL). The work is done by scripts/plan-post.sh --json.
-final class NewPostWindow: NSObject, NSTextViewDelegate {
+private final class ComposerSteps: NSTextField {
+    private let accent = NSColor(srgbRed: 0.55, green: 0.79, blue: 1, alpha: 1)
+    private var text = ""
+    private var timer: Timer?
+    private var interactionMonitor: Any?
+    var isAnimating: Bool { timer != nil }
+
+    func updateText(_ text: String) {
+        self.text = text
+        setAccessibilityLabel(text)
+        render()
+    }
+
+    func startSweep(in window: NSWindow) {
+        stopSweep()
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let start = ProcessInfo.processInfo.systemUptime
+        interactionMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown, .scrollWheel]
+        ) { [weak self, weak window] event in
+            if event.window === window { self?.stopSweep() }
+            return event
+        }
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24, repeats: true) { [weak self, weak window] _ in
+            guard let self else { return }
+            let progress = (ProcessInfo.processInfo.systemUptime - start) / 1.8
+            guard progress < 1, window?.isVisible == true else {
+                self.stopSweep()
+                return
+            }
+            self.render(progress: progress)
+        }
+    }
+
+    func stopSweep() {
+        timer?.invalidate()
+        timer = nil
+        if let interactionMonitor {
+            NSEvent.removeMonitor(interactionMonitor)
+            self.interactionMonitor = nil
+        }
+        render()
+    }
+
+    deinit {
+        timer?.invalidate()
+        if let interactionMonitor { NSEvent.removeMonitor(interactionMonitor) }
+    }
+
+    private func render(progress: Double? = nil) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byWordWrapping
+        style.alignment = .center
+        let line = NSMutableAttributedString(string: text, attributes: [
+            .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: accent, .paragraphStyle: style,
+        ])
+        if let progress {
+            let width = 10.0
+            let center = progress * (Double(line.length) + 2 * width) - width
+            let start = max(0, Int(center - width))
+            let end = min(line.length, Int(center + width) + 1)
+            if start < end {
+                for index in start..<end {
+                    let strength = max(0, 1 - abs(Double(index) - center) / width)
+                    if let color = accent.blended(withFraction: strength, of: .white) {
+                        line.addAttribute(.foregroundColor, value: color, range: NSRange(location: index, length: 1))
+                    }
+                }
+            }
+        }
+        attributedStringValue = line
+    }
+}
+
+private final class MixingIndicator: NSView {
+    private var timer: Timer?
+    private var phase = 0.0
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 30, height: 29) }
+
+    func start() {
+        isHidden = false
+        guard timer == nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.phase += 0.55
+            self.needsDisplay = true
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        isHidden = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let whisk = NSBezierPath()
+        let x = 14 + sin(phase) * 4
+        whisk.move(to: NSPoint(x: x + 5, y: 22))
+        whisk.line(to: NSPoint(x: x, y: 12))
+        whisk.curve(to: NSPoint(x: x - 3, y: 8),
+                    controlPoint1: NSPoint(x: x + 4, y: 5), controlPoint2: NSPoint(x: x - 6, y: 4))
+        whisk.line(to: NSPoint(x: x, y: 12))
+        NSColor.systemOrange.setStroke()
+        whisk.lineWidth = 1.7
+        whisk.lineCapStyle = .round
+        whisk.stroke()
+
+        let bowl = NSBezierPath()
+        bowl.move(to: NSPoint(x: 3, y: 12))
+        bowl.line(to: NSPoint(x: 25, y: 12))
+        bowl.curve(to: NSPoint(x: 3, y: 12),
+                   controlPoint1: NSPoint(x: 23, y: 0), controlPoint2: NSPoint(x: 5, y: 0))
+        NSColor.labelColor.setStroke()
+        bowl.lineWidth = 1.6
+        bowl.lineCapStyle = .round
+        bowl.stroke()
+
+        let sparks = NSBezierPath()
+        for (index, center) in [NSPoint(x: 5, y: 19), NSPoint(x: 24, y: 21), NSPoint(x: 15, y: 25)].enumerated() {
+            let radius = 1.4 + (1 + sin(phase + Double(index) * 2)) * 0.55
+            sparks.move(to: NSPoint(x: center.x - radius, y: center.y))
+            sparks.line(to: NSPoint(x: center.x + radius, y: center.y))
+            sparks.move(to: NSPoint(x: center.x, y: center.y - radius))
+            sparks.line(to: NSPoint(x: center.x, y: center.y + radius))
+        }
+        NSColor.systemYellow.setStroke()
+        sparks.lineWidth = 1
+        sparks.lineCapStyle = .round
+        sparks.stroke()
+    }
+}
+
+final class ComposerActionButton: NSButton {
+    override func draw(_ dirtyRect: NSRect) {
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1),
+                                 xRadius: 15, yRadius: 15)
+        let base = bezelColor ?? NSColor.systemBlue
+        let fill = isEnabled ? base : base.withAlphaComponent(0.22)
+        (isHighlighted ? fill.blended(withFraction: 0.15, of: .black) ?? fill : fill).setFill()
+        shape.fill()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let text = NSAttributedString(string: title, attributes: [
+            .font: font ?? NSFont.systemFont(ofSize: 14, weight: .semibold),
+            .foregroundColor: isEnabled ? NSColor.white : NSColor.white.withAlphaComponent(0.45),
+            .paragraphStyle: paragraph,
+        ])
+        let height = text.size().height
+        text.draw(in: NSRect(x: 6, y: (bounds.height - height) / 2, width: bounds.width - 12, height: height))
+        if window?.firstResponder === self {
+            NSColor.keyboardFocusIndicatorColor.setStroke()
+            shape.lineWidth = 2
+            shape.stroke()
+        }
+    }
+}
+
+final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
     let project: String
     let window: NSWindow
     let files = NSTextField(labelWithString: "")
@@ -2422,25 +2786,65 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     let emptyState = NSStackView()
     let status = NSTextField(labelWithString: "")
     let turnOnButton = NSButton(title: "", target: nil, action: nil)
-    let connections = NSTextField(wrappingLabelWithString: "")
+    let connectionsButton = NSButton()
+    let connectionsPopover = NSPopover()
+    private var connectionDetails: [ConnectionDetail] = []
     let instruction = NSTextView()
+    private let steps = ComposerSteps()
     let result = NSTextView()
-    let preview = NSButton(title: "Preview", target: nil, action: nil)
-    let create = NSButton(title: "Create Drafts", target: nil, action: nil)
+    let preview = ComposerActionButton(title: "Preview", target: nil, action: nil)
+    let create = ComposerActionButton(title: "Create Drafts", target: nil, action: nil)
+    let schedule = NSButton()
+    let editCaption = NSButton()
+    var reviewedWhen: String?
+    var textOnlyNetworks: [String]?
+    var canScheduleSocials = false
     let calendar = NSButton(title: "Open Postiz Calendar", target: nil, action: nil)
+    let statusApproval = NSButton(title: "", target: nil, action: nil)
+    var pendingStatusID: String?
     let updatesButton = NSButton(title: "", target: nil, action: nil)
     let spinner = NSProgressIndicator()
     var statsQueue = NSTextField(labelWithString: "0")
     var statsDrafts = NSTextField(labelWithString: "0")
     var statsNext = NSTextField(labelWithString: "")
     var media: [URL] = []
+    let placementMenu = NSPopUpButton()
+    let coverSecond = NSTextField()
+    let coverFile = NSTextField(labelWithString: "")
+    let chooseCover = NSButton()
+    let clearCover = NSButton()
+    let changeCover = NSButton()
+    private let mixer = MixingIndicator()
+    var coverLocked = false
+    var coverAvailable = false
+    var acceptedNoCover = false
+    var coverURL: URL?
+    var inputRevision = 0
+    var ideaHeight: NSLayoutConstraint?
     var reviewURL: URL?
     var previewed = false
+    var reviewedCaption: String?
+    var reviewedThreadsCaption: String?
+    var reviewedFinalTag: String?
+    var reviewedYouTubeTitle: String?
+    let captionPrevious = NSButton()
+    let captionNext = NSButton()
+    let captionVersionLabel = NSTextField(labelWithString: "")
+    let clearWork = NSButton()
+    let optionsToggle = NSButton()
+    private var optionsPanel: NSView?
+    private var coverRow: NSView?
+    var captionRange: NSRange?
+    let alternateCaption = NSButton()
+    var savedVersions: [(instruction: String, output: String)] = []
+    var selectedVersion: Int?
+    var canGenerateVariant = false
+    var working = false
     var lastReport: (String, Bool, Int32)?
 
     init(project: String) {
         self.project = project
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 720),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 790),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
@@ -2450,7 +2854,9 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         window.appearance = NSAppearance(named: .darkAqua)  // one look: the controls are drawn for dark
         window.backgroundColor = BackgroundView.color
         window.isMovableByWindowBackground = true
-        window.contentMinSize = NSSize(width: 520, height: 660)
+        let bounds = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 900)
+        window.contentMinSize = NSSize(width: min(920, bounds.width - 48), height: min(700, bounds.height - 48))
+        window.setContentSize(NSSize(width: min(1060, bounds.width - 48), height: min(790, bounds.height - 48)))
         window.isReleasedWhenClosed = false
         build()
         refreshState(nil)
@@ -2458,9 +2864,16 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
     }
 
     func show() {
+        let opening = !window.isVisible
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(instruction)
         NSApp.activate(ignoringOtherApps: true)
+        if opening { steps.startSweep(in: window) }
+    }
+
+    func refreshStepLabels() {
+        steps.updateText(t("1. Compose  →  2. Bake and review  →  3. Create drafts",
+                           "1. Redacta  →  2. Hornea y revisa  →  3. Crea los borradores"))
     }
 
     func t(_ english: String, _ spanish: String) -> String {
@@ -2496,13 +2909,81 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         default: break
         }
         let delegate = NSApp.delegate as? AppDelegate
-        let connection = state.map { delegate?.connectionLines($0).prefix(2).joined(separator: "\n") ?? "" } ?? ""
+        let details = state.map { delegate?.connectionRows($0) ?? [] } ?? []
+        if details != connectionDetails {
+            connectionDetails = details
+            if connectionsPopover.isShown { updateConnectionsPopover() }
+        }
         status.stringValue = "● " + (delegate?.busy ?? label)
-        connections.stringValue = connection
-        connections.toolTip = state.map { delegate?.connectionLines($0).joined(separator: "\n") ?? "" }
-        connections.isHidden = connection.isEmpty
+        let hasAlert = state?.channelAlerts?.isEmpty == false
+        connectionsButton.image = NSImage(systemSymbolName: hasAlert ? "exclamationmark.circle" : "link",
+                                         accessibilityDescription: nil)
+        connectionsButton.contentTintColor = hasAlert ? .systemOrange : nil
         status.textColor = tone
         turnOnButton.isHidden = state?.state != "off" && state?.state != "partial"
+    }
+
+    @objc func showConnections() {
+        if connectionsPopover.isShown {
+            connectionsPopover.performClose(nil)
+            return
+        }
+        updateConnectionsPopover()
+        connectionsPopover.behavior = .transient
+        connectionsPopover.show(relativeTo: connectionsButton.bounds, of: connectionsButton, preferredEdge: .maxY)
+        (NSApp.delegate as? AppDelegate)?.poll()
+    }
+
+    func updateConnectionsPopover() {
+        let width: CGFloat = 318
+        let horizontalPadding: CGFloat = 24
+        let verticalPadding: CGFloat = 18
+        let innerWidth = width - 2 * horizontalPadding
+        let title = NSTextField(labelWithString: t("Channel connections", "Conexiones de canales"))
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.alignment = .center
+        let details = connectionDetails.isEmpty
+            ? [ConnectionDetail(network: nil, message: t("No connection details available yet.", "Todavía no hay datos de conexión."))]
+            : connectionDetails
+        func rowLabel(_ text: String, weight: NSFont.Weight, color: NSColor) -> NSTextField {
+            let label = NSTextField(wrappingLabelWithString: text)
+            label.isEditable = false
+            label.isSelectable = false
+            label.alignment = .center
+            label.font = .systemFont(ofSize: 12, weight: weight)
+            label.textColor = color
+            label.preferredMaxLayoutWidth = innerWidth
+            label.widthAnchor.constraint(equalToConstant: innerWidth).isActive = true
+            return label
+        }
+        let rows = details.map { detail -> NSView in
+            let message = rowLabel(detail.message, weight: .regular, color: .secondaryLabelColor)
+            guard let network = detail.network else { return message }
+            let name = rowLabel(network, weight: .bold, color: .labelColor)
+            let row = NSStackView(views: [name, message])
+            row.orientation = .vertical
+            row.alignment = .centerX
+            row.spacing = 2
+            return row
+        }
+        let stack = NSStackView(views: [title] + rows)
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 9
+        let size = NSSize(width: width, height: ceil(stack.fittingSize.height) + 2 * verticalPadding)
+        let root = NSView(frame: NSRect(origin: .zero, size: size))
+        root.addSubview(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: horizontalPadding),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -horizontalPadding),
+            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: verticalPadding),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -verticalPadding),
+        ])
+        let controller = NSViewController()
+        controller.view = root
+        connectionsPopover.contentViewController = controller
+        connectionsPopover.contentSize = size
     }
 
     func caption(_ text: String) -> NSTextField {
@@ -2573,7 +3054,12 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         turnOnButton.target = self
         turnOnButton.action = #selector(turnOnFromWindow)
         turnOnButton.controlSize = .small
-        let serviceControls = NSStackView(views: [status, turnOnButton])
+        connectionsButton.title = t("Connections", "Conexiones")
+        connectionsButton.target = self
+        connectionsButton.action = #selector(showConnections)
+        connectionsButton.controlSize = .small
+        connectionsButton.imagePosition = .imageLeading
+        let serviceControls = NSStackView(views: [status, connectionsButton, turnOnButton])
         serviceControls.orientation = .vertical
         serviceControls.alignment = .trailing
         serviceControls.spacing = 4
@@ -2629,12 +3115,45 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
             dropRow.centerYAnchor.constraint(equalTo: drop.centerYAnchor),
         ])
 
+        let placementLabel = caption(t("Formats", "Formatos"))
+        refreshPlacementLabels()
+        placementMenu.target = self
+        placementMenu.action = #selector(draftOptionsChanged)
+        let finalTagButton = NSButton(title: t("Final hashtag…", "Etiqueta final…"),
+                                      target: NSApp.delegate, action: #selector(AppDelegate.editCaptionFinalTag))
+        finalTagButton.controlSize = .small
+        let placements = NSStackView(views: [placementLabel, placementMenu])
+        placements.spacing = 8
+
+        chooseCover.title = t("Choose image…", "Elegir imagen…")
+        chooseCover.target = self
+        chooseCover.action = #selector(chooseCoverImage)
+        clearCover.title = t("Clear", "Limpiar")
+        clearCover.target = self
+        clearCover.action = #selector(clearCoverImage)
+        changeCover.title = t("Edit cover…", "Editar portada…")
+        changeCover.target = self
+        changeCover.action = #selector(editCover)
+        changeCover.isHidden = true
+        let coverLabel = caption(t("Video cover", "Portada del video"))
+        coverSecond.placeholderString = t("Second", "Segundo")
+        coverSecond.toolTip = t("Enter a second in the video, such as 12.5.", "Ingresa un segundo del video, por ejemplo 12,5.")
+        coverSecond.delegate = self
+        coverSecond.widthAnchor.constraint(equalToConstant: 72).isActive = true
+        coverFile.lineBreakMode = .byTruncatingMiddle
+        coverFile.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let coverControls = NSStackView(views: [coverLabel, chooseCover, coverSecond, clearCover, changeCover, coverFile])
+        coverRow = coverControls
+        coverControls.spacing = 6
+
         // Idea
         instruction.delegate = self
+        instruction.allowsUndo = true
         let ideaPanel = Panel(scroll(instruction, editable: true), insets: NSEdgeInsets(), style: .input)
-        ideaPanel.heightAnchor.constraint(equalToConstant: 96).isActive = true
-        placeholder.stringValue = t("Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm: fresh sourdough”",
-                                    "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm: pan de masa madre”")
+        ideaHeight = ideaPanel.heightAnchor.constraint(equalToConstant: 86)
+        ideaHeight?.isActive = true
+        placeholder.stringValue = t("Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm; idea: our new launch”",
+                                    "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm; idea: nuestro lanzamiento”")
         placeholder.font = .systemFont(ofSize: 13)
         placeholder.textColor = .tertiaryLabelColor
         placeholder.maximumNumberOfLines = 2
@@ -2654,25 +3173,55 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         preview.title = t("👨‍🍳 Bake idea", "👨‍🍳 Hornea la idea")
         preview.target = self
         preview.action = #selector(runPreview)
+        preview.keyEquivalent = "\r"
+        preview.keyEquivalentModifierMask = .command
+        preview.toolTip = t("Bake idea (⌘↵)", "Hornea la idea (⌘↵)")
+        preview.controlSize = .large
+        preview.font = .systemFont(ofSize: 14, weight: .semibold)
+        preview.bezelColor = .systemBlue
+        preview.widthAnchor.constraint(greaterThanOrEqualToConstant: 136).isActive = true
+        preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
         create.title = t("Create Drafts", "Crear borradores")
         create.target = self
         create.action = #selector(runCreate)
-        create.keyEquivalent = "\r"
         create.isEnabled = false
+        create.controlSize = .large
+        create.font = .systemFont(ofSize: 14, weight: .semibold)
+        create.bezelColor = .systemBlue
+        create.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
+        schedule.title = t("Schedule Directly…", "Programar directamente…")
+        schedule.target = self
+        schedule.action = #selector(scheduleReviewedPlan)
+        schedule.isEnabled = false
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         let actionSpacer = NSView()
         actionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let actions = NSStackView(views: [dictate, actionSpacer, spinner, preview, create])
+        mixer.isHidden = true
+        let actions = NSStackView(views: [preview])
+        actions.distribution = .fillEqually
         actions.spacing = 10
         actions.alignment = .centerY
+        let secondaryActions = NSStackView(views: [mixer, spinner, actionSpacer])
+        secondaryActions.spacing = 8
+        secondaryActions.alignment = .centerY
+
+        steps.isEditable = false
+        steps.isSelectable = false
+        steps.isBordered = false
+        steps.drawsBackground = false
+        steps.maximumNumberOfLines = 2
+        steps.alignment = .center
+        refreshStepLabels()
 
         // Plan: a read-only result. Until there is one, an empty state explains what happens next.
         result.string = ""
         result.textColor = .labelColor
         result.font = .systemFont(ofSize: 13)
         let planPanel = Panel(scroll(result, editable: false), insets: NSEdgeInsets(), style: .output)
+        result.isRichText = true
+        result.textContainerInset = NSSize(width: 12, height: 12)
         planPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 110).isActive = true
         planPanel.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .vertical)
         let emptyIcon = NSImageView(image: NSImage(systemSymbolName: "list.bullet.clipboard", accessibilityDescription: nil) ?? NSImage())
@@ -2723,35 +3272,114 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         updatesButton.action = #selector(AppDelegate.openUpdates)
         updatesButton.controlSize = .small
         refreshUpdates(available: (NSApp.delegate as? AppDelegate)?.updatesAvailable == true)
-        let footer = NSStackView(views: [whatsappButton, updatesButton, footerSpacer, backupButton])
+        clearWork.title = t("Clear…", "Limpiar…")
+        clearWork.target = self
+        clearWork.action = #selector(clearWorkspace)
+        clearWork.controlSize = .small
+        let footer = NSStackView(views: [whatsappButton, updatesButton, clearWork, footerSpacer, backupButton])
         footer.spacing = 8
         footer.alignment = .centerY
 
-        let mediaLabel = caption(t("Photos & videos", "Fotos y videos"))
-        let ideaLabel = caption(t("Your idea", "Tu idea"))
-        let planLabel = caption(t("Plan", "Plan"))
+        let mediaLabel = caption(t("Media · optional", "Archivos · opcional"))
+        let ideaLabel = caption(t("Your request", "Tu pedido"))
+        ideaPanel.toolTip = t("Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.",
+                              "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.")
+        let planLabel = caption(t("Review and finish", "Revisa y termina"))
         let planSpacer = NSView()
         planSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let planHeader = NSStackView(views: [planLabel, planSpacer, calendar])
+        statusApproval.title = t("Approve Status…", "Aprobar Estado…")
+        statusApproval.target = self
+        statusApproval.action = #selector(approveStatusFromPlan)
+        statusApproval.controlSize = .small
+        statusApproval.isHidden = true
+        captionPrevious.title = "‹"
+        captionNext.title = "›"
+        captionPrevious.target = self
+        captionNext.target = self
+        captionPrevious.action = #selector(previousCaption)
+        captionNext.action = #selector(nextCaption)
+        captionPrevious.toolTip = t("Previous caption", "Texto anterior")
+        captionNext.toolTip = t("Next caption", "Texto siguiente")
+        captionVersionLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        captionVersionLabel.alignment = .center
+        alternateCaption.title = t("Try Another Caption", "Probar otro texto")
+        alternateCaption.target = self
+        alternateCaption.action = #selector(runAlternateCaption)
+        alternateCaption.controlSize = .small
+        editCaption.title = t("Edit Caption…", "Editar texto…")
+        editCaption.target = self
+        editCaption.action = #selector(editReviewedCaption)
+        editCaption.controlSize = .small
+        updateCaptionVersions()
+        let planHeader = NSStackView(views: [planLabel, planSpacer, statusApproval, calendar])
         planHeader.alignment = .centerY
-        connections.font = .systemFont(ofSize: 11)
-        connections.textColor = .secondaryLabelColor
-        let main = NSStackView(views: [header, connections, stats, mediaLabel, drop, ideaLabel, ideaPanel, actions, planHeader, planPanel, footer])
+        let versionSpacer = NSView()
+        versionSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let captionToolbar = NSStackView(views: [captionPrevious, captionVersionLabel, captionNext,
+                                                versionSpacer, editCaption, alternateCaption])
+        captionToolbar.spacing = 5
+        captionToolbar.alignment = .centerY
+        let inputHint = NSTextField(wrappingLabelWithString: t(
+            "idea: a brief to write from · caption: your exact words. Quoted text stays as written.",
+            "idea: un tema para redactar · texto: tus palabras exactas. Lo que va entre comillas se conserva."))
+        inputHint.font = .systemFont(ofSize: 11)
+        inputHint.textColor = .secondaryLabelColor
+        let requestSpacer = NSView()
+        requestSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let requestHeader = NSStackView(views: [ideaLabel, requestSpacer, dictate])
+        requestHeader.alignment = .centerY
+        finalTagButton.title = t("Configure…", "Configurar…")
+        let extraOptions = NSStackView(views: [caption(t("Final hashtag", "Etiqueta final")), finalTagButton])
+        extraOptions.spacing = 8
+        let optionContents = NSStackView(views: [placements, coverControls, extraOptions])
+        optionContents.orientation = .vertical
+        optionContents.alignment = .leading
+        optionContents.spacing = 12
+        let optionPanel = Panel(optionContents, insets: NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12))
+        optionsPanel = optionPanel
+        optionPanel.isHidden = true
+        optionsToggle.target = self
+        optionsToggle.action = #selector(togglePublishingOptions)
+        optionsToggle.controlSize = .small
+        refreshOptionsLabel()
+        let inputColumn = NSStackView(views: [requestHeader, ideaPanel, inputHint,
+                                             mediaLabel, drop, optionsToggle, optionPanel, actions, secondaryActions])
+        inputColumn.orientation = .vertical
+        inputColumn.alignment = .leading
+        inputColumn.spacing = 10
+        let inputSpacer = NSView()
+        inputSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .vertical)
+        inputColumn.addArrangedSubview(inputSpacer)
+        for view in [requestHeader, drop, optionPanel, ideaPanel, inputHint, actions, secondaryActions] {
+            view.widthAnchor.constraint(equalTo: inputColumn.widthAnchor).isActive = true
+        }
+        let finishActions = NSStackView(views: [create, schedule])
+        finishActions.spacing = 10
+        finishActions.alignment = .centerY
+        finishActions.distribution = .fillEqually
+        let planColumn = NSStackView(views: [planHeader, captionToolbar, planPanel, finishActions])
+        planColumn.orientation = .vertical
+        planColumn.alignment = .leading
+        planColumn.spacing = 8
+        for view in [planHeader, captionToolbar, planPanel, finishActions] {
+            view.widthAnchor.constraint(equalTo: planColumn.widthAnchor).isActive = true
+        }
+        let body = NSStackView(views: [inputColumn, planColumn])
+        body.alignment = .top
+        body.spacing = 22
+        inputColumn.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.43, constant: -11).isActive = true
+        planColumn.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.57, constant: -11).isActive = true
+        inputColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        planColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        let main = NSStackView(views: [header, steps, stats, body, footer])
         main.orientation = .vertical
         main.alignment = .leading
         main.spacing = 12
-        main.edgeInsets = NSEdgeInsets(top: 38, left: inset, bottom: 20, right: inset)
-        main.setCustomSpacing(20, after: header)
-        main.setCustomSpacing(22, after: stats)
-        for label in [mediaLabel, ideaLabel] { main.setCustomSpacing(6, after: label) }
-        main.setCustomSpacing(20, after: actions)
-        main.setCustomSpacing(16, after: planPanel)
-        main.setCustomSpacing(6, after: planHeader)
+        main.edgeInsets = NSEdgeInsets(top: 32, left: inset, bottom: 16, right: inset)
         main.translatesAutoresizingMaskIntoConstraints = false
-        for view in [header, stats, drop, ideaPanel, actions, planHeader, planPanel, footer] {
+        for view in [header, steps, stats, body, footer] {
             view.widthAnchor.constraint(equalTo: main.widthAnchor, constant: -2 * inset).isActive = true
         }
-
         root.addSubview(main)
         NSLayoutConstraint.activate([
             main.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -2760,14 +3388,232 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
             main.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
         window.contentView = root
+        updateCoverControls()
     }
 
     func add(_ urls: [URL]) {
         media += urls.filter { !media.contains($0) }
         files.stringValue = media.isEmpty ? t("No files yet", "Sin archivos")
             : "\(media.count) · " + media.map { $0.lastPathComponent }.joined(separator: ", ")
+        draftOptionsChanged()
+    }
+
+    func refreshPlacementLabels() {
+        let selected = max(0, placementMenu.indexOfSelectedItem)
+        placementMenu.removeAllItems()
+        placementMenu.addItems(withTitles: [
+            t("Automatic (posts and stories)", "Automático (publicaciones e historias)"),
+            t("Posts only", "Solo publicaciones"),
+            t("Stories only", "Solo historias"),
+            t("Posts and stories", "Publicaciones e historias"),
+        ])
+        placementMenu.toolTip = t("Automatic follows your instruction and includes both formats where supported.",
+                                  "Automático sigue tu instrucción e incluye ambos formatos donde se admiten.")
+        placementMenu.selectItem(at: selected)
+    }
+
+    @objc func draftOptionsChanged() {
+        savedVersions.removeAll()
+        acceptedNoCover = false
+        invalidateReviewedPlan()
+    }
+
+    func invalidateReviewedPlan() {
+        inputRevision += 1
+        textOnlyNetworks = nil
+        selectedVersion = nil
+        savedVersions.removeAll()
+        captionRange = nil
+        canGenerateVariant = false
+        lastReport = nil
+        reviewedCaption = nil
+        reviewedThreadsCaption = nil
+        reviewedFinalTag = nil
+        reviewedYouTubeTitle = nil
+        reviewedWhen = nil
+        canScheduleSocials = false
         previewed = false
+        preview.bezelColor = .systemBlue
         create.isEnabled = false
+        result.alphaValue = 0.5
+        coverLocked = false
+        updateCoverControls()
+        updateCaptionVersions()
+    }
+
+    func refreshOptionsLabel() {
+        optionsToggle.title = (optionsPanel?.isHidden == false ? "▾ " : "▸ ")
+            + t("Publishing options", "Opciones de publicación")
+    }
+
+    @objc func togglePublishingOptions() {
+        optionsPanel?.isHidden.toggle()
+        refreshOptionsLabel()
+    }
+
+    func updateCoverControls() {
+        let hasVideo = media.contains { ["mp4", "mov", "m4v", "webm", "mkv", "avi", "3gp"].contains($0.pathExtension.lowercased()) }
+        coverRow?.isHidden = !hasVideo
+        if hasVideo && !coverLocked {
+            optionsPanel?.isHidden = false
+        }
+        refreshOptionsLabel()
+        chooseCover.isEnabled = hasVideo && !coverLocked && !working
+        coverSecond.isEnabled = hasVideo && !coverLocked && !working
+        clearCover.isEnabled = !coverLocked && !working
+        clearCover.isHidden = coverLocked || (coverURL == nil && coverSecond.stringValue.isEmpty)
+        changeCover.isHidden = !coverLocked || !coverAvailable
+        changeCover.isEnabled = !working
+    }
+
+    @objc func editCover() {
+        guard !working else { return }
+        if coverLocked {
+            draftOptionsChanged()
+            show(t("Choose a cover, then bake the idea again to review the updated plan.",
+                   "Elige una portada y vuelve a hornear la idea para revisar el plan actualizado."))
+        }
+        window.makeFirstResponder(coverSecond)
+    }
+
+    func confirmPlanWithoutCover(_ output: String) -> Bool {
+        guard !acceptedNoCover,
+              let plan = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any],
+              plan["video_without_cover"] as? Bool == true,
+              let delegate = NSApp.delegate as? AppDelegate else { return true }
+        acceptedNoCover = delegate.ask(
+            t("Continue without a cover?", "¿Continuar sin portada?"),
+            t("You can choose an image or a frame from the video. If you continue, each platform uses its default where applicable.",
+              "Puedes elegir una imagen o un fotograma del video. Si continúas, cada plataforma usará su portada predeterminada cuando corresponda."),
+            safe: t("Choose a cover", "Elegir portada"),
+            risky: t("Continue without cover", "Continuar sin portada"))
+        if !acceptedNoCover {
+            invalidateReviewedPlan()
+            show(t("Choose an image or enter a second from the video, then bake the idea again.",
+                   "Elige una imagen o indica un segundo del video y vuelve a hornear la idea."))
+            editCover()
+        }
+        return acceptedNoCover
+    }
+
+    func updateCaptionVersions() {
+        let visible = previewed && !savedVersions.isEmpty
+        captionVersionLabel.stringValue = visible ? t("\((selectedVersion ?? 0) + 1) of \(savedVersions.count)",
+                                                       "\((selectedVersion ?? 0) + 1) de \(savedVersions.count)") : ""
+        for view in [captionPrevious, captionNext, captionVersionLabel] { view.isHidden = !visible }
+        captionPrevious.isEnabled = previewed && !working && (selectedVersion ?? 0) > 0
+        captionNext.isEnabled = previewed && !working && (selectedVersion ?? -1) < savedVersions.count - 1
+        alternateCaption.isHidden = !canGenerateVariant
+        alternateCaption.isEnabled = !working
+        editCaption.isHidden = !previewed
+        editCaption.isEnabled = !working
+        clearWork.isEnabled = !working
+        schedule.isEnabled = previewed && canScheduleSocials && reviewedWhen != nil && !working
+    }
+
+    @objc func previousCaption() { restoreCaptionVersion(at: (selectedVersion ?? 0) - 1) }
+    @objc func nextCaption() { restoreCaptionVersion(at: (selectedVersion ?? -1) + 1) }
+
+    func restoreCaptionVersion(at index: Int) {
+        guard !working, savedVersions.indices.contains(index) else { return }
+        selectedVersion = index
+        applyCaptionOnly(savedVersions[index].output)
+        updateCaptionVersions()
+    }
+
+    @objc func runAlternateCaption() {
+        guard canGenerateVariant else { return }
+        reviseReviewedCopy()
+    }
+
+    @objc func editReviewedCaption() {
+        guard !working, previewed, let reviewedCaption else { return }
+        let editor = NSTextView(frame: NSRect(x: 0, y: 0, width: 390, height: 145))
+        editor.string = reviewedCaption
+        editor.allowsUndo = true
+        let scrollView = scroll(editor, editable: true)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 390, height: 145)
+        let alert = NSAlert()
+        alert.messageText = t("Edit the caption", "Edita el texto")
+        alert.informativeText = t("Your channels and schedule stay the same.", "Se conservan los canales y la hora del plan.")
+        alert.accessoryView = scrollView
+        alert.addButton(withTitle: t("Apply", "Aplicar"))
+        alert.addButton(withTitle: t("Cancel", "Cancelar"))
+        alert.window.initialFirstResponder = editor
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let edited = editor.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !edited.isEmpty, edited != reviewedCaption else { return }
+        reviseReviewedCopy(edited: edited)
+    }
+
+    func reviseReviewedCopy(edited: String? = nil) {
+        guard !working, previewed, let snapshot = lastReport?.0 else { return }
+        let revision = inputRevision
+        let request = instruction.string
+        var args = [project + "/scripts/plan-post.sh", "--json", "--revise-copy=\(snapshot)"]
+        if let edited { args.append("--edited-caption=\(edited)") }
+        args += ["--", request]
+        working = true
+        updateCaptionVersions()
+        create.isEnabled = false
+        preview.isEnabled = false
+        mixer.start()
+        (NSApp.delegate as? AppDelegate)?.planningWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(args, in: self.project, timeout: 900, quietErrors: true)
+            DispatchQueue.main.async {
+                if let delegate = NSApp.delegate as? AppDelegate {
+                    delegate.planningWork -= 1
+                    delegate.poll()
+                }
+                self.mixer.stop()
+                self.working = false
+                self.preview.isEnabled = true
+                defer { self.updateCaptionVersions() }
+                guard revision == self.inputRevision else { return }
+                if code == 0 {
+                    self.applyCaptionOnly(output)
+                    if self.previewed { self.rememberVersion(request, output: self.lastReport?.0 ?? output) }
+                } else {
+                    self.create.isEnabled = self.previewed
+                    (NSApp.delegate as? AppDelegate)?.alert(
+                        self.t("Couldn’t update the caption", "No se pudo actualizar el texto"),
+                        self.t("Your previous caption is still selected.", "Tu texto anterior sigue seleccionado."))
+                }
+            }
+        }
+    }
+
+    func rememberVersion(_ request: String, output: String) {
+        savedVersions.append((instruction: request, output: output))
+        if savedVersions.count > 8 { savedVersions.removeFirst() }
+        selectedVersion = savedVersions.count - 1
+        updateCaptionVersions()
+    }
+
+    @objc func chooseCoverImage() {
+        guard !working else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        if panel.runModal() == .OK, let url = panel.url {
+            coverURL = url
+            coverSecond.stringValue = ""
+            coverFile.stringValue = url.lastPathComponent
+            draftOptionsChanged()
+        }
+    }
+
+    @objc func clearCoverImage() {
+        coverURL = nil
+        coverSecond.stringValue = ""
+        coverFile.stringValue = ""
+        draftOptionsChanged()
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        coverURL = nil
+        coverFile.stringValue = ""
+        draftOptionsChanged()
     }
 
     @objc func chooseFiles() {
@@ -2777,15 +3623,126 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         if panel.runModal() == .OK { add(panel.urls) }
     }
 
+    func resetComposer() {
+        media.removeAll()
+        instruction.string = ""
+        instruction.undoManager?.removeAllActions()
+        placeholder.isHidden = false
+        coverURL = nil
+        coverFile.stringValue = ""
+        coverSecond.stringValue = ""
+        acceptedNoCover = false
+        pendingStatusID = nil
+        statusApproval.isHidden = true
+        calendar.isHidden = true
+        files.stringValue = t("No files yet", "Sin archivos")
+        invalidateReviewedPlan()
+        result.string = ""
+        emptyState.isHidden = false
+        resizeRequestField()
+    }
+
+    func runCleanup(_ arguments: [String], completion: @escaping (Int32, [String: Any]) -> Void) {
+        working = true
+        preview.isEnabled = false
+        create.isEnabled = false
+        updateCaptionVersions()
+        spinner.startAnimation(nil)
+        (NSApp.delegate as? AppDelegate)?.planningWork += 1
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (code, output) = runCommand(["/usr/bin/python3", self.project + "/scripts/manage_posts.py"] + arguments,
+                                            in: self.project, timeout: 180, quietErrors: true)
+            let json = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any] ?? [:]
+            DispatchQueue.main.async {
+                self.working = false
+                self.preview.isEnabled = true
+                self.create.isEnabled = self.previewed
+                self.spinner.stopAnimation(nil)
+                self.updateCaptionVersions()
+                if let delegate = NSApp.delegate as? AppDelegate {
+                    delegate.planningWork -= 1
+                    delegate.poll()
+                }
+                completion(code, json)
+            }
+        }
+    }
+
+    @objc func clearWorkspace() {
+        guard !working else { return }
+        let options = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 28))
+        options.addItems(withTitles: [
+            t("Clear this composer", "Limpiar este formulario"),
+            t("Delete Postiz drafts and failed posts", "Eliminar borradores y publicaciones fallidas"),
+            t("Cancel queued posts and WhatsApp Status", "Cancelar la cola y los Estados de WhatsApp"),
+            t("Drafts, failed posts and queue", "Borradores, publicaciones fallidas y cola"),
+        ])
+        let alert = NSAlert()
+        alert.messageText = t("What would you like to clear?", "¿Qué quieres limpiar?")
+        alert.informativeText = t("Choose the scope. Stored work is counted before you confirm deletion.",
+                                  "Elige el alcance. Se contarán los elementos guardados antes de confirmar su eliminación.")
+        alert.accessoryView = options
+        alert.addButton(withTitle: t("Continue", "Continuar"))
+        alert.addButton(withTitle: t("Cancel", "Cancelar"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let selection = options.indexOfSelectedItem
+        if selection == 0 { resetComposer(); return }
+        let scope = ["drafts", "queue", "all"][selection - 1]
+        runCleanup(["--scope", scope]) { code, snapshot in
+            guard let delegate = NSApp.delegate as? AppDelegate else { return }
+            guard code == 0, let posts = snapshot["post_count"] as? Int,
+                  let statuses = snapshot["whatsapp_count"] as? Int else {
+                delegate.alert(self.t("Couldn’t read the queue", "No se pudo leer la cola"),
+                               self.t("Try again when Postiz is available.", "Vuelve a intentar cuando Postiz esté disponible."))
+                return
+            }
+            guard posts + statuses > 0 else {
+                delegate.alert(self.t("Nothing to clear", "No hay nada que limpiar"),
+                               self.t("No matching unpublished work was found.", "No se encontraron elementos pendientes con ese alcance."))
+                return
+            }
+            guard delegate.ask(self.t("Clear the selected work?", "¿Eliminar los elementos seleccionados?"),
+                               self.t("\(posts) Postiz entries and \(statuses) WhatsApp plans. Work already being sent may finish. Shared media follows the retention setting.",
+                                      "\(posts) elementos de Postiz y \(statuses) planes de WhatsApp. Un envío que ya empezó podría completarse. Los archivos compartidos siguen la retención configurada."),
+                               safe: self.t("Keep", "Conservar"), risky: self.t("Clear", "Eliminar")) else { return }
+            let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("postforge-cleanup-" + UUID().uuidString + ".json")
+            guard let data = try? JSONSerialization.data(withJSONObject: snapshot),
+                  FileManager.default.createFile(atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+                delegate.alert(self.t("Cleanup couldn’t start", "No se pudo iniciar la limpieza"), "")
+                return
+            }
+            self.runCleanup(["--apply-snapshot", file.path]) { code, outcome in
+                try? FileManager.default.removeItem(at: file)
+                let deleted = outcome["deleted"] as? Int ?? 0
+                let cancelled = outcome["cancelled_whatsapp"] as? Int ?? 0
+                let skipped = outcome["skipped"] as? Int ?? 0
+                if code == 0 { self.resetComposer() }
+                delegate.alert(self.t(code == 0 ? "Cleanup finished" : "Cleanup needs review",
+                                      code == 0 ? "Limpieza terminada" : "Revisa la limpieza"),
+                               self.t("\(deleted) Postiz entries cleared; \(cancelled) WhatsApp plans cancelled. \(skipped) changed entries were kept. Check the calendar before trying again.",
+                                      "Se eliminaron \(deleted) elementos de Postiz y se cancelaron \(cancelled) planes de WhatsApp. Se conservaron \(skipped) elementos que habían cambiado. Revisa el calendario antes de volver a intentar."))
+            }
+        }
+    }
+
     @objc func clearFiles() {
         media = []
+        clearCoverImage()
         add([])
     }
 
     func textDidChange(_ notification: Notification) {
         placeholder.isHidden = !instruction.string.isEmpty
-        previewed = false
-        create.isEnabled = false
+        invalidateReviewedPlan()
+        resizeRequestField()
+    }
+
+    func resizeRequestField() {
+        guard let layout = instruction.layoutManager, let container = instruction.textContainer else { return }
+        layout.ensureLayout(for: container)
+        let needed = ceil(layout.usedRect(for: container).height + 2 * instruction.textContainerInset.height + 6)
+        let height = min(160, max(86, needed))
+        ideaHeight?.constant = height
     }
 
     @objc func startDictation() {
@@ -2801,6 +3758,37 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         delegate.turnOn()
     }
 
+    func confirmTextAnnouncement(_ request: String) -> Bool {
+        let words = request.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_EC"))
+        let all = ["everywhere", "all networks", "all platforms", "todo lado", "todas las redes"].contains { words.contains($0) }
+        let names = [("facebook", "Facebook post", "Publicación de Facebook"),
+                     ("threads", "Threads post", "Publicación de Threads"),
+                     ("whatsapp", "WhatsApp Status", "Estado de WhatsApp")]
+        let choices = names.map { network, english, spanish -> NSButton in
+            let button = NSButton(checkboxWithTitle: t(english, spanish), target: nil, action: nil)
+            button.state = all || words.contains(network) ? .on : .off
+            return button
+        }
+        let stack = NSStackView(views: choices)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 370, height: 90)
+        let alert = NSAlert()
+        alert.messageText = t("Text-only announcement", "Anuncio solo de texto")
+        alert.informativeText = t(
+            "No photo or video is attached. Choose the destinations for this announcement. Facebook and Threads use regular posts. WhatsApp uses Status. Instagram posts and Stories require media.",
+            "No adjuntaste fotos ni videos. Elige los destinos de este anuncio. Facebook y Threads usarán publicaciones. WhatsApp usará un Estado. Las publicaciones e historias de Instagram requieren un archivo.")
+        alert.accessoryView = stack
+        alert.addButton(withTitle: t("Review announcement", "Revisar anuncio"))
+        alert.addButton(withTitle: t("Add media or cancel", "Adjuntar archivos o cancelar"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return false }
+        let selected = zip(names, choices).filter { $0.1.state == .on }.map { $0.0.0 }
+        guard !selected.isEmpty else { return false }
+        textOnlyNetworks = selected
+        return true
+    }
+
     @objc func runPreview() { run(dryRun: true) }
     @objc func runCreate() {
         guard previewed else {
@@ -2810,8 +3798,24 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         run(dryRun: false)
     }
 
+    @objc func scheduleReviewedPlan() {
+        guard previewed, canScheduleSocials, let when = reviewedWhen,
+              let delegate = NSApp.delegate as? AppDelegate else { return }
+        let time = shortDate(iso: when)
+        guard delegate.ask(t("Schedule these posts?", "¿Programar estas publicaciones?"),
+                           t("Social posts will publish automatically at \(time). WhatsApp Status still needs its own approval.",
+                             "Las publicaciones de redes saldrán automáticamente a las \(time). El Estado de WhatsApp requiere su propia aprobación."),
+                           safe: t("Cancel", "Cancelar"), risky: t("Schedule Posts", "Programar publicaciones")) else { return }
+        run(dryRun: false, scheduleDirectly: true)
+    }
+
     @objc func openWhatsAppFromWindow() { (NSApp.delegate as? AppDelegate)?.reviewWhatsAppPlans() }
     @objc func openBackupFromWindow() { (NSApp.delegate as? AppDelegate)?.openBackupWindow() }
+
+    @objc func approveStatusFromPlan() {
+        guard let id = pendingStatusID, let delegate = NSApp.delegate as? AppDelegate else { return }
+        delegate.approveStatus(id) { self.statusApproval.isHidden = true }
+    }
 
     @objc func openCalendar() {
         if let url = reviewURL { NSWorkspace.shared.open(url) }
@@ -2824,7 +3828,8 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         emptyState.isHidden = !text.isEmpty
     }
 
-    func run(dryRun: Bool) {
+    func run(dryRun: Bool, scheduleDirectly: Bool = false) {
+        guard !working else { return }
         if (NSApp.delegate as? AppDelegate)?.state?.state == "off" {
             show(t("Turn on PostForge to prepare a plan.", "Enciende PostForge para preparar un plan."))
             return
@@ -2834,71 +3839,250 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         }
         let text = instruction.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return show("Say where, when, and your idea first.") }
-        var args = [project + "/scripts/plan-post.sh", "--json"]
-        if dryRun { args.append("--dry-run") }
+        if dryRun && media.isEmpty && textOnlyNetworks == nil && !confirmTextAnnouncement(text) { return }
+        let revision = inputRevision
+        var args = [project + "/scripts/plan-post.sh", "--json", "--ui-lang", t("English", "Spanish")]
+        switch placementMenu.indexOfSelectedItem {
+        case 1: args += ["--placement", "feed"]
+        case 2: args += ["--placement", "story"]
+        case 3: args += ["--placement", "both"]
+        default: break
+        }
+        if let textOnlyNetworks { args += ["--text-networks", textOnlyNetworks.joined(separator: ",")] }
+        if let url = coverURL { args += ["--cover-image", url.path] }
+        let second = coverSecond.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !second.isEmpty { args += ["--cover-second=\(second)"] }
+        if dryRun {
+            savedVersions.removeAll()
+            selectedVersion = nil
+            captionRange = nil
+            args.append("--dry-run")
+        } else if let reviewedCaption {
+            args.append("--reviewed-caption=\(reviewedCaption)")
+            if let reviewedThreadsCaption { args.append("--reviewed-threads-caption=\(reviewedThreadsCaption)") }
+            if let reviewedFinalTag { args.append("--final-tag=\(reviewedFinalTag)") }
+            if let reviewedYouTubeTitle { args.append("--reviewed-youtube-title=\(reviewedYouTubeTitle)") }
+            if let reviewedWhen { args.append("--reviewed-when=\(reviewedWhen)") }
+            if let snapshot = lastReport?.0,
+               let json = (try? JSONSerialization.jsonObject(with: Data(snapshot.utf8))) as? [String: Any],
+               let targets = json["targets"] as? [[String: Any]] {
+                let identifiers = Set(targets.compactMap { $0["integration_id"] as? String })
+                args.append("--reviewed-integrations=" + identifiers.sorted().joined(separator: ","))
+            }
+            if scheduleDirectly { args.append("--schedule") }
+        }
         for url in media { args += ["--media", url.path] }
         args.append(text)
+        working = true
+        updateCoverControls()
+        updateCaptionVersions()
         preview.isEnabled = false
         create.isEnabled = false
-        if dryRun { previewed = false }
-        spinner.startAnimation(nil)
+        previewed = false
+        if dryRun { mixer.start() } else { spinner.startAnimation(nil) }
         (NSApp.delegate as? AppDelegate)?.planningWork += 1
         show(dryRun ? t("Reading your plan and writing the caption…", "Leyendo tu plan y redactando el texto…") : t("Creating drafts…", "Creando borradores…"))
         DispatchQueue.global(qos: .userInitiated).async {
             let (code, output) = runCommand(args, in: self.project, timeout: 900, quietErrors: true)
             DispatchQueue.main.async {
                 self.spinner.stopAnimation(nil)
+                self.mixer.stop()
                 if let delegate = NSApp.delegate as? AppDelegate {
                     delegate.planningWork -= 1
                     delegate.poll()
                 }
+                self.working = false
+                self.updateCoverControls()
+                self.updateCaptionVersions()
                 self.preview.isEnabled = true
-                self.create.isEnabled = true
+                if dryRun && revision != self.inputRevision {
+                    self.invalidateReviewedPlan()
+                    self.show(self.t("The draft options changed. Bake the idea again to review them.",
+                                     "Cambiaste las opciones del borrador. Vuelve a hornear la idea para revisarlas."))
+                    return
+                }
+                if dryRun && code == 0 && !self.confirmPlanWithoutCover(output) { return }
                 self.report(output, dryRun: dryRun, exitCode: code)
+                if dryRun && self.previewed {
+                    self.rememberVersion(text, output: output)
+                } else if !dryRun && code == 0 {
+                    self.savedVersions.removeAll()
+                    self.selectedVersion = nil
+                }
+                self.updateCaptionVersions()
             }
+        }
+    }
+
+    func captionContent(_ json: [String: Any]) -> NSAttributedString {
+        let document = NSMutableAttributedString(string: "")
+        func line(_ value: String, heading: Bool = false, secondary: Bool = false) {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacing = 6
+            style.paragraphSpacingBefore = heading ? 9 : 0
+            style.lineSpacing = 2
+            document.append(NSAttributedString(string: value + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: secondary ? 11 : 13, weight: heading ? .semibold : .regular),
+                .foregroundColor: secondary ? NSColor.secondaryLabelColor : NSColor.labelColor,
+                .paragraphStyle: style,
+            ]))
+        }
+        if let text = json["caption"] as? String {
+            line(t("✍️  Caption", "✍️  Texto"), heading: true)
+            let source = json["caption_source"] as? String ?? ""
+            line(source == "your text" ? t("Your exact words", "Tus palabras exactas")
+                 : source.hasPrefix("written by ") ? t("Written from your idea", "Redactado a partir de tu idea")
+                 : t("Your selected caption", "El texto que elegiste"), secondary: true)
+            line(text)
+        }
+        if let title = json["youtube_title"] as? String {
+            line(t("▶  YouTube title", "▶  Título de YouTube"), heading: true)
+            line(title)
+        }
+        if let text = json["threads_caption"] as? String {
+            line(t("✍️  Threads caption", "✍️  Texto para Threads"), heading: true)
+            line(text)
+        }
+        return document
+    }
+
+    func applyCaptionOnly(_ output: String) {
+        guard let range = captionRange, let storage = result.textStorage,
+              NSMaxRange(range) <= storage.length,
+              let previous = lastReport,
+              var current = (try? JSONSerialization.jsonObject(with: Data(previous.0.utf8))) as? [String: Any],
+              let revised = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any],
+              revised["caption"] is String else { return }
+        for key in ["caption", "caption_source", "threads_caption", "youtube_title"] {
+            current[key] = revised[key]
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: current),
+              let snapshot = String(data: data, encoding: .utf8) else { return }
+        let position = result.enclosingScrollView?.contentView.bounds.origin
+        let copy = captionContent(current)
+        storage.replaceCharacters(in: range, with: copy)
+        captionRange = NSRange(location: range.location, length: copy.length)
+        reviewedCaption = current["caption"] as? String
+        reviewedThreadsCaption = current["threads_caption"] as? String
+        reviewedYouTubeTitle = current["youtube_title"] as? String
+        lastReport = (snapshot, previous.1, previous.2)
+        create.isEnabled = previewed && !working
+        if let position, let scroll = result.enclosingScrollView {
+            scroll.contentView.scroll(to: position)
+            scroll.reflectScrolledClipView(scroll.contentView)
         }
     }
 
     func report(_ output: String, dryRun: Bool, exitCode: Int32) {
         lastReport = (output, dryRun, exitCode)
+        canGenerateVariant = false
+        defer {
+            updateCaptionVersions()
+            updateCoverControls()
+        }
         guard let json = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any] else {
             return show("✖ \(dryRun ? t("Preview", "Vista previa") : t("Draft creation", "Creación de borradores")) \(t("failed", "falló")) (\(exitCode)).\n"
                         + String(output.suffix(800)))
         }
         if let error = json["error"] as? String {
             return show("✖ \(dryRun ? t("Preview", "Vista previa") : t("Draft creation", "Creación de borradores")) \(t("failed", "falló")):\n" + error
-                        + t("\n\nNothing was created. Correct the request or retry.", "\n\nNo se creó nada. Corrige la solicitud o vuelve a intentar."))
+                        + (dryRun ? "" : t("\n\nCheck the Postiz calendar before retrying.", "\n\nRevisa el calendario de Postiz antes de volver a intentar.")))
         }
         let names = ["instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
                      "threads": "Threads", "whatsapp": "WhatsApp Status"]
-        var lines = [(dryRun ? t("Plan (nothing created yet) for ", "Plan (aún no se ha creado nada) para ") : t("Drafts created for ", "Borradores creados para "))
-                     + ((json["when_utc"] as? String).map { shortDate(iso: $0) } ?? (json["when_local"] as? String ?? "")) + t(" (local time)", " (hora local)")]
+        let document = NSMutableAttributedString(string: "")
+        func line(_ value: String, size: CGFloat = 13, weight: NSFont.Weight = .regular,
+                  color: NSColor = .labelColor, before: CGFloat = 0) {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacingBefore = before
+            style.paragraphSpacing = 5
+            style.lineSpacing = 2
+            document.append(NSAttributedString(string: value + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: size, weight: weight),
+                .foregroundColor: color, .paragraphStyle: style,
+            ]))
+        }
+        let scheduled = (json["when_utc"] as? String).map { shortDate(iso: $0) }
+            ?? (json["when_local"] as? String ?? "")
+        let scheduledDirectly = json["scheduled"] as? Bool == true
+        let readyTitle = scheduledDirectly ? t("✓  Posts scheduled", "✓  Publicaciones programadas")
+            : t("✓  Drafts prepared", "✓  Borradores preparados")
+        line(dryRun ? t("🗓  Plan ready to review", "🗓  Plan listo para revisar") : readyTitle,
+             size: 18, weight: .bold)
+        line(scheduled + t(" · local time", " · hora local"), weight: .medium, color: .secondaryLabelColor)
+        line(t("📍  Destinations", "📍  Destinos"), weight: .semibold, before: 9)
         for target in json["targets"] as? [[String: Any]] ?? [] {
             let network = target["network"] as? String ?? ""
             let short = network == "youtube" && (json["short"] as? Bool ?? false) ? " (Short)" : ""
-            lines.append("  • \(names[network] ?? network): \(target["channel"] as? String ?? "")\(short)")
+            let placementLabels = ["feed": t("Post", "Publicación"), "story": t("Story", "Historia"),
+                                   "status": t("Status", "Estado")]
+            let label = placementLabels[target["placement"] as? String ?? ""].map { " · " + $0 } ?? ""
+            let cover: String
+            if let seconds = target["cover_second"] as? Double {
+                let timestamp = seconds.formatted(.number.locale(Locale(identifier: t("en_US", "es_EC"))))
+                cover = t(" · Cover at \(timestamp) s", " · Portada en el segundo \(timestamp)")
+            } else if target["cover"] as? String == "image" {
+                cover = t(" · Cover image", " · Imagen de portada")
+            } else { cover = "" }
+            let channel = network == "whatsapp" ? t("WhatsApp Status", "Estado de WhatsApp") : target["channel"] as? String ?? ""
+            line(network == "whatsapp" ? channel : "\(names[network] ?? network) · \(channel)\(short)\(label)\(cover)")
         }
-        if let caption = json["caption"] as? String {
-            var source = json["caption_source"] as? String ?? ""
-            if source == "your text" { source = t("your text", "tu texto") }
-            else if source.hasPrefix("written by ") && source.hasSuffix(" from your idea") {
-                let model = String(source.dropFirst("written by ".count).dropLast(" from your idea".count))
-                source = t("written by \(model) from your idea", "redactado por \(model) a partir de tu idea")
-            }
-            lines.append("\n\(t("Caption", "Texto")) (\(source)):\n\(caption)")
+        let copy = captionContent(json)
+        captionRange = NSRange(location: document.length, length: copy.length)
+        document.append(copy)
+        let notes = json["notes"] as? [String] ?? []
+        let warnings = json["warnings"] as? [String] ?? []
+        if !notes.isEmpty || !warnings.isEmpty {
+            line(t("⚠️  Things to check", "⚠️  Por revisar"), weight: .semibold, before: 9)
+            for note in notes { line(note, color: .secondaryLabelColor) }
+            for warning in warnings { line(warning, color: .systemOrange) }
         }
-        for note in json["notes"] as? [String] ?? [] { lines.append(t("· assumed: ", "· se asumió: ") + note) }
-        for warning in json["warnings"] as? [String] ?? [] { lines.append("⚠ " + warning) }
         if !dryRun {
-            lines.append(t("\nNothing is published yet: review, edit and approve them on the Postiz calendar.", "\nAún no se ha publicado nada: revisa, edita y aprueba los borradores en el calendario de Postiz."))
+            line(scheduledDirectly ? t("Check scheduled posts in the Postiz calendar.", "Revisa las publicaciones programadas en el calendario de Postiz.")
+                 : t("Review and approve social drafts in the Postiz calendar.", "Revisa y aprueba los borradores en el calendario de Postiz."),
+                 weight: .medium, color: .secondaryLabelColor, before: 9)
             reviewURL = (json["review_url"] as? String).flatMap(URL.init(string:))
             calendar.isHidden = reviewURL == nil
+            pendingStatusID = json["whatsapp_pending_id"] as? String
+            if let id = pendingStatusID,
+               let delegate = NSApp.delegate as? AppDelegate,
+               delegate.pendingStatusApprovals().contains(where: { $0["id"] as? String == id }) {
+                statusApproval.isHidden = false
+                line(t("WhatsApp Status needs separate approval. Use Approve Status above.",
+                       "El Estado de WhatsApp necesita su propia aprobación. Pulsa Aprobar Estado arriba."),
+                     weight: .semibold, color: .systemOrange, before: 6)
+            } else { statusApproval.isHidden = true }
         } else {
-            previewed = true
-            create.isEnabled = true
-            lines.append(t("\nPlan verified. Click Create Drafts to continue, or edit and bake the idea again.", "\nPlan verificado. Haz clic en Crear borradores para continuar, o edita y vuelve a hornear la idea."))
+            statusApproval.isHidden = true
+            reviewedCaption = json["caption"] as? String
+            canGenerateVariant = json["can_rewrite"] as? Bool
+                ?? ((json["caption_source"] as? String)?.hasPrefix("written by ") == true)
+            reviewedThreadsCaption = json["threads_caption"] as? String
+            reviewedFinalTag = json["final_tag"] as? String
+            reviewedYouTubeTitle = json["youtube_title"] as? String
+            reviewedWhen = json["when_utc"] as? String
+            canScheduleSocials = json["direct_schedule_available"] as? Bool == true
+            let gated = json["direct_schedule_blocked_by_gateway"] as? Bool == true
+            schedule.toolTip = gated ? t("Direct scheduling of media is paused while gateway delivery is being fixed.",
+                                         "La programación directa de archivos está pausada mientras se corrige la entrega por el acceso seguro.") : nil
+            if gated {
+                line(t("Direct scheduling is unavailable for this media through the secure gateway.",
+                       "Este archivo todavía no se puede programar directamente a través del acceso seguro."),
+                     weight: .medium, color: .systemOrange, before: 6)
+            }
+            previewed = reviewedCaption != nil
+            coverLocked = previewed
+            coverAvailable = json["video_cover_available"] as? Bool == true
+            preview.bezelColor = .systemBlue
+            create.isEnabled = previewed
+            line(t("Create drafts when you’re ready to continue.", "Cuando esté todo listo, pulsa Crear borradores."),
+                 weight: .medium, color: .secondaryLabelColor, before: 9)
         }
-        show(lines.joined(separator: "\n"))
+        result.alphaValue = 1
+        result.textStorage?.setAttributedString(document)
+        result.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        emptyState.isHidden = true
+        resizeRequestField()
     }
 }
 
@@ -3129,8 +4313,8 @@ final class BackupWindow: NSObject {
         exportActions.spacing = 10
         exportActions.alignment = .centerY
         let exportBody = panelStack([
-            windowLabel(t("Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.",
-                          "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales."),
+            windowLabel(t("Saves encrypted credentials, gateway access settings if configured, and a verified Postiz export. Keep the folder private because the Postiz archive contains channel tokens.",
+                          "Guarda tus credenciales cifradas, los ajustes de acceso seguro si están configurados y un respaldo verificado de Postiz. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales."),
                         size: 12, color: .secondaryLabelColor, lines: 4),
             exportRow, exportPass, exportPass2,
             windowLabel(t("You will need this passphrase to restore. It can't be recovered if you forget it.",
@@ -3232,11 +4416,11 @@ final class BackupWindow: NSObject {
         let parts = line.dropFirst(5).split(separator: " ", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return nil }
         let translations = [
-            "Encrypting credentials": "Cifrando credenciales",
+            "Encrypting credentials and gateway settings": "Cifrando credenciales y ajustes de acceso",
             "Exporting Postiz data": "Exportando datos de Postiz",
             "Verifying backup": "Verificando el respaldo",
-            "Validating credentials": "Validando credenciales",
-            "Restoring Postiz data": "Restaurando datos de Postiz",
+            "Validating backup credentials": "Validando las credenciales del respaldo",
+            "Restoring Postiz and gateway data": "Restaurando datos de Postiz y del acceso seguro",
             "Finishing": "Finalizando",
         ]
         let label = t(parts[1], translations[parts[1]] ?? parts[1])
@@ -3303,8 +4487,8 @@ final class BackupWindow: NSObject {
             return setStatus(restoreStatus, t("Enter the backup's passphrase.", "Escribe la contraseña del respaldo."), error: true)
         }
         guard delegate.ask(t("Replace this Mac's PostForge data?", "¿Reemplazar los datos de PostForge de este Mac?"),
-                           t("Restoring replaces your current credentials, Postiz posts, channels and media with the ones in the backup. PostForge will stop while it restores.",
-                             "Restaurar reemplaza tus credenciales, publicaciones, canales y archivos actuales por los del respaldo. PostForge se detendrá mientras restaura."),
+                           t("Restoring replaces your credentials, Postiz data and any gateway settings included in the backup. PostForge will stop during the restore.",
+                             "La restauración reemplaza tus credenciales, los datos de Postiz y los ajustes de acceso seguro que estén en el respaldo. PostForge se detendrá durante el proceso."),
                            safe: t("Cancel", "Cancelar"), risky: t("Replace and Restore", "Reemplazar y restaurar")) else { return }
         restoreButton.isEnabled = false
         restoreSpinner.startAnimation(nil)
@@ -3703,8 +4887,20 @@ let uiSpanish: [String: String] = [
     "Couldn't save your caption.": "No se pudo guardar tu texto.",
     "Couldn't send the approval": "No se pudo enviar la aprobación",
     "Couldn't send the approval.": "No se pudo enviar la aprobación.",
+    "Approve Status…": "Aprobar Estado…",
+    "Final hashtag…": "Etiqueta final…",
+    "Connections": "Conexiones",
+    "Edit Caption…": "Editar texto…",
+    "Schedule Directly…": "Programar directamente…",
+    "Bake idea (⌘↵)": "Hornea la idea (⌘↵)",
+    "Create drafts for": "Crear borradores de",
+    "Video cover": "Portada del video",
+    "Choose image…": "Elegir imagen…",
+    "Edit cover…": "Editar portada…",
+    "Second": "Segundo",
+    "Enter a second in the video, such as 12.5.": "Ingresa un segundo del video, por ejemplo 12,5.",
     "Create Drafts": "Crear borradores",
-    "Saves encrypted credentials and a verified Postiz export with posts, channels and media. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas y un respaldo verificado de Postiz con publicaciones, canales y archivos. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
+    "Saves encrypted credentials, gateway access settings if configured, and a verified Postiz export. Keep the folder private because the Postiz archive contains channel tokens.": "Guarda tus credenciales cifradas, los ajustes de acceso seguro si están configurados y un respaldo verificado de Postiz. Mantén la carpeta en privado porque el respaldo de Postiz contiene tokens de tus canales.",
     "Cut": "Cortar",
     "Default: 30 days. This sets the cleanup age for logs and unused uploaded media. Cleanup requires a separate review and apply command; changing this value deletes nothing. Scheduled posts and the database are preserved.": "Por defecto: 30 días. Define la antigüedad para limpiar registros y archivos subidos que ya no se usan. Debes revisar y ejecutar la limpieza por separado; cambiar este valor no borra nada. Se conservan la base de datos y las publicaciones programadas.",
     "Dictate": "Dictar",
@@ -3816,7 +5012,7 @@ let uiSpanish: [String: String] = [
     "Restore a backup": "Restaurar un respaldo",
     "Restored.": "Restaurado.",
     "Restore…": "Restaurar…",
-    "Restoring replaces your current credentials, Postiz posts, channels and media with the ones in the backup. PostForge will stop while it restores.": "Restaurar reemplaza tus credenciales, publicaciones, canales y archivos actuales por los del respaldo. PostForge se detendrá mientras restaura.",
+    "Restoring replaces your credentials, Postiz data and any gateway settings included in the backup. PostForge will stop during the restore.": "La restauración reemplaza tus credenciales, los datos de Postiz y los ajustes de acceso seguro que estén en el respaldo. PostForge se detendrá durante el proceso.",
     "Running": "En marcha",
     "Save": "Guardar",
     "Save to": "Guardar en",
@@ -3885,12 +5081,29 @@ let uiSpanish: [String: String] = [
     "WhatsApp disconnected": "WhatsApp se desconectó",
     "When": "Cuándo",
     "Where": "Dónde",
-    "Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm: fresh sourdough”": "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm: pan de masa madre”",
+    "Where, when and your idea. e.g. “Instagram and TikTok tomorrow at 6pm; idea: our new launch”": "Dónde, cuándo y tu idea. Ej.: “Instagram y TikTok mañana a las 6pm; idea: nuestro lanzamiento”",
     "Window": "Ventana",
     "Working…": "Procesando…",
     "You can finish by deleting ~/postforge by hand.": "Puedes terminar borrando ~/postforge a mano.",
     "You will need this passphrase to restore. It can't be recovered if you forget it.": "Necesitarás esta contraseña para restaurar. No se puede recuperar si la olvidas.",
     "Your idea": "Tu idea",
+    "Your request": "Tu pedido",
+    "Another Caption…": "Otra versión del texto…",
+    "Media · optional": "Archivos · opcional",
+    "Review and finish": "Revisa y termina",
+    "Configure…": "Configurar…",
+    "Formats": "Formatos",
+    "Final hashtag": "Etiqueta final",
+    "Try Another Caption": "Probar otro texto",
+    "Previous caption": "Texto anterior",
+    "Next caption": "Texto siguiente",
+    "Clear…": "Limpiar…",
+    "Written from your idea": "Redactado a partir de tu idea",
+    "Your exact words": "Tus palabras exactas",
+    "Your selected caption": "El texto que elegiste",
+    "idea: a brief to write from · caption: your exact words. Quoted text stays as written.": "idea: un tema para redactar · texto: tus palabras exactas. Lo que va entre comillas se conserva.",
+
+    "Use ‘idea:’ to generate a caption or ‘caption:’ to use your exact words.": "Usa «idea:» para redactar un texto o «texto:» para usar tus palabras tal cual.",
     "Your plan appears here": "Tu plan aparecerá aquí",
     "• The PostForge app and its project folder\n• Your credentials (.env) and settings\n• Every Postiz post, draft, channel and uploaded file\n• The WhatsApp session and all logs\n• The PostForge Docker containers and installer files\n": "• La app PostForge y su carpeta de proyecto\n• Tus credenciales (.env) y ajustes\n• Todas las publicaciones, borradores, canales y archivos de Postiz\n• La sesión de WhatsApp y todos los registros\n• Los contenedores de Docker y los archivos de instalación de PostForge\n",
     "⚠︎ NO BACKUP WAS EXPORTED. If you continue, everything above is lost and cannot be recovered.": "⚠︎ NO SE EXPORTÓ NINGÚN RESPALDO. Si continúas, todo lo anterior se pierde y no se puede recuperar.",
@@ -3940,7 +5153,15 @@ if CommandLine.arguments.contains("--verify-ui") {
         precondition(trayMenu.items.dropLast().last?.title == about)
         precondition(trayMenu.items.last?.action == #selector(AppDelegate.quitApp))
         precondition(trayMenu.items.first(where: { $0.title == updates })?.action == #selector(AppDelegate.checkUpdatesFromMenu))
+        let draftOptions = trayMenu.items.first {
+            $0.title == (language == "es" ? "Opciones de borrador" : "Draft Options")
+        }?.submenu
+        precondition(draftOptions?.items.filter { $0.action == #selector(AppDelegate.openDraftOption(_:)) }.map(\.tag) == [1, 2, 3, 4, 5])
         let settings = trayMenu.items.compactMap(\.submenu).last!
+        let reviewTitle = language == "es" ? "Planes y confirmaciones de WhatsApp…" : "WhatsApp Plans & Receipts…"
+        let review = trayMenu.items.first { $0.title == reviewTitle }
+        precondition(review?.action == #selector(AppDelegate.reviewWhatsAppPlans) && review?.isEnabled == true)
+        precondition(settings.items.allSatisfy { $0.action != #selector(AppDelegate.reviewWhatsAppPlans) })
         precondition(settings.items.allSatisfy { $0.title != updates && $0.title != about })
     }
 
@@ -3971,6 +5192,90 @@ if CommandLine.arguments.contains("--verify-ui") {
     defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
     delegate.refreshLocalizedWindows()
     precondition(delegate.newPost!.preview.title == "👨‍🍳 Bake idea")
+    delegate.newPost!.placementMenu.selectItem(at: 2)
+    defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Solo historias")
+    defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(delegate.newPost!.placementMenu.titleOfSelectedItem == "Stories only")
+    delegate.newPost!.placementMenu.selectItem(at: 0)
+    let composer = delegate.newPost!
+    let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
+    composer.window.contentView!.layoutSubtreeIfNeeded()
+    let composerBody = composerStack.arrangedSubviews[3] as! NSStackView
+    let reviewColumn = composerBody.arrangedSubviews[1]
+    precondition(abs(reviewColumn.frame.maxX - composerBody.bounds.maxX) < 2, "Review column must fill the remaining width")
+    let overview = composerStack.arrangedSubviews[2] as! NSStackView
+    precondition(overview.arrangedSubviews.allSatisfy { $0.frame.height >= 70 }, "Overview cards must fit title and count")
+    let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
+    precondition(steps.stringValue.hasPrefix("1. Compose"))
+    precondition(composer.connectionsButton.title == "Connections")
+    precondition(composer.connectionsButton.action == #selector(NewPostWindow.showConnections))
+    let connectionFixture = #"{"state":"on","docker":true,"services":{"postiz":true,"evolution":true,"scheduler":true,"tunnel":true},"pending":{"total":0,"scheduled":0,"overdue":0,"jobs":[],"fromCache":false},"scheduled":[],"channels":[{"provider":"facebook","network":"Facebook Page","channel":"Example","renews":false,"expires":"2099-12-30T20:02:10Z"}],"channelsFromCache":false,"postizUrl":"https://example.org"}"#
+    composer.refreshState(try! JSONDecoder().decode(MachineState.self, from: Data(connectionFixture.utf8)))
+    composer.updateConnectionsPopover()
+    let popoverRoot = composer.connectionsPopover.contentViewController!.view
+    popoverRoot.layoutSubtreeIfNeeded()
+    let connectionStack = popoverRoot.subviews[0] as! NSStackView
+    precondition(connectionStack.frame.minX == 24 && popoverRoot.frame.width - connectionStack.frame.maxX == 24)
+    let networkRow = connectionStack.arrangedSubviews[1] as! NSStackView
+    let nameLabel = networkRow.arrangedSubviews[0] as! NSTextField
+    let detailLabel = networkRow.arrangedSubviews[1] as! NSTextField
+    precondition(nameLabel.stringValue == "Facebook Page" && detailLabel.stringValue.contains("Estimated expiry"))
+    precondition([nameLabel, detailLabel].allSatisfy { $0.alignment == .center && !$0.isSelectable && !$0.isEditable })
+    precondition(NSFontManager.shared.traits(of: nameLabel.font!).contains(.boldFontMask))
+    let serviceHeader = composerStack.arrangedSubviews[0] as! NSStackView
+    let serviceControls = serviceHeader.arrangedSubviews.last as! NSStackView
+    precondition(serviceControls.arrangedSubviews.contains { $0 === composer.connectionsButton })
+    let stepStyle = steps.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+    precondition(stepStyle?.alignment == .center)
+    defaults.setVolatileDomain(["uiLanguage": "es"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    precondition(steps.stringValue.hasPrefix("1. Redacta"))
+    precondition(composer.connectionsButton.title == "Conexiones")
+    defaults.setVolatileDomain(["uiLanguage": "en"], forName: UserDefaults.argumentDomain)
+    delegate.refreshLocalizedWindows()
+    steps.startSweep(in: composer.window)
+    precondition(steps.isAnimating != NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    steps.stopSweep()
+    precondition(!steps.isAnimating)
+    precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
+    precondition(composer.instruction.allowsUndo)
+    precondition(composer.preview.keyEquivalent == "\r" && composer.preview.keyEquivalentModifierMask == .command)
+    precondition(!composer.schedule.isEnabled)
+    composer.media = [URL(fileURLWithPath: "/tmp/synthetic-ui-video.mp4")]
+    let planFixture = #"{"when_local":"19:15","targets":[{"network":"instagram","channel":"Sample","placement":"story"}],"caption":"Sample caption","video_cover_available":true,"warnings":["Sample warning"]}"#
+    composer.report(planFixture, dryRun: true, exitCode: 0)
+    precondition(composer.result.string.contains("Plan ready to review"))
+    precondition(composer.result.string.contains("Destinations"))
+    precondition(composer.result.string.contains("Things to check"))
+    precondition(composer.window.frame.width > composer.window.frame.height)
+    precondition(composer.create.controlSize == .large && composer.create.bezelColor == .systemBlue)
+    let rangeBefore = composer.captionRange!
+    let planPrefix = (composer.result.string as NSString).substring(to: rangeBefore.location)
+    let planSuffix = (composer.result.string as NSString).substring(from: NSMaxRange(rangeBefore))
+    let changedCopy = #"{"when_local":"wrong time","caption":"Revised caption ✨","caption_source":"written by hidden-model from your idea","targets":[]}"#
+    composer.applyCaptionOnly(changedCopy)
+    let rangeAfter = composer.captionRange!
+    precondition((composer.result.string as NSString).substring(to: rangeAfter.location) == planPrefix)
+    precondition((composer.result.string as NSString).substring(from: NSMaxRange(rangeAfter)) == planSuffix)
+    precondition(composer.result.string.contains("Revised caption ✨") && !composer.result.string.contains("hidden-model"))
+    precondition((composer.ideaHeight?.constant ?? 0) >= 64 && composer.create.isEnabled)
+    precondition(!composer.chooseCover.isEnabled && !composer.coverSecond.isEnabled && !composer.changeCover.isHidden)
+    composer.editCover()
+    precondition(composer.chooseCover.isEnabled && composer.coverSecond.isEnabled && !composer.create.isEnabled)
+    let variant = #"{"when_local":"19:15","caption":"Earlier version","caption_source":"written by test from your idea"}"#
+    composer.report(variant, dryRun: true, exitCode: 0)
+    composer.savedVersions = [(instruction: "Earlier idea", output: variant)]
+    composer.updateCaptionVersions()
+    let requestBeforeVersion = composer.instruction.string
+    composer.restoreCaptionVersion(at: 0)
+    precondition(composer.instruction.string == requestBeforeVersion)
+    precondition(composer.reviewedCaption == "Earlier version" && !composer.alternateCaption.isHidden)
+    composer.draftOptionsChanged()
+    precondition(composer.captionVersionLabel.isHidden)
+    precondition(composer.preview.bezelColor == .systemBlue && !composer.create.isEnabled)
     delegate.application(app, open: [URL(string: "postforge://new-post")!])
     precondition(delegate.newPost!.window.isVisible)
     delegate.newPost!.window.orderOut(nil)
@@ -4015,6 +5320,8 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.windowWork = 2
     precondition(NSApp.dockTile.badgeLabel == "2")
     precondition(delegate.statusItem.button?.title == " 2 •")
+    precondition(delegate.statusItem.button?.image?.size.height == 18)
+    precondition(delegate.statusItem.button?.imageScaling == .scaleNone)
     delegate.windowWork = 0
     precondition(NSApp.dockTile.badgeLabel == nil)
 

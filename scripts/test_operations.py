@@ -41,17 +41,394 @@ import pmlib
 import machine_state
 credentials = module("credentials", "credentials.py")
 tunnel = module("tunnel_url", "tunnel_url.py")
+manage_posts = module("manage_posts", "manage_posts.py")
 
 
 class Operations(unittest.TestCase):
+    def test_quoted_idea_is_exact_and_schedule_ignores_caption_dates(self):
+        words = 'WhatsApp today at 8:36 pm; idea: "Open on Saturday at 9am. See you! 🎉"'
+        command, exact, idea = plan_post.split_instruction(words)
+        self.assertEqual(exact, "Open on Saturday at 9am. See you! 🎉")
+        self.assertIsNone(idea)
+        now = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
+        when, notes = plan_post.parse_when(command, now)
+        self.assertEqual((when.day, when.hour, when.minute), (7, 20, 36))
+        command, exact, idea = plan_post.split_instruction("idea: a project update; post everywhere tomorrow at 7pm")
+        self.assertEqual(idea, "a project update")
+        self.assertEqual(plan_post.parse_when(command, now)[0].hour, 19)
+        self.assertEqual(plan_post.parse_when("2026-11-09 at 18:30", now)[0].day, 9)
+        self.assertIsNone(plan_post.parse_when("2026-02-31 at 18:30", now)[0])
+        self.assertEqual(plan_post.parse_when("mañana a las 8:36 p. m.", now)[0].hour, 20)
+        self.assertIsNone(plan_post.parse_when("tomorrow at 25:00", now)[0])
+        self.assertIsNone(plan_post.parse_when("tomorrow at 13 pm", now)[0])
+        command, exact, idea = plan_post.split_instruction('caption: "Offers tomorrow at 9am"; post everywhere today at 7pm')
+        self.assertEqual(exact, "Offers tomorrow at 9am")
+        self.assertEqual(plan_post.parse_when(command, now)[0].hour, 19)
+
+    def test_cleanup_skips_changed_posts_and_inflight_whatsapp(self):
+        from unittest.mock import Mock
+        client = Mock(org_id="synthetic-org")
+        group = {"group": "g", "posts": [{"id": "a", "state": "DRAFT"}]}
+        reviewed = {"organization": "synthetic-org", "scope": "all", "groups": [group],
+                    "whatsapp": [{"id": "w", "status": "pending"}]}
+        changed = {"groups": [], "whatsapp": []}
+        with patch.object(manage_posts, "snapshot", return_value=changed), \
+             patch.object(manage_posts.whatsapp_pending, "_queue_lock"), \
+             patch.object(manage_posts.whatsapp_pending, "_read", return_value=[{"id": "w", "status": "sending"}]), \
+             patch.object(manage_posts.whatsapp_pending, "_write") as write:
+            result = manage_posts.clear({}, reviewed, client)
+        client._call.assert_not_called()
+        write.assert_not_called()
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(result["cancelled_whatsapp"], 0)
+
+    def test_cleanup_calls_cancellation_api_and_checks_removal(self):
+        from unittest.mock import Mock
+        client = Mock(org_id="synthetic-org")
+        group = {"group": "g", "posts": [{"id": "a", "state": "DRAFT"}]}
+        reviewed = {"organization": "synthetic-org", "scope": "drafts", "groups": [group], "whatsapp": []}
+        with patch.object(manage_posts, "snapshot", side_effect=[{"groups": [group]}, {"groups": []}]):
+            result = manage_posts.clear({}, reviewed, client)
+        client._call.assert_called_once_with("DELETE", "/posts/a")
+        self.assertEqual(result["deleted"], 1)
+
+    def test_media_links_are_scoped_expire_and_reject_writes(self):
+        import media_links
+        from urllib.parse import urlsplit
+        key = b"k" * 32
+        origin = "https://media.example.test"
+        path = "/uploads/2026/11/06/synthetic_media_only_123456.mp4"
+        now = 1794013200
+        expiry = now + 86400
+        with patch.object(media_links.time, "time", return_value=now):
+            link = media_links.signed_url(key, origin, origin + path, expiry)
+        uri = urlsplit(link).path
+        self.assertTrue(media_links.authorized(key, "GET", uri, now))
+        self.assertTrue(media_links.authorized(key, "HEAD", uri, now))
+        for method in ("POST", "PUT", "DELETE"):
+            self.assertFalse(media_links.authorized(key, method, uri, now))
+        self.assertFalse(media_links.authorized(key, "GET", uri, expiry))
+        self.assertFalse(media_links.authorized(b"x" * 32, "GET", uri, now))
+        self.assertFalse(media_links.authorized(key, "GET", uri.replace("123456", "123457"), now))
+        self.assertFalse(media_links.authorized(key, "GET", uri + "?override=1", now))
+        self.assertFalse(media_links.authorized(key, "GET", uri.replace("/uploads/", "/uploads/../"), now))
+        self.assertFalse(media_links.authorized(key, "GET", uri, now - media_links.MAX_AGE))
+        with patch.object(media_links.time, "time", return_value=now):
+            with self.assertRaises(ValueError):
+                media_links.signed_url(key, origin, "https://other.example" + path, expiry)
+            with self.assertRaises(ValueError):
+                media_links.signed_url(key, origin, origin + path, now + media_links.MAX_AGE + 1)
+
+    def test_secure_media_failure_stops_before_creating_any_posts(self):
+        import media_links
+        now = datetime.now(timezone.utc)
+        env = {"FRONTEND_URL": "https://media.example.test"}
+        p = plan_post.plan(env, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="feed")
+        p["reviewed_caption"] = "Delivery check"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gateway = root / "data/gateway"
+            gateway.mkdir(parents=True)
+            (gateway / "configuration.yml").write_text("{}")
+            (gateway / "media-signing.key").write_bytes(b"k" * 32)
+            with patch.object(pmlib, "ROOT", directory), \
+                 patch.object(pmlib, "Postiz") as client, \
+                 patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+                 patch.object(pmlib, "is_short", return_value=False), \
+                 patch.object(media_links, "serves_media", return_value=False):
+                client.return_value.integrations.return_value = [
+                    {"id": "facebook-test", "identifier": "facebook", "name": "Synthetic account"}]
+                client.return_value.upload.return_value = {
+                    "id": "synthetic-media",
+                    "path": env["FRONTEND_URL"] + "/uploads/2026/11/06/synthetic_media_only_123456.mp4"}
+                with self.assertRaisesRegex(pmlib.PMError, "No posts were created"):
+                    plan_post.run(env, p, False, schedule=True)
+                client.return_value.create_draft.assert_not_called()
+
+    def test_long_story_uses_separate_clips_and_keeps_full_feed_video(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="both")
+        p["reviewed_caption"] = "Delivery check"
+        with patch.object(pmlib, "Postiz") as client, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(93, "h264", "aac", 1080, 1920)), \
+             patch.object(pmlib, "split_story_video", return_value=["part1.mp4", "part2.mp4"]), \
+             patch.object(pmlib, "append_log"):
+            api = client.return_value
+            api.integrations.return_value = [{"id": "test", "identifier": "facebook", "name": "Test"}]
+            api.upload.side_effect = lambda path: {"id": path, "path": path}
+            api.create_draft.return_value = [{"postId": "synthetic-draft"}]
+            result = plan_post.run({}, p, False)
+            self.assertEqual(len(result["drafts"]), 3)
+            calls = api.create_draft.call_args_list
+            self.assertEqual(calls[0].args[2][0]["path"], "clip.mp4")
+            self.assertEqual(calls[1].args[2][0]["path"], "part1.mp4")
+            self.assertEqual(calls[2].args[2][0]["path"], "part2.mp4")
+            self.assertEqual(calls[1].kwargs["settings"]["post_type"], "story")
+            self.assertEqual(calls[2].kwargs["when"] - calls[1].kwargs["when"], timedelta(minutes=1))
+            self.assertTrue(any("2 Story drafts" in warning for warning in result["warnings"]))
+
+    def test_text_announcement_overrides_require_explicit_supported_destinations(self):
+        now = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
+        selected = plan_post.plan({}, 'Instagram tomorrow at 7pm; caption: "Opening at 10 tomorrow"',
+                                  [], "English", now, text_networks=["facebook", "threads", "whatsapp"])
+        self.assertEqual(selected["networks"], ["facebook", "threads", "whatsapp"])
+        self.assertEqual(selected["placement"], "both")
+        self.assertTrue(selected["text_approved"])
+        self.assertEqual(selected["exact"], "Opening at 10 tomorrow")
+        with patch.object(pmlib, "Postiz") as client:
+            client.return_value.integrations.return_value = [
+                {"id": "facebook", "identifier": "facebook", "name": "Example"},
+                {"id": "threads", "identifier": "threads", "name": "Example"}]
+            output = plan_post.run({}, selected, True)
+            self.assertEqual([(item["network"], item["placement"]) for item in output["targets"]],
+                             [("facebook", "feed"), ("threads", "feed"), ("whatsapp", "status")])
+            client.return_value.create_draft.assert_not_called()
+        with self.assertRaises(pmlib.PMError):
+            plan_post.plan({}, "Instagram tomorrow at 7pm; idea: an announcement", [], "English", now,
+                           text_networks=["instagram"])
+
+    def test_reviewed_accounts_exclude_new_connections(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="feed")
+        p["reviewed_integrations"] = ["original"]
+        with patch.object(pmlib, "Postiz") as client, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False):
+            client.return_value.integrations.return_value = [
+                {"id": "original", "identifier": "facebook", "name": "Original"},
+                {"id": "new", "identifier": "facebook", "name": "New connection"}]
+            result = plan_post.run({}, p, True)
+            self.assertEqual([target["integration_id"] for target in result["targets"]], ["original"])
+            p["reviewed_integrations"] = ["missing"]
+            with self.assertRaisesRegex(pmlib.PMError, "no longer connected"):
+                plan_post.run({}, p, True)
+
     def test_video_warnings_respect_platform_thresholds(self):
-        networks = {"facebook", "youtube", "whatsapp"}
-        self.assertEqual(plan_post.video_warnings(networks, [59], "English"), [])
-        self.assertEqual(len(plan_post.video_warnings(networks, [60], "English")), 1)
+        networks = {"instagram", "youtube", "whatsapp"}
+        self.assertEqual(plan_post.video_warnings(networks, [60], "English"), [])
+        self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 1)
         warnings = plan_post.video_warnings(networks, [181], "Spanish")
         self.assertEqual(len(warnings), 3)
+        self.assertIn("nuevas audiencias", warnings[0])
         self.assertIn("4 partes", warnings[-1])
-        self.assertEqual(len(plan_post.video_warnings(networks, [180], "English")), 2)
+        self.assertEqual(plan_post.video_warnings({"facebook"}, [181], "English"), [])
+
+    def test_drafts_use_reviewed_caption_and_threads_variant(self):
+        now = datetime(2026, 11, 5, 12, tzinfo=timezone.utc)
+        text = "Threads and Facebook tomorrow at 9am; idea: share a project update"
+        plan = plan_post.plan({}, text, ["clip.mp4"], "English", now)
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)), \
+             patch.object(pmlib, "append_log"), \
+             patch.object(plan_post, "ollama_caption", return_value=("Reviewed caption", "test", 0)) as generate, \
+             patch.object(plan_post, "threads_caption", return_value="Reviewed Threads text") as shorten:
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = [{"id": name, "name": name, "identifier": name}
+                                                for name in ("threads", "facebook")]
+            postiz.upload.return_value = {"id": "clip", "path": "https://example.test/clip.mp4"}
+            postiz.create_draft.return_value = [{"postId": "draft"}]
+            preview = plan_post.run({}, plan, True)
+            self.assertEqual(preview["threads_caption"], "Reviewed Threads text")
+            plan.update(reviewed_caption=preview["caption"], reviewed_threads_caption=preview["threads_caption"])
+            plan_post.run({}, plan, False)
+            generate.assert_called_once()
+            shorten.assert_called_once()
+            self.assertEqual([call.args[1] for call in postiz.create_draft.call_args_list],
+                             ["Reviewed Threads text", "Reviewed caption", "Reviewed caption"])
+
+    def test_final_tag_moves_to_footer_and_whatsapp_can_change_it(self):
+        tag = pmlib.final_tag("MiNegocio")
+        caption = pmlib.apply_final_tag("Mi texto\n\n#minegocio #OtraEtiqueta", tag)
+        self.assertEqual(caption, "Mi texto\n\n#OtraEtiqueta #MiNegocio")
+        self.assertEqual(pmlib.apply_final_tag(caption, tag), caption)
+        self.assertEqual(pmlib.apply_final_tag(caption, ""), caption)
+        with self.assertRaises(pmlib.PMError):
+            pmlib.final_tag("dos etiquetas")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "plan.json"
+            confirmation = {"lang": "Spanish", "result": {
+                "caption": caption, "final_tag": tag, "networks": ["threads"],
+                "threads_caption": "Texto corto\n\n#MiNegocio",
+            }}
+            path.write_text(json.dumps(confirmation))
+            mtime = path.stat().st_mtime_ns
+            result = wa_inbox.change_plan_tag(str(path), confirmation, "#OtroNegocio", {})
+            self.assertEqual(result["caption"], "Mi texto\n\n#OtraEtiqueta #OtroNegocio")
+            self.assertEqual(result["threads_caption"], "Texto corto\n\n#OtroNegocio")
+            self.assertEqual(json.loads(path.read_text())["result"]["final_tag"], "#OtroNegocio")
+            self.assertEqual(path.stat().st_mtime_ns, mtime)
+
+    def test_youtube_title_respects_limit_without_trimming_description(self):
+        caption = "#Opening\nA title " + "🍓" * 80 + "\n\nThe full description."
+        for short in (False, True):
+            title = pmlib.youtube_title(caption, short)
+            self.assertLessEqual(len(title.encode("utf-16-le")) // 2, 100)
+            self.assertEqual(title.endswith(" #Shorts"), short)
+            self.assertEqual(pmlib.draft_settings("youtube", caption, short=short)["title"], title)
+            self.assertNotIn("The full description", title)
+        self.assertEqual(pmlib.youtube_title("A <good> title"), "A good title")
+
+    def test_youtube_long_title_uses_reviewable_ai_summary(self):
+        caption = ("¿Te gustaría unirte a nosotros con una rica torta de frutillas con chantilly "
+                   "para celebrar los partidos de Liga Deportiva Universitaria?")
+        with patch.object(pmlib, "http", return_value=(200, {
+            "response": "Torta de frutillas con chantilly para la hinchada de Liga"
+        })) as generate:
+            title = plan_post.reviewed_youtube_title({}, caption, "Torta para hinchas de Liga", "Spanish", True)
+        generate.assert_called_once()
+        self.assertEqual(title, "Torta de frutillas con chantilly para la hinchada de Liga #Shorts")
+        with patch.object(pmlib, "http", side_effect=pmlib.PMError("offline")):
+            fallback = plan_post.reviewed_youtube_title({}, caption, None, "Spanish", True)
+        prefix = fallback.removesuffix("… #Shorts")
+        self.assertTrue(caption.startswith(prefix + " "))
+        self.assertLessEqual(len(fallback), 100)
+
+    def test_generated_caption_retries_when_hashtags_are_missing(self):
+        with patch.object(pmlib, "http", side_effect=[
+            (200, {"response": "Galletas para compartir."}),
+            (200, {"response": "Galletas para compartir.\n\n#Galletas #Antojo"}),
+        ]) as generate:
+            caption, _, _ = create_draft.ollama_caption({}, "galletas", "Spanish")
+        self.assertEqual(generate.call_count, 2)
+        self.assertTrue(pmlib.apply_final_tag(caption, "#MiNegocio").endswith("#Galletas #Antojo #MiNegocio"))
+
+    def test_caption_intent_distinguishes_brief_from_exact_text(self):
+        instruction = 'post everywhere today at 6:40 pm; escribe sobre una torta para “Liga Deportiva Universitaria”'
+        command, exact, idea = plan_post.split_instruction(instruction)
+        self.assertEqual(command.strip(" ;"), "post everywhere today at 6:40 pm")
+        self.assertIsNone(exact)
+        self.assertEqual(idea, 'una torta para “Liga Deportiva Universitaria”')
+        _, exact, idea = plan_post.split_instruction('Instagram hoy 6pm; texto: “Frutillas y chantilly 🍓”')
+        self.assertEqual(exact, "Frutillas y chantilly 🍓")
+        self.assertIsNone(idea)
+        self.assertEqual(create_draft.fitting_emojis("Una torta 🎂", "torta de frutillas"), "Una torta 🍓")
+        self.assertEqual(create_draft.finish("Torta de frutillas 🍓.", "Spanish", topic="torta de frutillas"),
+                         "Torta de frutillas. 🍓")
+
+    def test_copy_revision_keeps_plan_and_skips_media_processing(self):
+        snapshot = {"lang": "Spanish", "when_utc": "2026-11-07T01:00:00+00:00",
+                    "targets": [{"network": "instagram", "placement": "feed", "cover_second": 8}],
+                    "warnings": ["Original warning"], "caption": "Texto anterior", "final_tag": "#Negocio"}
+        with patch.object(pmlib, "Postiz") as postiz, patch.object(pmlib, "normalize_media") as normalize, \
+             patch.object(plan_post, "ollama_caption", return_value=("Otro texto 🍓", "test", 0)) as model:
+            revised = plan_post.revise_copy({}, snapshot, "Instagram mañana 7pm; idea: torta de frutillas")
+            edited = plan_post.revise_copy({}, snapshot, "Instagram mañana 7pm; idea: torta", "Texto editado")
+        for result in (revised, edited):
+            for key in ("when_utc", "targets", "warnings"):
+                self.assertEqual(result[key], snapshot[key])
+            self.assertTrue(result["caption"].endswith("#Negocio"))
+        postiz.assert_not_called()
+        normalize.assert_not_called()
+        model.assert_called_once()
+
+    def test_postiz_schedules_only_when_explicitly_requested(self):
+        client = pmlib.Postiz.__new__(pmlib.Postiz)
+        client.env = {}
+        with patch.object(client, "_call") as call:
+            channel = {"id": "test", "identifier": "threads"}
+            client.create_draft(channel, "Caption")
+            self.assertEqual(call.call_args.args[2]["type"], "draft")
+            client.create_draft(channel, "Caption", schedule=True)
+            self.assertEqual(call.call_args.args[2]["type"], "schedule")
+
+    def test_ollama_reasoning_is_excluded_from_caption(self):
+        self.assertEqual(pmlib.ollama_final_text({"response": "<think>analysis</think>Texto"}), "Texto")
+        self.assertEqual(pmlib.ollama_final_text({"response": "<think>unfinished"}), "")
+        self.assertFalse(pmlib.ollama_text_prompt("qwen3:4b", "Caption")["think"])
+
+    def test_topic_first_colloquial_post_everywhere(self):
+        now = datetime(2026, 11, 5, 12, tzinfo=plan_post.ZoneInfo("America/Guayaquil"))
+        text = "galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias"
+        p = plan_post.plan({}, text, [], None, now)
+        self.assertEqual(p["idea"], "galletas y cupcakes")
+        self.assertEqual((p["when"].hour, p["when"].minute), (19, 15))
+        self.assertEqual(p["placement"], "both")
+        self.assertEqual(p["networks"], list(plan_post.NETWORKS))
+        with self.assertRaisesRegex(pmlib.PMError, "hora indicada ya pasó"):
+            plan_post.plan({}, text, [], None, now.replace(hour=20), ui_lang="Spanish")
+        explicit = 'Instagram mañana a las 7pm; texto: "galletas y cupcakes; publica en todo lado"'
+        self.assertEqual(plan_post.split_instruction(explicit)[1], "galletas y cupcakes; publica en todo lado")
+
+    def test_everywhere_and_story_only_make_only_supported_drafts(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        channels = [{"id": name, "name": name, "identifier": name}
+                    for name in ("facebook", "instagram-standalone", "threads", "youtube")]
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)):
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = channels
+            for text, expected in (
+                ('Post everywhere tomorrow at 9am; text: "A demo"', {
+                    ("facebook", "feed"), ("facebook", "story"), ("instagram", "feed"),
+                    ("instagram", "story"), ("threads", "feed"), ("youtube", "feed"),
+                    ("whatsapp", "status")}),
+                ('En todas las redes mañana 9am, solo historias; texto: "Un ejemplo"', {
+                    ("facebook", "story"), ("instagram", "story"), ("whatsapp", "status")}),
+            ):
+                plan = plan_post.plan({}, text, ["clip.mp4"], None, now)
+                result = plan_post.run({}, plan, True)
+                self.assertEqual({(t["network"], t["placement"]) for t in result["targets"]}, expected)
+                self.assertEqual(result["video_without_cover"], any(
+                    network == "instagram" and placement == "feed" for network, placement in expected))
+            postiz.create_draft.assert_not_called()
+            postiz.upload.assert_not_called()
+
+    def test_cover_timestamp_only_reaches_supported_video_drafts(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        env = {"TIKTOK_POSTING_METHOD": "DIRECT_POST"}
+        channels = [{"id": name, "name": name, "identifier": name} for name in ("instagram", "tiktok")]
+        p = plan_post.plan(env, 'Instagram y TikTok mañana 9am; portada en el segundo 12,5; texto: "Un ejemplo"',
+                           ["clip.mp4"], None, now)
+        with patch.object(pmlib, "Postiz") as mock_postiz, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)), \
+             patch.object(pmlib, "append_log"):
+            postiz = mock_postiz.return_value
+            postiz.integrations.return_value = channels
+            postiz.upload.return_value = {"id": "clip", "path": "https://example.test/clip.mp4"}
+            postiz.create_draft.return_value = [{"postId": "draft"}]
+            result = plan_post.run(env, p, False)
+            calls = postiz.create_draft.call_args_list
+            self.assertEqual([call.args[2][0].get("thumbnailTimestamp") for call in calls], [12500, None, 12500])
+            self.assertEqual(calls[1].kwargs["settings"], {"post_type": "story"})
+            with patch.object(wa_inbox, "ui_language", return_value="Spanish"):
+                message = wa_inbox.summary(result, "Spanish", confirmation_id="2")
+            self.assertIn("portada en el segundo 12,5", message)
+            self.assertIn("Instagram · historia", message)
+            self.assertIn("rechazar plan 2", message)
+            with patch.object(wa_inbox, "ui_language", return_value="English"):
+                message = wa_inbox.summary(result, "Spanish", confirmation_id="2")
+            self.assertIn("cover at 12.5 s", message)
+            self.assertIn("Instagram · story", message)
+
+    def test_whatsapp_cover_image_is_separate_from_video_attachment(self):
+        now = datetime(2026, 11, 5, 8, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            video, cover = (Path(directory) / name for name in ("clip.mp4", "cover.png"))
+            video.touch()
+            cover.touch()
+            plan = plan_post.plan({}, 'Instagram tomorrow at 9am; cover image; text: "A demo"',
+                                  [str(cover), str(video)], None, now)
+            with patch.object(pmlib, "Postiz") as mock_postiz, \
+                 patch.object(pmlib, "normalize_media", side_effect=[("video", str(video)), ("image", str(cover))]) as normalize, \
+                 patch.object(pmlib, "is_short", return_value=False), \
+                 patch.object(pmlib, "ffprobe", return_value=(30, None, None, 1920, 1080)):
+                mock_postiz.return_value.integrations.return_value = [
+                    {"id": "ig", "name": "Instagram", "identifier": "instagram"}]
+                result = plan_post.run({}, plan, True)
+                self.assertEqual(normalize.call_args_list[0].args[0], str(video))
+                self.assertEqual([t["cover"] for t in result["targets"]], ["image", None])
+                mock_postiz.return_value.upload.assert_not_called()
 
     def test_whatsapp_cleanup_keeps_future_confirmation_and_other_uploads(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -116,6 +493,40 @@ class Operations(unittest.TestCase):
                 self.assertEqual(env.read_bytes(), previous.replace(b"old.example.org", b"new.example.org"))
                 self.assertEqual(env.stat().st_mode & 0o777, 0o600)
             self.assertFalse((env.parent / "run/tunnel-url.previous").exists())
+
+    def test_gateway_tunnel_rollback_preserves_enrollment_keys(self):
+        from v2.gateway_setup import config
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            env = root / ".env"
+            original = b"NGROK_DOMAIN=old.example.org\nFRONTEND_URL=https://old.example.org\n"
+            original += b"NEXT_PUBLIC_BACKEND_URL=https://old.example.org/api\nMAIN_URL=https://old.example.org\n"
+            env.write_bytes(original)
+            gateway = root / "data/gateway/configuration.yml"
+            gateway.parent.mkdir(parents=True)
+            original_gateway = json.dumps(config("old.example.org")).encode()
+            gateway.write_bytes(original_gateway)
+
+            def verify(local, public, expected, *, gated):
+                self.assertTrue(gated)
+                current = json.loads(gateway.read_text())
+                self.assertEqual(current["storage"], json.loads(original_gateway)["storage"])
+                self.assertEqual(current["session"]["cookies"][0]["domain"], tunnel.normalize(public)[0])
+                if public == "https://new.example.org":
+                    raise RuntimeError("simulated public verification failure")
+
+            with patch.object(tunnel, "probe", return_value=b"Postiz") as probe, \
+                 patch.object(tunnel, "gateway_ready", return_value=True), \
+                 patch.object(tunnel, "check_gateway_config"), patch.object(tunnel, "compose") as compose, \
+                 patch.object(tunnel, "wait_until_ready", side_effect=verify):
+                with self.assertRaisesRegex(RuntimeError, "previous settings and services were restored"):
+                    tunnel.switch(env, "new.example.org")
+                self.assertEqual(env.read_bytes(), original)
+                self.assertEqual(gateway.read_bytes(), original_gateway)
+                self.assertEqual([call.args[1:] for call in compose.call_args_list].count(("stop", "ngrok")), 2)
+                probe.assert_called_once_with("http://localhost:4200")
+            self.assertFalse((root / "run/tunnel-gateway.previous").exists())
 
     def test_uninstall_preserves_data_and_aborts_on_failed_docker_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -184,6 +595,47 @@ class Operations(unittest.TestCase):
             self.assertEqual(env.read_bytes(), original)
             self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
+    def test_whatsapp_uncertain_delivery_is_not_retried(self):
+        import whatsapp_pending
+
+        item = {"id": "aabbcc112233", "status": "pending", "approved": True,
+                "approval_source": "explicit-whatsapp-command", "when": "2026-01-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(whatsapp_pending, "QUEUE_FILE", str(Path(folder) / "queue.json")), \
+             patch.object(whatsapp_pending, "_send_item", side_effect=TimeoutError) as send:
+            whatsapp_pending._write([item])
+            whatsapp_pending.process({})
+            whatsapp_pending.process({})
+            send.assert_called_once()
+            self.assertEqual(whatsapp_pending._read()[0]["status"], "needs_review")
+            self.assertIsNone(whatsapp_pending.approve(item["id"]))
+            whatsapp_pending._write([dict(item, status="sending")])
+            self.assertEqual(whatsapp_pending.recover_interrupted(), 1)
+            whatsapp_pending.process({})
+            send.assert_called_once()
+            self.assertEqual(whatsapp_pending._read()[0]["review_reason"], "send_interrupted")
+
+    def test_status_approval_sends_exact_reference_to_own_chat(self):
+        reference = "aabbcc112233"
+        env = {}
+        with patch.object(sys, "argv", ["wa-inbox", "--send-status-approval", reference]), \
+             patch.object(pmlib, "load_env", return_value=env), \
+             patch.object(wa_inbox, "own_identity", return_value=("instance", "id", "555", [])), \
+             patch.object(wa_inbox, "ui_language", return_value="Spanish"), \
+             patch.object(wa_inbox, "reply") as reply:
+            self.assertEqual(wa_inbox.main(), 0)
+        reply.assert_called_once_with(env, "instance", "555", "555",
+                                      "aprobar whatsapp " + reference, {}, False)
+
+    def test_generated_caption_repairs_split_tag_and_drops_unrelated_emoji(self):
+        text = "¿Galletas o cupcakes ? 🍪🎂\n\n#GalletasY CupcakesEcuador\n\n#ComidaCasera #comidacasera"
+        self.assertEqual(
+            create_draft.finish(text, "Spanish", topic="galletas y cupcakes"),
+            "¿Galletas o cupcakes? 🍪\n\n#GalletasYCupcakesEcuador #ComidaCasera",
+        )
+        inline = "Start with #Weekend Hikes are more fun outside."
+        self.assertEqual(create_draft.split_hashtags(inline), (inline, []))
+
     def test_caption_removes_prompt_echo_and_duplicate_cta(self):
         text = 'Pan de yuca recién horneado. Pan de yuca recién horneado. 🍎\nEscribe frases cortas sobre el tema.\nHaz tu pedido por WhatsApp.\n#PanDeYuca #PanDeYuca'
         result = create_draft.finish(text, 'Spanish', topic='pan de yuca')
@@ -242,7 +694,8 @@ class Operations(unittest.TestCase):
         now = datetime(2026, 11, 5, 6, tzinfo=timezone(timedelta(hours=-5)))
         plan = plan_post.plan({}, 'YouTube Shorts today at 8am, caption: Test', ['sample.mp4'], 'English', now)
         with patch.object(pmlib, 'Postiz') as api, patch.object(pmlib, 'normalize_media', return_value=('video', 'sample.mp4')), \
-             patch.object(pmlib, 'is_short', return_value=False):
+             patch.object(pmlib, 'is_short', return_value=False), \
+             patch.object(pmlib, 'ffprobe', return_value=(200, 'h264', 'aac', 1920, 1080)):
             api.return_value.integrations.return_value = [{'identifier': 'youtube'}]
             with self.assertRaisesRegex(pmlib.PMError, 'at most 3 minutes'):
                 plan_post.run({}, plan, True)

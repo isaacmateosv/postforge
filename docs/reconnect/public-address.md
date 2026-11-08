@@ -12,6 +12,7 @@ reconnect every channel.
    - Redirect URLs `…/integrations/social/facebook` and `…/integrations/social/instagram`: under
      Facebook Login for Business → Valid OAuth Redirect URIs, and in the Instagram API use case's
      redirect list.
+   - Instagram Standalone uses `…/integrations/social/instagram-standalone` in its separate Instagram Login settings.
 3. **TikTok app** (developers.tiktok.com), in Production and in the Sandbox:
    - Login Kit → Redirect URI `…/integrations/social/tiktok`.
    - URL properties: `…/uploads/`, only if you post photos.

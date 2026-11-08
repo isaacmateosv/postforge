@@ -27,6 +27,14 @@ silently publish content.
 > self-hosted integration project, not an official client or endorsement of
 > any platform.
 
+## Current v2 development
+
+**Rust/Tauri is the desktop client going forward.** Use the [Rust desktop guide](desktop/README.md)
+for the current preview. The Swift controller is retained as legacy source for
+compatibility and reference, rather than a second app to run alongside Rust.
+Installation paths stay inside advanced recovery; WhatsApp pairs by QR in the window. Some system integrations are still being ported; this is a beta, not a feature-complete
+replacement release. The legacy macOS installer below targets the Swift controller.
+
 ## Contents
 
 - [What it provides](#what-it-provides)
@@ -67,6 +75,22 @@ Open **Help → PostForge Help** in the Mac app to read either guide offline in 
   health checks, watchdog validation, rollback snapshots, and sanitized release
   packages.
 
+## Rust desktop and Telegram
+
+The Rust/Tauri client opens on a live draft/schedule dashboard and has structured Compose, Delivery and Review steps
+and shares the existing Python planner. See the [desktop setup guide](desktop/README.md).
+The legacy Swift source documents the system integrations still being ported.
+Native builds run on macOS, Windows and Linux in CI; installation and real-device
+acceptance remain separate release checks.
+
+The private Telegram bot now guides caption mode, media, destinations, formats,
+time, cover/tag options, revisions and final confirmation through buttons.
+Each installation supplies its own bot; there is no shared global bot. Open
+**Telegram** in the Rust app header to validate its token, select the private
+owner and configure language, heartbeat and activation. Settings travel in the
+encrypted credentials backup; migration restores Telegram paused until explicit
+activation on the destination. Full bilingual instructions are in Help.
+
 ## How it works
 
 ![From idea through human approval to scheduled publishing](docs/images/publishing-flow.svg)
@@ -76,9 +100,24 @@ Open **Help → PostForge Help** in the Mac app to read either guide offline in 
 3. **Approve in Postiz.** Review the caption, accounts, media, and schedule. WhatsApp plans also require explicit approval.
 4. **Let Temporal run the schedule.** Keep the Mac and stack online; the tray shows health, waiting work, and connections that need attention.
 
+The Mac composer uses two columns, with media and the request beside the scrollable
+plan. Bake with **⌘ Return**, review the resolved time and destinations, and then
+use **Create Drafts** or confirm **Schedule Directly…**. **Try Another Caption**,
+**Edit Caption…**, and the **‹ / ›** version controls update the copy section.
+Changing scheduling inputs requires a fresh bake. Use **idea:** with an unquoted
+brief to generate copy, or **caption:** and double quotes to preserve your wording.
+
+With no media, the app asks which supported text destinations should receive the
+announcement. **Clear…** previews and confirms cleanup of drafts, failed entries,
+queued posts and pending WhatsApp Status. Work already sending may finish.
+The current workflows and limitations are described in the
+[English quick guide](docs/help/quick-en.md),
+[guía rápida en español de Ecuador](docs/help/quick-es.md),
+[English technical guide](docs/help/technical-en.md), and
+[guía técnica en español](docs/help/technical-es.md).
+
 Open **PostForge → About PostForge** for the app icon, version/build, copyright and license. **How It Works…** opens this flow; **License & Notices…** displays the bundled legal texts offline. In the tray, **About PostForge** is directly above **Quit PostForge**.
 
-<p align="center"><img src="docs/images/app-es-ec.png" width="560" alt="PostForge native app in Ecuadorian Spanish"></p>
 
 ## Credentials and first connection
 
@@ -91,7 +130,7 @@ Start with [SETUP.md](SETUP.md) and copy `.env.example` to a private `.env` (mod
 | 3. Postiz account | Your own Postiz email/password, created on first setup | Log in to the Postiz calendar. This is separate from the Evolution API key. Keep public registration disabled afterward. |
 | 4. WhatsApp Manager | Local server URL `http://localhost:8080`, **global API key** = `AUTHENTICATION_API_KEY`; instance = `WA_INSTANCE` | Open **WhatsApp Manager** from the tray. There is no separate Evolution username/password in this deployment. Never put the key in a URL or screenshot. |
 | 5. Link WhatsApp | Access to the intended phone's WhatsApp **Linked devices** screen | Scan the QR for that instance. `./scripts/link-whatsapp.sh` creates a missing instance and refreshes the QR; it leaves a working session untouched. Re-link on a new Mac. |
-| 6. Social accounts | Account access plus provider developer-app IDs/secrets for the channels you enable | Connect each channel inside Postiz. See [app keys](docs/reconnect/app-keys.md), [Meta](docs/reconnect/meta.md), [TikTok](docs/reconnect/tiktok.md), [YouTube](docs/reconnect/youtube.md), and [Threads](docs/reconnect/threads.md). |
+| 6. Social accounts | Account access plus provider developer-app IDs/secrets for the channels you enable | Connect each channel inside Postiz. Start with [first-time setup and permissions](docs/reconnect/channel-setup.md), then see [app keys](docs/reconnect/app-keys.md), [Meta](docs/reconnect/meta.md), [TikTok](docs/reconnect/tiktok.md), [YouTube](docs/reconnect/youtube.md), and [Threads](docs/reconnect/threads.md). |
 | 7. Local captions | Installed Ollama and `LOCAL_LLM_MODEL` | No cloud API key is needed for local captions. Gemini is optional and disabled unless explicitly enabled. |
 | Backup and migration | A passphrase of at least 12 characters | Encrypts the exported credentials; it is separate from all service passwords. |
 
@@ -235,7 +274,7 @@ Authoritative references: [Google OAuth expiry](https://developers.google.com/id
 ## Roadmap
 
 **Release 1 (`v1.0.x`)** provides the publishing foundation described here.
-**Release 2 (`v2.0.0`)** will add Telegram connection setup, health-aware pings and alerts.
+**Release 2 (`v2.0.0`)** adds a local browser dashboard, a separate MFA gateway for optional remote access, and private Telegram guided posting, status and heartbeat. See the [v2 release candidate guide](v2/README.md) for setup and acceptance checks.
 Telegram code, credentials and background requests are excluded from release 1.
 See [ROADMAP.md](ROADMAP.md).
 
