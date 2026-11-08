@@ -11,17 +11,16 @@ elige destinos, fecha y hora local. Revisa el plan horneado antes de continuar.
 La portada y la etiqueta del negocio están en una misma sección de opciones.
 Las versiones del texto conservan la programación.
 
-Crea un bot con **/newbot** en **@BotFather**. Ingresa el token en el asistente
-local. Este identifica al propietario privado y registra los comandos. Mantén
-activa la privacidad de grupos. No necesitas modo inline ni webhooks públicos.
+Abre **Telegram** en la cabecera de la app. Cada instalación usa su propio bot
+dedicado y una cuenta privada autorizada; no hay un bot global compartido.
+Créalo con **/newbot** en **@BotFather**, pega el token en el campo oculto y pulsa
+**Validar bot**. Envía **/start** a tu bot y usa **Buscar mi cuenta privada**.
+Elige tu cuenta y verifica su ID numérico. Configura el idioma y los avisos de
+actividad (**0** = apagados; si los activas, de **5 a 1440 minutos**), activa el
+bot y confirma **Guardar ajustes**. No necesitas la terminal. Mantén activa la
+privacidad de grupos; no necesitas modo inline ni webhook público. Envía **/new**
+a tu bot.
 
-```text
-python3 v2/telegram_setup.py --language es --heartbeat 15
-python3 scripts/host_agent.py restart
-python3 scripts/host_agent.py status
-```
-
-En Windows usa **py -3** en lugar de python3. Envía **/new** al bot privado.
 Los botones guían el tipo de texto, archivos, destinos, formatos, hora y revisión.
 Usa **Probar otro texto**, las flechas o **Editar texto** para refinarlo.
 Envía solo después de la confirmación final. El Estado de WhatsApp se aprueba
@@ -32,6 +31,14 @@ El bot descarga hasta 20 MB por archivo desde la nube. Usa la app de escritorio
 para videos más grandes. Mantén el equipo despierto y los servicios activos
 cuando corresponda publicar. Inicia el agente después de reiniciar o configura
 el inicio automático del sistema.
+
+El .env privado y los respaldos cifrados de credenciales incluyen el token,
+la cuenta autorizada, el idioma, los avisos de actividad y la preferencia de
+activación. Al migrar, Telegram queda en pausa: detén el receptor anterior,
+revisa los ajustes en el nuevo equipo y actívalo expresamente. Guarda el
+respaldo y su contraseña de forma privada. Deja el token vacío para conservar
+el que ya guardaste. Desactivar conserva los ajustes y funciona incluso sin
+conexión con Telegram.
 
 ## Flujo anterior del Mac en Swift
 

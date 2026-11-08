@@ -86,8 +86,11 @@ def main():
             {"command": "help", "description": "Mostrar el menú" if args.language == "es" else "Show the menu"},
         ]
         telegram(token, "setMyCommands", commands=commands, scope={"type": "chat", "chat_id": owner})
-        save(ROOT / "run/telegram", token, owner, args.language, args.heartbeat)
-        print("Telegram settings saved. On macOS run ./postforge.sh telegram start, then send /new in your private chat.")
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import telegram_settings
+        telegram_settings.save({"token": token, "owner_id": str(owner), "enabled": True,
+                                "language": args.language, "heartbeat": args.heartbeat})
+        print("Telegram settings saved in .env and the local agent started. Send /new in your private chat.")
         return 0
     except TelegramError:
         parser.exit(1, "Telegram could not validate the bot. Check the token, connectivity, and any other running poller.\n")

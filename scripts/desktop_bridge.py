@@ -52,9 +52,19 @@ def dispatch(operation, payload):
         if not identifier:
             raise pmlib.PMError("This Status is no longer waiting for approval.")
         return {"approved": identifier}
-    if operation == "telegram_status":
-        return {"configured": (ROOT / "run/telegram/token").is_file(),
-                "setup": "python3 v2/telegram_setup.py"}
+    if operation.startswith("telegram_"):
+        import telegram_settings
+        if operation == "telegram_resume":
+            if telegram_settings.active(telegram_settings.configuration()):
+                import host_agent
+                host_agent.start()
+            return telegram_settings.status()
+        actions = {"telegram_status": lambda: telegram_settings.status(),
+                   "telegram_inspect": lambda: telegram_settings.inspect(payload),
+                   "telegram_detect": lambda: telegram_settings.detect(payload),
+                   "telegram_save": lambda: telegram_settings.save(payload)}
+        if operation in actions:
+            return actions[operation]()
     raise pmlib.PMError("Unknown desktop operation.")
 
 

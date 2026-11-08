@@ -18,7 +18,7 @@ fi
 # Include the optional worker in the same Compose project so a normal
 # PostForge start/restart does not remove it as an orphan.
 TELEGRAM_SETTINGS="$DIR/run/telegram/settings.env"
-if [ -s "$DIR/run/telegram/token" ] && [ -s "$TELEGRAM_SETTINGS" ]; then
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && [ -s "$DIR/run/telegram/token" ] && [ -s "$TELEGRAM_SETTINGS" ]; then
   set -a; . "$TELEGRAM_SETTINGS"; set +a
   if [ "${TELEGRAM_TRANSPORT:-docker}" != host ]; then
   if [ -z "${COMPOSE_FILE:-}" ]; then
@@ -534,7 +534,7 @@ case "${1:-}" in
     ;;
 
   telegram)
-    if [ ! -s "$DIR/run/telegram/token" ] || [ ! -s "$TELEGRAM_SETTINGS" ]; then
+    if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && { [ ! -s "$DIR/run/telegram/token" ] || [ ! -s "$TELEGRAM_SETTINGS" ]; }; then
       echo "Configure Telegram first with: python3 v2/telegram_setup.py" >&2
       exit 1
     fi

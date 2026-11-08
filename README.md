@@ -85,8 +85,11 @@ acceptance remain separate release checks.
 
 The private Telegram bot now guides caption mode, media, destinations, formats,
 time, cover/tag options, revisions and final confirmation through buttons.
-Configure its token and private owner locally with **python3 v2/telegram_setup.py**
-and start the host agent. Full bilingual setup instructions are in Technical Help.
+Each installation supplies its own bot; there is no shared global bot. Open
+**Telegram** in the Rust app header to validate its token, select the private
+owner and configure language, heartbeat and activation. Settings travel in the
+encrypted credentials backup; migration restores Telegram paused until explicit
+activation on the destination. Full bilingual instructions are in Help.
 
 ## How it works
 
