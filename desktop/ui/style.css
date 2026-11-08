@@ -123,3 +123,8 @@ footer > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-s
 #telegram-settings .toggle { display: flex; gap: 10px; align-items: center; font-weight: 600; }
 #telegram-settings .settings-field button { margin: 4px 0; }
 #telegram-feedback { white-space: pre-wrap; color: #b9daff; margin: 15px 0; }
+
+#telegram-settings[open] { display: flex; flex-direction: column; overflow: hidden; }
+#telegram-settings .telegram-body { overflow-y: auto; min-height: 0; padding-right: 10px; }
+#telegram-settings .settings-actions { flex-shrink: 0; border-top: 1px solid var(--border); padding-top: 14px; }
+#telegram-feedback:empty { display: none; }
