@@ -1,6 +1,9 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
+import concurrent.futures
+import threading
+import time
 import unittest
 from urllib.parse import urlsplit
 from unittest.mock import Mock, patch
@@ -12,6 +15,22 @@ import telegram_worker as bot
 
 
 class PreviewTests(unittest.TestCase):
+    def test_slow_dns_has_bounded_wait_and_refresh_reuses_workers(self):
+        release = threading.Event()
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(web.PROBES))
+        try:
+            with patch.object(web, "PROBE_POOL", pool), patch.object(web, "PROBE_TASKS", {}), \
+                 patch.object(web, "PROBE_DEADLINE", 0.02), \
+                 patch.object(web, "reachable", side_effect=lambda url: release.wait(3)) as check:
+                started = time.monotonic()
+                for _ in range(3):
+                    self.assertFalse(any(web.services().values()))
+                self.assertLess(time.monotonic() - started, 0.5)
+                self.assertEqual(check.call_count, len(web.PROBES))
+        finally:
+            release.set()
+            pool.shutdown(wait=True)
+
     def test_google_policy_is_fail_closed_and_uses_exact_addresses(self):
         for values in ([], ["*@example.org"], ['x@example.org" || true']):
             with self.subTest(values=values), self.assertRaises(ValueError):

@@ -6,6 +6,8 @@ import html
 import os
 import re
 import sys
+import threading
+import time
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,9 +37,32 @@ def reachable(url):
         return False
 
 
+# DNS resolution can outlive urllib's socket timeout. Bound the caller's wait
+# and reuse one worker per probe so refreshes cannot accumulate blocked threads.
+PROBE_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=len(PROBES))
+PROBE_LOCK = threading.Lock()
+PROBE_TASKS = {}
+PROBE_DEADLINE = 2.25
+PROBE_CACHE_SECONDS = 3
+
+
 def services():
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(PROBES)) as pool:
-        return dict(zip(PROBES, pool.map(reachable, PROBES.values())))
+    with PROBE_LOCK:
+        now = time.monotonic()
+        for name, url in PROBES.items():
+            previous = PROBE_TASKS.get(name)
+            if (previous is None or previous[0] != url
+                    or (previous[1].done() and now - previous[2] >= PROBE_CACHE_SECONDS)):
+                PROBE_TASKS[name] = (url, PROBE_POOL.submit(reachable, url), now)
+        tasks = {name: PROBE_TASKS[name][1] for name in PROBES}
+    concurrent.futures.wait(tasks.values(), timeout=PROBE_DEADLINE)
+    result = {}
+    for name, task in tasks.items():
+        try:
+            result[name] = bool(task.result()) if task.done() else False
+        except Exception:
+            result[name] = False
+    return result
 
 
 def browser_url():

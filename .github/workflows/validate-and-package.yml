@@ -45,7 +45,7 @@ jobs:
           docker compose -f docker-compose.yml -f v2/compose.gateway.yml config --quiet
           docker compose -f docker-compose.yml -f v2/compose.yml --profile web --profile telegram config --quiet
           docker compose -f docker-compose.yml -f v2/compose.yml --profile web up -d --build --no-deps postforge-web
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --max-time 5 -o /tmp/postforge-dashboard.html http://127.0.0.1:8787/
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 2 --retry-max-time 45 --max-time 5 -o /tmp/postforge-dashboard.html http://127.0.0.1:8787/
           grep -q PostForge /tmp/postforge-dashboard.html
 
   package:
