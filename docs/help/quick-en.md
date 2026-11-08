@@ -1,5 +1,37 @@
 # PostForge Quick Start
 
+This is the current v2 desktop workflow. The older Swift instructions are retained below for reference; run only the Rust client during v2 testing.
+
+## Rust desktop and guided Telegram
+
+The Rust/Tauri client separates **Compose**, **Delivery** and **Review & finish**.
+Enter the message without schedule commands, choose idea generation or exact
+words, then attach optional media. Choose destinations and a local date/time
+on the next screen. Review the baked plan before finishing. Cover and business
+hashtag settings live in one options section. Caption versions preserve delivery.
+
+Create a bot with **/newbot** in **@BotFather**. Enter the token in the local
+setup prompt. It identifies your private owner account and registers commands.
+Keep group privacy enabled. Inline mode and public webhooks are unnecessary.
+
+```text
+python3 v2/telegram_setup.py --language en --heartbeat 15
+python3 scripts/host_agent.py restart
+python3 scripts/host_agent.py status
+```
+
+Use **py -3** instead of python3 on Windows. Send **/new** to the private bot.
+The buttons guide caption mode, media, destinations, formats, time and review.
+Use **Try another caption**, arrows or **Edit caption** to refine the copy.
+Submit only after the final confirmation. WhatsApp Status has its own approval.
+**/cancel** discards an unfinished plan and **/status** checks reachability.
+
+The bot's cloud download limit is 20 MB per file. Use the desktop app for larger
+videos. Keep the host awake and services running when jobs are due. Start the
+agent after reboot or configure your OS startup manager.
+
+## Legacy Swift Mac workflow
+
 Turn a photo or video and an idea into a draft you can review before it goes live.
 
 ```text
@@ -98,35 +130,3 @@ PostForge turns off its services after an hour without activity or queued work. 
 - **Check for Updates** is in the top-level tray menu.
 - **Backup & Move** lets you export a private backup.
 - Switch to **Technical** in Help for setup, recovery, and data details.
-
-## Rust desktop and guided Telegram
-
-The Rust/Tauri client separates **Compose**, **Delivery** and **Review & finish**.
-Enter the message without schedule commands, choose idea generation or exact
-words, then attach optional media. Choose destinations and a local date/time
-on the next screen. Review the baked plan before finishing. Cover and business
-hashtag settings live in one options section. Caption versions preserve delivery.
-
-In the Mac app, the request is first and optional media second. **Publishing
-options** groups formats, cover and final hashtag. Completion actions sit below
-the reviewed plan. The Swift controller retains its existing Mac integrations.
-
-Create a bot with **/newbot** in **@BotFather**. Enter the token in the local
-setup prompt. It identifies your private owner account and registers commands.
-Keep group privacy enabled. Inline mode and public webhooks are unnecessary.
-
-```text
-python3 v2/telegram_setup.py --language en --heartbeat 15
-python3 scripts/host_agent.py restart
-python3 scripts/host_agent.py status
-```
-
-Use **py -3** instead of python3 on Windows. Send **/new** to the private bot.
-The buttons guide caption mode, media, destinations, formats, time and review.
-Use **Try another caption**, arrows or **Edit caption** to refine the copy.
-Submit only after the final confirmation. WhatsApp Status has its own approval.
-**/cancel** discards an unfinished plan and **/status** checks reachability.
-
-The bot's cloud download limit is 20 MB per file. Use the desktop app for larger
-videos. Keep the host awake and services running when jobs are due. Start the
-agent after reboot or configure your OS startup manager.

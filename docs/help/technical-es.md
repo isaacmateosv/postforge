@@ -1,5 +1,7 @@
 # Guía técnica de PostForge
 
+El desarrollo actual de v2 usa el cliente de escritorio Rust. Las secciones anteriores del controlador del Mac describen el comportamiento de Swift y no implican que esas funciones ya estén en Rust. Consulta Implementación de Rust y Telegram para conocer el alcance actual de la beta.
+
 PostForge controla desde macOS una instalación local de publicación. Prepara planes y borradores. Postiz y Temporal gestionan las publicaciones aprobadas. Evolution y Baileys vinculan la sesión de WhatsApp del operador.
 
 ```text
