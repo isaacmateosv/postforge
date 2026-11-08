@@ -49,7 +49,7 @@ cp "$PROJECT"/docs/help/*.md "$APP/Contents/Resources/Help/"
 mkdir -p "$APP/Contents/Resources/Shortcuts"
 cp "$HERE"/shortcuts/*.shortcut "$APP/Contents/Resources/Shortcuts/"
 
-# Menu bar glyph: the black template mask at 54px for a crisp 21pt item; the app tints it for light and dark bars.
+# Menu bar glyph: the black template mask at 54px for a crisp 18pt item; the app tints it for light and dark bars.
 cp "$ASSETS/PostForgeTrayTemplate-Tight-54.png" "$APP/Contents/Resources/PostForgeTray.png"
 
 if [ "$PORTABLE" = true ]; then

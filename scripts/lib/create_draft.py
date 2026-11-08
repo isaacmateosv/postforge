@@ -27,15 +27,19 @@ NEEDS_MEDIA = {"instagram": "Instagram", "instagram-standalone": "Instagram", "t
                "youtube": "YouTube"}
 
 PROMPT = """Write one social media caption in {lang} about: {topic}
-- Use one or two short sentences and at most two relevant emojis.
+- Write like a person talking to their audience. Use at most two short sentences. Lead with a specific detail from the topic, then ask at most one question. Avoid stock openings such as “Enjoy our delicious”.
+- Use two or three emojis if they fit the subject. Put them after a complete sentence.
 - Use only the facts in the topic. Do not invent a business name, prices, dates, locations or contact details.
-- Add 3 to 5 relevant hashtags on the next line.
+- Leave one blank line, then add 2 to 4 specific hashtags on one line. Every tag starts with # and contains no spaces, for example #WeekendHike. Skip generic tags and locations not given.
 Return only the caption."""
 
 PROMPT_ES = """Escribe una publicación en español de Ecuador sobre: {topic}
-- Usa una o dos frases cortas y hasta dos emojis pertinentes.
-- Usa solo los datos del tema. Evita inventar nombres de negocios, precios, fechas, lugares o datos de contacto.
-- Agrega de 3 a 5 hashtags pertinentes en la siguiente línea.
+- Escribe máximo 28 palabras antes de los hashtags. Una o dos frases naturales, sin saludo ni introducción. Abre con el producto o la ocasión. Una sola pregunta, si aporta.
+- Usa el nombre del equipo o la marca tal como se indicó. Evita frases de cajón como «Disfruta de nuestros deliciosos», «la combinación perfecta» o «el regalo perfecto». Cuida la concordancia.
+- Ejemplo de tono para otro tema: «¿Qué planta pondrías junto a tu ventana? 🌿». No copies el ejemplo.
+- Usa dos o tres emojis si aportan al texto. Ponlos al final de una frase completa.
+- Usa solo los datos del tema. No inventes frescura, ingredientes, capas, disponibilidad, regalos, precios, fechas, lugares ni datos de contacto.
+- Deja una línea en blanco y añade de 2 a 4 hashtags concretos en una sola línea. Cada etiqueta empieza con # y va sin espacios, por ejemplo #RutaDeMontaña. Evita etiquetas genéricas y lugares que no se mencionaron.
 Devuelve solo la publicación."""
 
 PREAMBLE = re.compile(r"^¡?(here(?:'s| is)|sure|caption|aquí (?:tienes|está)|claro|por supuesto)\b[^\n]*:\s*\n+",
@@ -54,10 +58,12 @@ INSTRUCTION_ECHO = re.compile(r"frases? cortas?|sobre el tema|short sentences?|a
 MORNING_CLAIM = re.compile(r"(every|each) morning|mornings|(todas las|cada|por las|en las) mañanas?", re.IGNORECASE)
 EMOJI_ALWAYS = set("❤🤍🧡💛🫶✨🌟🙂😊😋🥰📲")
 EMOJI_IF = {
+    "🍓": ("fresa", "frutilla", "strawberr"),
+    "⚽": ("fútbol", "futbol", "football", "soccer", "liga deportiva"),
     "🍞": ("pan", "guagua", "bread", "sourdough", "masa madre", "loaf", "loaves"),
     "🥐": ("croissant", "cachito"), "🎂": ("torta", "cumple", "pastel", "cake", "birthday"),
     "🧁": ("cupcake", "magdalena"), "🍪": ("galleta", "cookie"), "☕": ("café", "cafe", "coffee"),
-    "🍵": ("té ", "tea "), "🍫": ("chocolate", "cacao"), "🍓": ("fresa", "frutilla", "strawberr"),
+    "🍵": ("té ", "tea "), "🍫": ("chocolate", "cacao"),
     "🫐": ("arándano", "arandano", "mora", "blueberr", "blackberr"), "🍋": ("limón", "limon", "lemon"),
     "🍯": ("miel", "honey"), "🧀": ("queso", "cheese"), "🥥": ("coco", "coconut"),
     "🍌": ("banano", "guineo", "banana"), "🍊": ("naranja", "orange"), "🍎": ("manzana", "apple"),
@@ -92,6 +98,9 @@ def split_hashtags(text):
     for line in text.splitlines():
         if SEPARATOR.fullmatch(line):
             continue
+        # Repair a split CamelCase tag only on tag-led lines, preserving inline prose.
+        if line.lstrip().startswith("#"):
+            line = re.sub(r"(#\w+)[ \t]+([A-ZÁÉÍÓÚÜÑ]\w*)(?=[ \t]*(?:#|$))", r"\1\2", line)
         if HASHTAG.search(line) and not HASHTAG.sub("", line).strip(" \t.,;·|-"):
             tags += HASHTAG.findall(line)
         else:
@@ -107,15 +116,17 @@ def split_hashtags(text):
 
 
 def fitting_emojis(text, topic=""):
-    """Swap or drop emojis that don't fit (EMOJI_* above); keep at most 2."""
-    words = (topic + " " + text).lower()
+    """Swap or drop emojis that don't fit (EMOJI_* above); keep at most 3."""
+    words = (topic or text).lower()
     kept = []
 
     def judge(match):
         emoji = EMOJI_SWAP.get(match.group(0), match.group(0))
         base = emoji.replace("\uFE0F", "")
-        fits = base in EMOJI_ALWAYS or any(w in words for w in EMOJI_IF.get(base, ()))
-        if not fits or len(kept) >= 2:
+        if base == "🎂" and any(term in words for term in ("frutilla", "fresa", "strawberr")):
+            emoji = base = "🍓"
+        fits = base in EMOJI_ALWAYS or any(re.search(r"(?<!\w)" + re.escape(w), words) for w in EMOJI_IF.get(base, ()))
+        if not fits or emoji in kept or len(kept) >= 3:
             return ""
         kept.append(emoji)
         return emoji
@@ -144,9 +155,17 @@ def finish(text, lang="English", env=None, topic=""):
     """Clean generated copy and append the operator's optional call to action."""
     body, tags = split_hashtags(PREAMBLE.sub("", text.strip()).strip().strip('"').strip())
     body = re.sub(r"[ \t]{2,}", " ", fitting_emojis(body, topic)).strip()
-    body = drop_repeats(body, topic)
+    body = re.sub(r"[ \t]*((?:" + EMOJI.pattern + r"[ \t]*)+)([.!?])",
+                  lambda match: match[2] + " " + match[1].strip(), body)
+    body = drop_repeats(re.sub(r"[ \t]+([,.!?;:])", r"\1", body), topic)
     if not re.search(r"\w", body):
         return ""  # nothing but emojis or punctuation survived
+    if not EMOJI.search(body) and topic:
+        words = topic.lower()
+        matches = [emoji for emoji, terms in EMOJI_IF.items()
+                   if any(re.search(r"(?<!\w)" + re.escape(term), words) for term in terms)]
+        if matches:
+            body += " " + "".join(matches[:2])
     lang = language(lang)
     cta = (env or {}).get(CTA_SETTING.get(lang, ""), "").strip()
     if cta or not ORDER_CHANNEL.search(topic):
@@ -157,36 +176,56 @@ def finish(text, lang="English", env=None, topic=""):
         else:
             cta = ""
     unique = []
-    for tag in tags[:5]:
+    for tag in tags:
         if tag.lower() not in {t.lower() for t in unique}:
             unique.append(tag)
     caption = body + ("\n" + cta if cta else "")
-    return caption + ("\n\n" + " ".join(unique[:8]) if unique else "")
+    return caption + ("\n\n" + " ".join(unique[:5]) if unique else "")
 
 
-def ollama_caption(env, topic, lang):
+def ollama_caption(env, topic, lang, *, previous=None):
     base = env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/")
     model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")  # picked in the owner's blind test, 2026-10-31
     seconds = 0.0
-    for attempt in (1, 2):  # a second try when the guards leave nothing usable
+    prompt = build_prompt(topic, lang)
+    if previous:
+        instruction = ("Redacta una alternativa con un inicio diferente. Conserva los hechos del tema."
+                       if language(lang) == "Spanish" else
+                       "Write an alternative with a different opening. Keep the facts from the topic.")
+        prompt += f"\n\n{instruction}\n<previous-caption>\n{previous[:600]}\n</previous-caption>"
+    fallback = ""
+    for attempt in (1, 2):  # a second try if the caption is unusable or lacks relevant hashtags
         try:
             status, data = pmlib.http("POST", base + "/api/generate", body={
                 "model": model,
-                "prompt": build_prompt(topic, lang),
+                **pmlib.ollama_text_prompt(model, prompt),
                 "stream": False,
                 "keep_alive": 0,  # evict from unified memory as soon as the caption is done
                 # captions need < 1k tokens; a 2048 context halves the KV cache (target: 8 GB MacBook Air)
                 # 0.5: steadier wording from small models (the A/B saw "se desploman por la ciudad" at 0.7)
-                "options": {"temperature": 0.5, "num_predict": 260, "num_ctx": 2048},
+                "options": {"temperature": 0.65 if previous else 0.5, "num_predict": 180, "num_ctx": 2048},
             }, timeout=600)
         except PMError:
+            if fallback:
+                return fallback, model, round(seconds, 1)
             raise PMError("Ollama is not reachable at %s. Run ./publish-machine.sh start." % base)
         if status != 200 or not isinstance(data, dict):
+            if fallback:
+                return fallback, model, round(seconds, 1)
             raise PMError("Ollama returned HTTP %s: %s" % (status, str(data)[:300]))
         seconds += data.get("total_duration", 0) / 1e9
-        text = finish(data.get("response", ""), lang, env, topic)
-        if text:
-            return text, model, round(seconds, 1)
+        text = finish(pmlib.ollama_final_text(data), lang, env, topic)
+        if text and (not previous or text.casefold() != previous.casefold()):
+            _, tags = split_hashtags(text)
+            if len(tags) >= 2:
+                return text, model, round(seconds, 1)
+            if not fallback or tags:
+                fallback = text
+            prompt += ("\nIncluye dos hashtags concretos del tema, en una sola línea al final."
+                       if language(lang) == "Spanish" else
+                       "\nInclude two specific hashtags about the topic on one final line.")
+    if fallback:
+        return fallback, model, round(seconds, 1)
     raise PMError("The model's caption didn't pass the checks twice. Try again, or pass your own text with --no-ai.")
 
 
@@ -240,6 +279,7 @@ def main():
         info("[2/4] Drafting caption with local %s (Metal GPU, evicted after use)..."
              % env.get("LOCAL_LLM_MODEL", "llama3.2:3b"))
         caption, model, seconds = ollama_caption(env, args.topic, lang)
+    caption = pmlib.apply_final_tag(caption, pmlib.final_tag(env.get("CAPTION_FINAL_TAG")))
     info("\n--- CAPTION ---\n%s\n---------------\n" % caption)
 
     if args.dry_run:

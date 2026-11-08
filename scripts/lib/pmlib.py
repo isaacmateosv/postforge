@@ -7,6 +7,7 @@ Stdlib only, Python 3.9 compatible (macOS system python3): no backslashes inside
 f-string expressions, no match statements, no `X | Y` type unions.
 """
 import json
+import math
 import mimetypes
 import os
 import re
@@ -197,6 +198,25 @@ def active_jobs():
 def pid_alive(pid):
     if not pid:
         return False
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        try:
+            handle = kernel.OpenProcess(0x1000, False, int(pid))
+        except (ValueError, OverflowError):
+            return False
+        if not handle:
+            return ctypes.get_last_error() == 5
+        try:
+            code = wintypes.DWORD()
+            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259
+        finally:
+            kernel.CloseHandle(handle)
     try:
         os.kill(int(pid), 0)
     except PermissionError:
@@ -278,9 +298,78 @@ PROVIDER_DEFAULTS = {
     "tiktok": {"privacy_level": "SELF_ONLY", "duet": False, "stitch": False, "comment": True,
                "autoAddMusic": "no", "brand_content_toggle": False, "brand_organic_toggle": False,
                "content_posting_method": "UPLOAD"},
-    # Uploads from a Google project YouTube hasn't audited are locked private (DEPLOY-M1.md §6).
     "youtube": {"type": "public", "selfDeclaredMadeForKids": "no"},
 }
+
+
+def ollama_text_prompt(model, prompt):
+    if model.startswith("qwen3:"):
+        return {"prompt": prompt + "\n/no_think", "think": False}
+    return {"prompt": prompt}
+
+
+def ollama_final_text(data):
+    value = (data.get("response") or "").strip()
+    value = re.sub(r"<think>.*?</think>", "", value, flags=re.DOTALL | re.IGNORECASE).strip()
+    leaked = re.match(r"^(?:(?:okay|alright)[, ]*\s*)?(?:I need to|let me (?:think|break|tackle)|let's tackle)\b",
+                      value, flags=re.IGNORECASE)
+    return "" if "<think>" in value.lower() or leaked else value
+
+
+def final_tag(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    tag = "#" + value.removeprefix("#")
+    if not re.fullmatch(r"#\w{1,60}", tag):
+        raise PMError("Use one hashtag of up to 60 letters, numbers or underscores, without spaces.")
+    return tag
+
+
+def remove_final_tag(caption, tag):
+    if not tag:
+        return caption
+    pattern = r"(?<![\w#])" + re.escape(tag) + r"(?!\w)"
+    caption = re.sub(r"^[ \t]*" + pattern + r"[ \t]+", "", caption, flags=re.IGNORECASE | re.MULTILINE)
+    return re.sub(r"[ \t]*" + pattern, "", caption, flags=re.IGNORECASE).rstrip()
+
+
+def apply_final_tag(caption, tag):
+    if not tag:
+        return caption
+    caption = remove_final_tag(caption, tag)
+    if not caption:
+        return tag
+    last_line = caption.rsplit("\n", 1)[-1]
+    separator = " " if re.fullmatch(r"#\w+(?:[ \t]+#\w+)*", last_line) else "\n\n"
+    return caption + separator + tag
+
+
+YOUTUBE_TITLE_LIMIT = 100
+
+
+def youtube_title_line(content):
+    lines = re.sub(r"#\S+|[<>]", "", content).splitlines()
+    return next((" ".join(line.split()) for line in lines if line.strip()), "")
+
+
+def youtube_title_fits(title, short=False):
+    budget = YOUTUBE_TITLE_LIMIT - (len(" #Shorts") if short else 0)
+    return len(title) >= 2 and len(title.encode("utf-16-le")) // 2 <= budget
+
+
+def youtube_title(content, short=False):
+    """Format the title and fall back to a whole-word cut if it is too long."""
+    title = youtube_title_line(content)
+    suffix = " #Shorts" if short else ""
+    if len(title) < 2:
+        return "Untitled video" + suffix
+    if not youtube_title_fits(title, short):
+        budget = YOUTUBE_TITLE_LIMIT - len(suffix) - 1
+        truncated = title.encode("utf-16-le")[:budget * 2].decode("utf-16-le", errors="ignore")
+        whole = truncated.rsplit(" ", 1)[0] if " " in truncated else truncated
+        title = whole.rstrip(" ,;:–-") + "…"
+    return title + suffix
 
 
 def draft_settings(identifier, content, env=None, short=False):
@@ -295,10 +384,7 @@ def draft_settings(identifier, content, env=None, short=False):
         if privacy in ("PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"):
             settings["privacy_level"] = privacy
     if identifier == "youtube":
-        lines = [l for l in re.sub(r"#\S+", "", content).splitlines() if l.strip()]
-        title = (lines[0].strip() if lines else "")[:100]
-        title = title if len(title) >= 2 else "Untitled video"
-        settings["title"] = title[:92].rstrip() + " #Shorts" if short else title
+        settings["title"] = youtube_title(content, short)
     return settings
 
 
@@ -355,16 +441,15 @@ class Postiz:
             raise PMError("%s (file %s, %.1f MB; Postiz takes images up to 10 MB and videos up to 1 GB)"
                           % (exc, os.path.basename(path), os.path.getsize(path) / 1048576.0))
 
-    def create_draft(self, integration, content, media=None, when=None, settings=None, short=False):
-        """Stage a DRAFT (HITL guardrail: type is always 'draft'; Postiz starts no publish
-        workflow for DRAFT posts). `integration` is an item from integrations();
-        `settings` overrides the provider defaults. Returns the created post list."""
+    def create_draft(self, integration, content, media=None, when=None, settings=None, short=False, *, schedule=False):
+        """Stage a draft, or schedule a post when explicitly requested by a caller.
+        Settings override the provider defaults. Returns the created post list."""
         merged = draft_settings(integration.get("identifier") or "", content, self.env, short)
         merged.update(settings or {})
         if when is None:
             when = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
         body = {
-            "type": "draft",
+            "type": "schedule" if schedule else "draft",
             "date": when.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "shortLink": False,
             "tags": [],
@@ -427,12 +512,17 @@ def youtube_short(identifier, kind, path):
 def to_jpeg(src, out_dir, max_side=1920):
     """Convert/resize any macOS-readable image (PNG/HEIC/WEBP/TIFF...) to an 85% JPEG."""
     out = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".jpg")
-    run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85",
-         "-Z", str(max_side), src, "--out", out])
+    if sys.platform == "darwin" and which("sips"):
+        run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85",
+             "-Z", str(max_side), src, "--out", out])
+    else:
+        run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", src, "-frames:v", "1",
+             "-vf", f"scale={max_side}:{max_side}:force_original_aspect_ratio=decrease",
+             "-q:v", "2", out])
     return out
 
 
-def to_mp4(src, out_dir, max_seconds=None, max_side=1920):
+def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
     """Return src if it already is an H.264/AAC MP4 within limits, else a transcoded copy."""
     if not which("ffprobe") or not which("ffmpeg"):
         raise PMError("ffmpeg/ffprobe are required for video (brew install ffmpeg).")
@@ -441,19 +531,49 @@ def to_mp4(src, out_dir, max_seconds=None, max_side=1920):
         raise PMError("No video stream found in " + src)
     ext = os.path.splitext(src)[1].lower()
     too_long = bool(max_seconds) and duration > max_seconds
+    fits_bytes = max_bytes is None or os.path.getsize(src) <= max_bytes
     if (ext == ".mp4" and vcodec == "h264" and acodec in (None, "aac")
-            and not too_long and max(width, height) <= max_side):
+            and not too_long and fits_bytes and max(width, height) <= max_side):
         return src
     out = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".mp4")
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", src]
     if too_long:
         cmd += ["-t", str(max_seconds)]
+    rate_limit = []
+    if max_bytes is not None:
+        seconds = max(1, min(duration, max_seconds or duration))
+        # Allow for audio, MP4 overhead and encoder bitrate variation.
+        video_kbps = max(100, int(max_bytes * 8 * 0.8 / seconds / 1000) - 96)
+        rate_limit = ["-maxrate", f"{video_kbps}k", "-bufsize", f"{video_kbps}k"]
     cmd += [
         "-vf", "scale='min(%d,iw)':'min(%d,ih)':force_original_aspect_ratio=decrease,"
                "scale=trunc(iw/2)*2:trunc(ih/2)*2" % (max_side, max_side),
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", *rate_limit, "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", out,
     ]
     info("      Transcoding video to H.264/AAC MP4 (%s, %.0fs, %dx%d)..." % (vcodec, duration, width, height))
     run(cmd)
+    if max_bytes is not None and os.path.getsize(out) > max_bytes:
+        raise PMError("Prepared video exceeds the safe size for WhatsApp Status.")
     return out
+
+
+def split_story_video(path, folder):
+    """Prepare balanced Story clips under 60 seconds without dropping the tail."""
+    duration = ffprobe(path)[0]
+    if duration <= 60:
+        return [path]
+    count = math.ceil(duration / 59.5)
+    span = duration / count
+    parts = []
+    for index in range(count):
+        target = os.path.join(folder, "story-%02d.mp4" % (index + 1))
+        run(["ffmpeg", "-nostdin", "-y", "-v", "error",
+             "-ss", str(index * span), "-i", path, "-t", str(span),
+             "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264",
+             "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", target])
+        if not 3 <= ffprobe(target)[0] <= 60:
+            raise PMError("Could not prepare a Story clip between 3 and 60 seconds.")
+        parts.append(target)
+    return parts

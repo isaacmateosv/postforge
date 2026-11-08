@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">PostForge mark</title>
+  <desc id="desc">A paper plane crossing a forge spark</desc>
+  <rect width="128" height="128" rx="28" fill="#111827"/>
+  <path d="M25 67 102 27 72 103 58 76 25 67Z" fill="#f9fafb"/>
+  <path d="m25 67 41 2 6 34-14-27-33-9Z" fill="#94a3b8"/>
+  <path d="m91 18 4 11 11 4-11 4-4 11-4-11-11-4 11-4 4-11Z" fill="#f59e0b"/>
+</svg>

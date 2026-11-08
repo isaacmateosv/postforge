@@ -329,6 +329,11 @@ Docker images are also downloaded automatically by the first start. Keep at
 least 20 GB free before starting, and more if you choose larger models or retain
 many videos.
 
+## Set up publishing channels
+
+Use the [first-time channel setup and permissions guide](docs/reconnect/channel-setup.md)
+to create developer apps, register OAuth callbacks, and link WhatsApp through Evolution.
+
 ## Reconnect WhatsApp
 
 If WhatsApp did not reconnect automatically:
@@ -348,9 +353,12 @@ Before creating a real post:
 1. Open the PostForge menu (the calendar-and-paper-plane icon at the top right of the screen) or
    click the PostForge icon in the Dock to open the New Post window.
 2. Confirm the menu says **Ready to post** and the window's status says **Running**.
-3. Create one test draft for a future time.
-4. Confirm it appears as a **Draft** in Postiz.
-5. Reject the test draft.
+3. In the wide composer, attach media or confirm the text-only announcement destinations.
+   Use **idea:** for a brief or **caption:** with double quotes for exact wording.
+4. Bake with **⌘ Return**, review the time and destinations, then choose **Create Drafts**.
+5. Create one test draft for a future time.
+6. Confirm it appears as a **Draft** in Postiz.
+7. Reject the test draft using **Clear…** or the Postiz calendar.
 
 Nothing should publish unless you explicitly approve it in the intended workflow.
 
@@ -364,7 +372,10 @@ New Post…
 Open Postiz Calendar
 Turn Off…
 Coming up · No scheduled posts waiting
+WhatsApp Plans & Receipts…
+Check for Updates…
 Settings & Tools ▸
+About PostForge
 Quit PostForge (posting keeps running)
 ```
 
@@ -464,3 +475,27 @@ Copy the resulting package, the export, and `.env` privately to the new Mac. Nev
 upload `.env`, `data/`, `logs/`, `run/`, or `exports/` to a public service.
 
 WhatsApp’s regular intake defaults to **32 MiB per file** (`WA_MAX_MEDIA_MB`, effective range 1–64). PostForge streams larger videos up to **256 MiB** to disk and verifies their size and SHA-256 before planning. Use New Post for bigger files or media with missing download metadata.
+
+
+## Rust desktop and Telegram preview
+
+The Rust/Tauri client uses structured Compose, Delivery and Review screens.
+See [desktop setup](desktop/README.md) for host prerequisites, platform builds,
+artifact signing limitations and the shared Python bridge. The Swift Mac
+controller retains its existing system integrations.
+
+For Telegram, create a private BotFather bot, run the local setup helper and
+start the host agent. It registers commands and restricts messages and buttons
+to the configured private owner. Full English and Ecuadorian Spanish setup
+steps, file limits and approval flow are bundled in Technical Help.
+
+### Telegram UI settings and migration
+
+In the Rust client, open Telegram in the header. Supply your own dedicated bot,
+validate its token, send /start privately, find/select your owner account, and
+set language, heartbeat and enabled state. Confirm the owner before saving.
+No terminal is required for normal bot setup. The private .env holds the
+portable configuration; encrypted credentials exports include it, including
+legacy bot settings. On restore, Telegram remains paused. Stop the old host
+agent and explicitly enable the restored configuration in the destination UI.
+One bot must have only one receiver. See desktop/README.md for the complete flow.

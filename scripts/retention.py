@@ -25,6 +25,7 @@ ROOTS = (
     os.path.join(ROOT, "logs"),
     os.path.join(ROOT, "run", "wa-confirmations"),
     os.path.join(ROOT, "run", "wa-cache"),
+    os.path.join(ROOT, "run", "composer-plans"),
 )
 
 
@@ -50,7 +51,7 @@ def referenced_media():
         result = subprocess.run([
             'docker', 'exec', 'pm-postgres', 'psql', '-U', env.get('POSTGRES_USER', 'postiz'),
             '-d', env.get('POSTGRES_DB', 'postiz'), '-tA', '-v', 'ON_ERROR_STOP=1', '-c',
-            "SELECT coalesce(image::text, '[]') FROM public.\"Post\" WHERE \"deletedAt\" IS NULL;"
+            "SELECT coalesce(image::text, '[]') || ' ' || coalesce(settings::text, '{}') FROM public.\"Post\" WHERE \"deletedAt\" IS NULL;"
         ], capture_output=True, text=True, timeout=10)
         if result.returncode != 0:
             return None
@@ -61,7 +62,7 @@ def referenced_media():
                 queue = json.load(source)
             if not isinstance(queue, list) or not all(isinstance(item, dict) for item in queue):
                 return None
-            references += json.dumps([item for item in queue if item.get("status") != "sent"])
+            references += json.dumps([item for item in queue if item.get("status") not in ("sent", "cancelled")])
         for path in glob.glob(os.path.join(ROOT, 'run', 'wa-confirmations', '*.json')):
             with open(path, encoding='utf-8') as source:
                 references += json.dumps(json.load(source))

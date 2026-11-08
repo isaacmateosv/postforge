@@ -1,9 +1,83 @@
 # Inicio rápido de PostForge
 
+Este es el flujo actual del escritorio v2. Las instrucciones anteriores de Swift quedan abajo como referencia; usa solo el cliente Rust durante las pruebas de v2.
+
+## Escritorio en Rust y Telegram guiado
+
+**Inicio** muestra los borradores, las publicaciones programadas, la próxima
+publicación y los indicadores de conexión. Abre Postiz para revisar lo guardado
+o elige **Nueva publicación**.
+
+1. **Redacta**: escribe una idea o selecciona conservar tus palabras. Adjunta
+   archivos si los necesitas.
+2. **Destinos**: elige redes, formatos, fecha y hora. **Pronto · +10 min** coloca
+   una hora cercana en el futuro. La etiqueta del negocio empieza vacía en una
+   instalación nueva; se conservan las etiquetas que configuraste expresamente.
+   Para un Estado de WhatsApp solo de texto puedes elegir el color de fondo.
+   Las opciones de portada y etiqueta están agrupadas debajo.
+3. **Hornea y revisa**: una batidora pequeña anima la preparación. Se muestra
+   un texto inicial. **Probar otro texto** añade otra versión; las flechas recorren
+   las anteriores. Editar modifica la versión elegida. La adaptación más corta
+   para Threads se identifica aparte. **Editar título…** modifica solo el título
+   de YouTube (hasta 100 caracteres). Revisa los destinos y segmentos antes de
+   crear borradores o confirmar expresamente la programación directa.
+
+Las historias largas de Facebook e Instagram se dividen y programan con un
+minuto entre cada segmento. Un video de 205 segundos genera **una publicación
+más cuatro borradores de historias** por red al seleccionar ambos formatos.
+YouTube Shorts prepara una copia aparte de **2:59** para videos verticales o
+cuadrados más largos; las otras redes conservan el video completo. Elige
+**Video completo** para conservar todo el video de YouTube. Un video horizontal
+no se recorta de forma automática para convertirlo en Short.
+
+**WhatsApp** en la cabecera muestra la conexión o permite escanear el QR en la
+ventana. Se conserva una sesión que ya funciona. **Eliminar publicaciones…**
+distingue entre borrar borradores y cancelar publicaciones programadas. Muestra
+las cantidades antes de confirmar. Lo que ya se publicó permanece en línea.
+
+La app encuentra automáticamente su instalación local; no necesitas elegir
+carpetas para usarla. **Ajustes → Avanzado · recuperación y migración** sirve
+solo para localizar una instalación recuperada o migrada. No se muestra la
+ruta en el inicio.
+
+Abre **Telegram** en la cabecera de la app. Cada instalación usa su propio bot
+dedicado y una cuenta privada autorizada; no hay un bot global compartido.
+Créalo con **/newbot** en **@BotFather**, pega el token en el campo oculto y pulsa
+**Validar bot**. Envía **/start** a tu bot y usa **Buscar mi cuenta privada**.
+Elige tu cuenta y verifica su ID numérico. Configura el idioma y los avisos de
+actividad (**0** = apagados; si los activas, de **5 a 1440 minutos**), activa el
+bot y confirma **Guardar ajustes**. No necesitas la terminal. Mantén activa la
+privacidad de grupos; no necesitas modo inline ni webhook público. Envía **/new**
+a tu bot.
+
+Los botones guían el tipo de texto, archivos, destinos, formatos, hora y revisión.
+Usa **Probar otro texto**, las flechas o **Editar texto** para refinarlo.
+Envía solo después de la confirmación final. El Estado de WhatsApp se aprueba
+aparte. **/cancel** descarta el plan sin terminar y **/status** revisa si los
+servicios responden.
+
+El bot descarga hasta 20 MB por archivo desde la nube. Usa la app de escritorio
+para videos más grandes. Mantén el equipo despierto y los servicios activos
+cuando corresponda publicar. Inicia el agente después de reiniciar o configura
+el inicio automático del sistema.
+
+El .env privado y los respaldos cifrados de credenciales incluyen el token,
+la cuenta autorizada, el idioma, los avisos de actividad y la preferencia de
+activación. Al migrar, Telegram queda en pausa: detén el receptor anterior,
+revisa los ajustes en el nuevo equipo y actívalo expresamente. Guarda el
+respaldo y su contraseña de forma privada. Deja el token vacío para conservar
+el que ya guardaste. Desactivar conserva los ajustes y funciona incluso sin
+conexión con Telegram.
+
+## Flujo anterior del Mac en Swift
+
 Convierte una foto o un video y una idea en un borrador que puedas revisar antes de publicar.
 
 ```text
-Agrega archivos → Hornea la idea → Crea borradores → Aprueba en Postiz
+Archivos o texto → Hornea y revisa
+                     ├─ Crea borradores → Aprueba en Postiz
+                     └─ Confirma la programación directa
+Estado de WhatsApp → aprobación aparte
 ```
 
 ## Haz tu primera publicación
@@ -16,14 +90,69 @@ Agrega archivos → Hornea la idea → Crea borradores → Aprueba en Postiz
 YouTube Shorts mañana a las 9 a. m. Texto: «Esto es lo que hicimos esta semana».
 ```
 
+También puedes poner primero la idea y separarla con punto y coma. Por ejemplo, «galletas y cupcakes; postea en todo lado a las 7:15 pm, posts e historias».
+
 4. Pulsa **👨‍🍳 Hornea la idea**. Revisa la hora, los canales, el texto y los avisos sobre el video.
 5. Pulsa **Crear borradores** y abre el **calendario de Postiz**. Revisa el borrador y aprueba la programación ahí.
 
+Usa **idea:** o **escribe sobre** con un tema sin comillas para generar un texto. Usa **texto:** o **caption:** para conservar la redacción que ya preparaste. Un texto entre comillas dobles se conserva, incluso después de **idea:**. Si configuraste una etiqueta final, se añade al final.
+
+```text
+Facebook y Threads mañana a las 7:15 p. m.; idea: anunciar nuestro nuevo horario
+WhatsApp mañana a las 19:15; texto: "Mañana atendemos desde las 10. ¡Te esperamos! ✨"
+```
+
+La ventana más ancha mantiene el pedido y los archivos a la izquierda y el plan a la derecha. **Crear borradores** se habilita después de hornear correctamente. Cambiar el pedido, los archivos, los formatos o la portada requiere volver a hornear. El campo del pedido crece dentro de la ventana y permite desplazarte si el texto es más largo.
+
+Pulsa **Probar otro texto** para pedir otra redacción, usa **‹ / ›** para recorrer hasta ocho versiones guardadas o **Editar texto…** para corregirlo a mano. Estas acciones cambian únicamente la sección del texto, incluidos el texto de Threads y el título de YouTube cuando correspondan. Se conservan la fecha, los destinos, la portada, las notas y las advertencias del plan. Un texto exacto se reescribe solo si pides otra versión. Las versiones pertenecen al plan actual.
+
+En macOS, **⌘ Return** hornea la idea y **⌘Z** deshace cambios en el pedido. **Programar directamente…** programa las publicaciones seleccionadas después de confirmar. **Crear borradores** mantiene la aprobación posterior en Postiz. El Estado de WhatsApp requiere su propia aprobación.
+
+## Enviar un anuncio solo de texto
+
+Si no adjuntaste archivos, Hornea la idea abre una selección de destinos. Elige **Publicación de Facebook**, **Publicación de Threads**, **Estado de WhatsApp** o varios. Revisa esos destinos en el plan antes de continuar. En este flujo, las publicaciones e historias de Instagram, las historias de Facebook, TikTok y YouTube requieren un archivo. Para usarlos con un anuncio, adjunta una imagen o un video adecuado.
+
+En WhatsApp, confirma los destinos compatibles de forma explícita, por ejemplo:
+
+```text
+Facebook y Threads mañana a las 19:15, solo texto aprobado; texto: "Mañana atendemos desde las 10. ✨"
+WhatsApp mañana a las 19:15; texto: "Mañana atendemos desde las 10. ✨"
+```
+
+Responde **mejora plan 1** cuando se ofrezca para pedir otra redacción sin cambiar el plan. Revisa el texto que recibes antes de aprobarlo. También puedes enviar tus palabras exactas desde el inicio.
+
+## Limpiar elementos que ya no necesitas
+
+**Limpiar…** permite reiniciar el formulario, eliminar borradores y publicaciones fallidas de Postiz, cancelar la cola y los Estados pendientes de WhatsApp o combinar ambos alcances guardados. Primero muestra cuántos elementos coinciden y después solicita confirmar. Reiniciar el formulario limpia solo los campos sin guardar. La limpieza usa la organización actual de Postiz y conserva elementos cuyo estado cambió después de la vista previa.
+
+Las publicaciones que ya salieron quedan fuera del alcance. Un envío que ya empezó podría completarse. Revisa cualquier entrega sin confirmar antes de volver a publicar. Los archivos compartidos siguen la retención configurada. Los planes recibidos por WhatsApp que todavía esperan revisión se pueden rechazar en esa ventana.
+
+## Elige los formatos y la portada
+
+Abre **Opciones de borrador** en la barra de menús para acceder a los formatos y la portada.
+En la ventana de publicación, usa **Crear borradores de** para elegir publicaciones,
+historias o ambos formatos. **Automático** sigue tu instrucción. «Publica en todas
+las redes» incluye publicaciones e historias donde se admiten. Las historias
+requieren fotos o videos. WhatsApp usa su propio formato de Estado.
+
+Si adjuntas un solo video, en **Portada del video** puedes elegir una imagen aparte
+o ingresar un segundo, por ejemplo `12,5`. El plan muestra qué borradores pueden
+usar la portada. Los reels de Instagram admiten ambas opciones. En los videos
+normales de YouTube puedes usar una imagen o un fotograma extraído del video.
+En publicación directa de TikTok puedes indicar el segundo. Para los envíos a
+la bandeja de TikTok y YouTube Shorts, elige la portada en la plataforma.
+
+Si el plan incluye un video para un destino que admite portada y todavía no elegiste una, PostForge te pregunta si quieres continuar. En un plan listo para revisar, usa **Editar portada…** para habilitar los controles y volver a hornear el plan.
+
+Abre **Opciones de publicación → Configurar… → Etiqueta final…** para guardar una etiqueta. Déjala en blanco si prefieres omitirla. El plan la muestra en la última línea, incluso si escribiste el texto exacto. En WhatsApp, usa el comando que te propone el bot, por ejemplo `etiqueta plan 1 #MiNegocio`. Revisa la versión nueva antes de aprobar.
+
 ## Usa WhatsApp o Siri
 
-Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras PostForge esté encendido. Revisa el plan que te devuelve. Al confirmarlo, se preparan los borradores. Revisa los borradores de redes sociales en Postiz.
+Envía un archivo y una instrucción a tu chat contigo en WhatsApp mientras PostForge esté encendido. Revisa el plan que te devuelve. Al confirmarlo, se preparan los borradores. Revisa los borradores de redes sociales en Postiz. Antes del texto, escribe «solo publicaciones», «solo historias», «publicaciones e historias» o «portada en el segundo 12,5». Para usar una imagen aparte, adjunta un video y una foto y escribe «imagen de portada». La respuesta muestra el plan y los comandos para aprobarlo o rechazarlo y reenviar tu pedido.
 
 En tu Mac, importa **Nueva publicación en PostForge** con **Atajos de Siri…** en Ayuda y dile ese nombre a Siri. El atajo abre la ventana de publicación. Elige **Encender** ahí si los servicios están inactivos.
+
+Después de crear los borradores en el Mac, aprueba por separado el Estado de WhatsApp. Usa **Aprobar Estado…** en el plan o **Aprobar Estado de WhatsApp…** en la barra de menús. Revisa la confirmación en tu propio chat. Si la hora ya pasó, el Estado puede enviarse en cuanto lo apruebes.
 
 ## Libera recursos para editar
 
@@ -31,8 +160,9 @@ PostForge apaga sus servicios después de una hora sin actividad ni trabajo en c
 
 ## Revisa la duración de tus videos
 
-- **Facebook** avisa cuando el video dura un minuto o más para que puedas considerar una edición más corta.
+- Los **reels de Instagram** de más de tres minutos no se recomiendan a nuevas audiencias.
 - **YouTube Shorts** requiere un video vertical o cuadrado de hasta tres minutos.
+- Las **historias de Facebook e Instagram** dividen un video largo en clips separados. Revisa cada borrador en orden.
 - **Estado de WhatsApp** divide los videos largos en partes de hasta 60 segundos después de aprobarlos.
 
 ## Encuentra las herramientas
@@ -41,3 +171,16 @@ PostForge apaga sus servicios después de una hora sin actividad ni trabajo en c
 - **Buscar actualizaciones** está en el menú principal de la barra.
 - **Respaldo y traslado** permite exportar un respaldo privado.
 - En Ayuda, elige **Técnica** para consultar la instalación, la recuperación y el manejo de datos.
+
+
+## Ventana, bandeja y migración
+La ventana Rust se abre centrada y con un ancho cómodo (hasta 1120 píxeles lógicos); aprovecha más altura si el escritorio lo permite. Conserva el acceso a la barra de menús del sistema y puedes maximizarla manualmente. La cabecera y los controles inferiores permanecen visibles; el área de trabajo y los diálogos largos permiten desplazarse. En pantallas de menor altura, el espaciado se vuelve más compacto. Cerrar oculta la ventana; ⌘N (macOS) o Ctrl+N (Windows/Linux) vuelve a abrir el formulario mientras PostForge sea la app activa. El ícono del Dock de macOS también vuelve a mostrar la ventana. Salir en la bandeja cierra el cliente y los servicios de publicación siguen activos.
+
+Usa **Respaldo y traslado** desde la ventana o la bandeja. La exportación crea un archivo `.pfbackup` cifrado y autenticado con las credenciales, la configuración del acceso seguro, los datos de Postiz y los archivos multimedia; además, verifica la restauración en una base temporal. Guarda por separado la contraseña de al menos 12 caracteres: no se puede recuperar. Revisar un respaldo no modifica los datos activos. Para restaurar, revisa el mismo archivo, vuelve a ingresar la contraseña y confirma que el equipo anterior esté detenido. Reemplazar datos existentes requiere marcar una casilla y primero crea un respaldo cifrado de recuperación. Si las credenciales de la base son distintas, necesitas una instalación de destino nueva. Los servicios restaurados quedan detenidos y Telegram permanece en pausa: verifica la URL pública, el acceso seguro, las sesiones de los canales y los horarios antes de iniciar los servicios o activar Telegram. WhatsApp puede necesitar vincularse otra vez.
+
+La bandeja incluye Inicio, Nueva publicación, planes y aprobaciones de WhatsApp, conexiones, respaldos, actualizaciones, ajustes y Ayuda. Acerca de está casi al final, antes de Salir. Un número pequeño junto al ícono monocromático indica tareas activas. La app busca actualizaciones al iniciar y cada seis horas; la consulta manual incluye los componentes de Docker y Evolution. Las consultas incompletas se indican como tales; el cliente solo ofrece archivos ZIP Rust compatibles, no paquetes anteriores.
+
+
+### Dónde encontrar las acciones en la app
+
+Redacta → Destinos → Revisa y termina permanece en la parte superior. Elige **Generar un texto** si tienes una idea o **Usar mi texto** para conservar tu redacción. Las opciones muestran por separado la selección y el foco del teclado. El pie contiene información de privacidad y, mientras redactas, **Limpiar formulario**. El mantenimiento está en **Ajustes → App y datos**: actualizaciones, **Respaldo y traslado**, y eliminación de borradores o publicaciones en cola. El idioma también está en Ajustes. Puedes actualizar el inicio junto a **Abrir Postiz**. Estas acciones siguen disponibles en la bandeja. La limpieza muestra una vista previa y pide confirmación antes de eliminar algo. El batidor solo se anima mientras se prepara el plan y respeta la preferencia del sistema para reducir movimiento.

@@ -1,5 +1,138 @@
 # Changelog
 
+## [2.0.0-rc.22]
+
+- Simplify desktop surfaces and typography, give radio labels clear spacing, group maintenance under Settings, and replace the baking graphic with a compact animated vector whisk. Remove trailing ellipses from action labels in both languages.
+
+- Rust desktop opens tall and centered at a comfortable width, bounded by the monitor work area, with scrolling content, persistent controls and compact short-screen spacing. Native Cmd/Ctrl+N reopens the hidden composer; macOS Dock reopening also restores the window.
+- Native tray, active-task badges, six-hour release checks and a private encrypted Backup & Move assistant now share the main window workflows. Restore requires inspection and confirmation, preserves a rollback backup when replacing data, and leaves publishing services paused.
+
+
+- Restore a colorful, status-aware dashboard as the opening view, with saved drafts, upcoming posts and focused refreshes.
+- Hide installation paths in advanced recovery, remove duplicate Telegram setup actions, add in-window WhatsApp QR linking and a compact animated mixer.
+- Clarify Story segment counts, caption adaptations and version history; add separate YouTube title editing, a +10-minute shortcut and text Status background colors.
+- Prepare an independent 2:59 YouTube Shorts copy for longer portrait/square videos while retaining other destinations' full media; offer explicit full-video mode.
+- Keep the optional business hashtag empty for fresh installations and retain explicitly configured tags.
+
+## [2.0.0-rc.21]
+
+- Add per-installation Telegram configuration in the Rust UI: private token entry, bot validation, private owner discovery, language, heartbeat and enable/disable.
+- Store portable settings in the private .env; carry legacy and new bot secrets in encrypted credential exports. Restores pause Telegram until explicit activation, preserving preferences without two pollers.
+- Keep saved tokens out of UI responses and logs, validate private chat access, and roll back settings and conversation state if restarting the worker fails.
+
+## [2.0.0-rc.20]
+
+- Reorder the Mac composer around request, optional media, grouped options and review-side completion.
+- Add a Rust/Tauri composer with structured delivery fields and native build artifacts.
+- Share reviewed snapshots and replay-safe submission guards between desktop and Telegram.
+- Add private Telegram workflow buttons, caption versions and explicit confirmations.
+- Add a local Status agent, portable locks and conversion, native CI, and bilingual setup guides.
+
+## [2.0.0-rc.19]
+
+- Use a wide two-column composer and prominent bake and draft actions.
+- Revise only the copy section and browse caption versions with arrows.
+- Preserve quoted captions, validate dates and times, and confirm text-only announcement destinations.
+- Add scoped cleanup with a preview, confirmation, state rechecks, and scheduler cancellation.
+- Hide model identifiers in the composer, add a third baking sparkle, and update bilingual workflows and technical guides.
+
+## [2.0.0-rc.18]
+
+- Restore media delivery through the protected gateway with expiring, file-scoped signed links.
+- Split long single-video Meta Stories into individual clips and space scheduled parts.
+- Verify public byte-range downloads before creating social posts, including cover images.
+- Preserve the media signing key in encrypted gateway backups and restore older backups.
+- Explain media delivery failures and link expiry in English and Ecuadorian Spanish.
+
+## [2.0.0-rc.17]
+
+- Revise or edit captions without rebuilding the plan, and request revisions in WhatsApp.
+- Add the Mac bake shortcut, undo support, and an expanding request field.
+- Offer explicit direct scheduling for eligible social posts.
+- Improve local caption model support and contextual emojis.
+
+## [2.0.0-rc.16]
+
+- Put each channel name above its countdown and prevent text selection in the connection popover.
+
+## [2.0.0-rc.15]
+
+- Add padding and centered connection details with bold network names.
+- Label Postiz’s estimated Meta expiry dates and refresh the snapshot when opening Connections.
+
+## [2.0.0-rc.14]
+
+- Move channel reconnection countdowns into a Connections popover beside the service status.
+
+## [2.0.0-rc.13]
+
+- Preview a concise YouTube title with AI help when the first line is too long, and keep the full description.
+- Keep generated hashtags together with the final business tag.
+- Warn about new-audience recommendations for Instagram Reels over three minutes.
+- Center the composer steps and add sparks to the mixing animation.
+
+## [2.0.0-rc.12]
+
+- Add an editable final hashtag and a WhatsApp review step for changing it per plan.
+
+## [2.0.0-rc.11]
+
+- Place the composer steps near the top and add a brief, interruptible opening highlight.
+
+## [2.0.0-rc.10]
+
+- Preview the YouTube title and enforce its 100-character limit separately from the caption.
+
+## [2.0.0-rc.9]
+
+- Confirm missing video covers before review and require an explicit edit to change a reviewed cover.
+- Show a small mixing animation while preparing the plan.
+
+## [2.0.0-rc.8]
+
+- Clarify generated versus exact captions and improve Ecuadorian Spanish caption prompts.
+- Generate alternate captions and restore earlier versions from the Mac composer.
+
+## [2.0.0-rc.7]
+
+- Add private Telegram setup with owner detection and keep the worker in the normal Mac lifecycle.
+- Preserve reviewed caption text when creating drafts and show any shortened Threads version before approval.
+
+## [2.0.0-rc.6]
+
+- Move WhatsApp Plans & Receipts to the top-level menu bar menu.
+- Hold WhatsApp Status sends for review after uncertain delivery, and prepare smaller clips for Evolution.
+
+## [2.0.0-rc.5]
+
+- Improve generated caption tone, hashtag layout, and contextual emoji filtering.
+- Surface separate WhatsApp Status approval in the plan and menu bar.
+
+## [2.0.0-rc.4]
+
+- Give the plan more vertical space and organize it into review sections.
+- Highlight Bake Idea and show the steps before creating drafts.
+- Accept topic-first requests and colloquial Spanish for posting everywhere.
+
+## [2.0.0-rc.3]
+
+- Add menu bar shortcuts for draft formats, cover images, and cover timestamps.
+
+## [2.0.0-rc.2]
+
+- Choose posts, stories, or both in the Mac composer and WhatsApp plans.
+- Set a video cover from an image or a timestamp on supported channels.
+- Render the menu bar glyph at 18 points without automatic enlargement.
+- Document first-time channel setup and API options in English and Ecuadorian Spanish.
+
+## [2.0.0-rc.1]
+
+- Add an optional Docker-based browser dashboard for local service status and access to Postiz.
+- Add an optional Telegram bot with private status, a refresh button, and a configurable heartbeat.
+- Add separate password and authenticator sign-in in front of Postiz for remote deployments.
+- Preserve gateway users and authenticator enrollment in encrypted migration backups.
+- Verify the gateway separately from the Postiz scheduler when changing a protected tunnel URL, with rollback on failure.
+
 ## [1.0.8]
 
 - Add illustrated flow diagrams and bilingual quick-start and technical guides to the repository and offline app Help.

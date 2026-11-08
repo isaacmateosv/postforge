@@ -29,11 +29,12 @@ mkdir -p "$RESOURCES"
 cp "$DIR/scripts/pkg-postinstall.sh" "$SCRIPTS/postinstall"
 chmod 755 "$SCRIPTS/postinstall"
 COPYFILE_DISABLE=1 rsync -a \
-  --exclude '.env' --exclude 'data/' --exclude 'exports/' --exclude 'logs/' \
+  --include '.env.example' --exclude '.env' --exclude '.env.*' --exclude 'data/' --exclude 'exports/' --exclude 'logs/' \
   --exclude 'run/' --exclude 'backups/' --exclude 'tunnel/' \
   --exclude 'config/whatsapp/vip-list.txt' --exclude '__PROJECT_DIR__/' \
-  --exclude 'dist/' --exclude '.git/' --exclude 'docs/site/.git/' --exclude '.checkpoint/' \
-  --exclude '.DS_Store' --exclude '._*' --exclude '__pycache__/' --exclude '*.pyc' \
+  --exclude 'desktop/target/' --exclude 'desktop/dist/' --exclude 'desktop/gen/' \
+  --exclude 'dist/' --exclude '.git' --exclude '*compose.override.y*ml' --exclude 'docs/site/.git/' --exclude '.checkpoint/' \
+  --exclude 'PROGRESS.md' --exclude '.DS_Store' --exclude '._*' --exclude '__pycache__/' --exclude '*.pyc' \
   "$DIR/" "$STAGE/usr/local/share/postforge/"
 find "$STAGE" -name '._*' -exec rm -rf {} +
 xattr -cr "$STAGE" 2>/dev/null || true

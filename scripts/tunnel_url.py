@@ -5,6 +5,7 @@
 """Switch the public Postiz URL and roll it back if the new endpoint fails."""
 import argparse
 import fcntl
+import json
 import os
 from pathlib import Path
 import re
@@ -13,9 +14,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 URL_KEYS = ("NGROK_DOMAIN", "FRONTEND_URL", "NEXT_PUBLIC_BACKEND_URL", "MAIN_URL")
 
 
@@ -40,6 +42,8 @@ def updated_config(content, host, url):
         content, count = re.subn(rf"(?m)^[ \t]*{key}[ \t]*=[^\r\n]*", f"{key}={value}", content)
         if count != 1:
             raise ValueError(f"Expected exactly one {key} entry in .env.")
+    content = re.sub(r"(?m)^[ \t]*POSTFORGE_GATEWAY_HOST[ \t]*=[^\r\n]*",
+                     lambda _: f"POSTFORGE_GATEWAY_HOST={host}", content)
     return content
 
 
@@ -70,19 +74,45 @@ def probe(url):
 
 def compose(path, *args):
     # The lifecycle CLI may have exported the previous .env values.
-    env = {key: value for key, value in os.environ.items() if key not in URL_KEYS}
+    env = {key: value for key, value in os.environ.items() if key not in (*URL_KEYS, "POSTFORGE_GATEWAY_HOST")}
     result = subprocess.run(
         ["docker", "compose", "--env-file", str(path), *args],
         cwd=path.parent, env=env, timeout=90, capture_output=True, text=True,
     )
     if result.returncode:
         raise RuntimeError("Docker could not apply the Postiz and ngrok configuration.")
+    return result.stdout
 
 
-def wait_until_ready(local, public, expected):
+def gateway_ready(url):
+    try:
+        result = subprocess.run(
+            ["/usr/bin/curl", "--silent", "--max-time", "5", "--output", os.devnull,
+             "--header", "ngrok-skip-browser-warning: true", "--header", "Accept: text/html",
+             "--header", "Sec-Fetch-Mode: navigate", "--write-out", "%{http_code} %{redirect_url}",
+             url + "/api/"], capture_output=True, text=True, timeout=7, check=True,
+        )
+        status, _, location = result.stdout.partition(" ")
+        target = urlsplit(urljoin(url, location))
+        if (status not in ("302", "303", "307", "308")
+                or (target.scheme, target.netloc) != ("https", urlsplit(url).netloc)
+                or not (target.path == "/authelia" or target.path.startswith("/authelia/"))):
+            return False
+        portal = subprocess.run(
+            ["/usr/bin/curl", "--silent", "--max-time", "5", "--output", os.devnull,
+             "--header", "ngrok-skip-browser-warning: true", "--write-out", "%{http_code}",
+             url + "/authelia/"], capture_output=True, text=True, timeout=7, check=True,
+        )
+        return portal.stdout == "200"
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return False
+
+
+def wait_until_ready(local, public, expected, *, gated=False):
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
-        if probe(local) == expected and (public is None or probe(public) == expected):
+        public_ready = public is None or (gateway_ready(public) if gated else probe(public) == expected)
+        if probe(local) == expected and public_ready:
             result = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/lib/machine_state.py"), "--check-scheduler"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12,
@@ -98,18 +128,39 @@ def read_setting(content, key, default=""):
     return match[1].strip().strip("\"'") if match else default
 
 
+def check_gateway_config(path, host):
+    services = json.loads(compose(path, "config", "--format", "json"))["services"]
+    proxy = services.get("postforge-gateway", {})
+    tunnel = services.get("ngrok", {})
+    auth = services.get("postforge-auth")
+
+    if (auth is None or not host or tunnel.get("command", [])[-1:] != ["postforge-gateway:8080"]
+            or proxy.get("environment", {}).get("POSTFORGE_GATEWAY_HOST") != host
+            or proxy.get("ports") or auth.get("ports")):
+        raise RuntimeError("The effective tunnel and gateway configuration does not protect Postiz.")
+
+
+def apply_services(path, gated, host):
+    if gated:
+        check_gateway_config(path, host)
+        compose(path, "up", "-d", "--no-deps", "--force-recreate", "postforge-auth", "postforge-gateway")
+    compose(path, "up", "-d", "--no-deps", "postiz", "ngrok")
+
+
 def switch(path, value):
     host, url = normalize(value)
     run = path.parent / "run"
     run.mkdir(mode=0o700, exist_ok=True)
     backup = run / "tunnel-url.previous"
+    gateway_backup = run / "tunnel-gateway.previous"
+    gateway = path.parent / "data/gateway/configuration.yml"
     with (run / "tunnel-url.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise ValueError("Another tunnel change is running.") from exc
-        if backup.exists():
-            raise ValueError(f"A previous switch needs recovery. Restore {backup} as .env before retrying.")
+        if backup.exists() or gateway_backup.exists():
+            raise ValueError(f"A previous switch needs recovery. Check the tunnel recovery files in {run} before retrying.")
         original = path.read_bytes()
         content = original.decode("utf-8")
         previous_url = read_setting(content, "FRONTEND_URL")
@@ -122,25 +173,48 @@ def switch(path, value):
         expected = probe(local)
         if expected is None:
             raise ValueError("Turn PostForge on and wait for local Postiz before changing the tunnel.")
-        previously_public = previous_url if previous_url and probe(previous_url) == expected else None
+        gated = gateway.exists() or gateway.is_symlink()
+        if gated:
+            if gateway.is_symlink() or not gateway.is_file():
+                raise ValueError("The gateway configuration must be a local file.")
+            from v2.gateway_setup import update_hostname
+
+            gateway_original = gateway.read_bytes()
+            gateway_updated = json.dumps(update_hostname(json.loads(gateway_original), host), indent=2)
+            if not previous_url or not gateway_ready(previous_url):
+                raise ValueError("Verify the existing public gateway before changing the tunnel.")
+            previous_host, _ = normalize(previous_url)
+            check_gateway_config(path, previous_host)
+            previously_public = previous_url
+        else:
+            previously_public = previous_url if previous_url and probe(previous_url) == expected else None
         compose(path, "config", "--quiet")
         private_write(backup, original, run)
         try:
+            if gated:
+                private_write(gateway_backup, gateway_original, run)
+                compose(path, "stop", "ngrok")
+                private_write(gateway, (gateway_updated + "\n").encode(), gateway.parent)
             private_write(path, updated, run)
             print("STEP 1/2 Restarting Postiz and ngrok", flush=True)
-            compose(path, "up", "-d", "--no-deps", "postiz", "ngrok")
+            apply_services(path, gated, host)
             print("STEP 2/2 Verifying the tunnel and scheduler", flush=True)
-            wait_until_ready(local, url, expected)
+            wait_until_ready(local, url, expected, gated=gated)
         except (Exception, KeyboardInterrupt) as failure:
             print("Restoring the previous tunnel configuration.", flush=True)
             try:
+                if gated:
+                    compose(path, "stop", "ngrok")
+                    private_write(gateway, gateway_original, gateway.parent)
                 private_write(path, original, run)
-                compose(path, "up", "-d", "--no-deps", "postiz", "ngrok")
-                wait_until_ready(local, previously_public, expected)
+                apply_services(path, gated, previous_host if gated else host)
+                wait_until_ready(local, previously_public, expected, gated=gated)
             except (Exception, KeyboardInterrupt) as rollback_error:
-                raise RuntimeError(f"Automatic recovery failed. The previous settings are in {backup}.") from rollback_error
+                raise RuntimeError(f"Automatic recovery failed. The previous settings are in {run}.") from rollback_error
+            gateway_backup.unlink(missing_ok=True)
             backup.unlink()
             raise RuntimeError("Tunnel change failed. The previous settings and services were restored.") from failure
+        gateway_backup.unlink(missing_ok=True)
         backup.unlink()
         return url
 
@@ -159,7 +233,7 @@ def main():
         path = args.env_file.resolve()
         print(switch(path, args.url) if args.url is not None else read_setting(path.read_text(), "FRONTEND_URL"))
         return 0
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
         print(f"✖ {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

@@ -1,0 +1,208 @@
+<!-- Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors. -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PostForge Desktop</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
+  <div class="tools">
+
+    <button id="go-home" data-en="Dashboard" data-es="Inicio"></button><button id="whatsapp-open">WhatsApp</button><button id="telegram-open">Telegram</button><button id="settings-open" data-en="Settings" data-es="Ajustes"></button><button id="help"></button>
+  </div>
+</header>
+<nav id="steps" aria-label="Workflow"></nav>
+<div id="notice" role="status" hidden></div>
+<div id="baking-visual" role="status" aria-live="polite" hidden>
+<svg viewBox="0 0 96 76" aria-hidden="true">
+<g class="mix-whisk"><path d="M66 7 47 35 M70 10 51 38 M48 32C29 30 30 51 42 50C54 49 58 36 48 32Z M48 32C37 35 34 47 42 50 M48 32C49 40 46 47 42 50"/></g>
+<path class="mix-bowl" d="M19 37C22 58 32 66 48 66S74 58 77 37"/>
+<ellipse class="mix-rim" cx="48" cy="37" rx="29" ry="6"/>
+<path class="mix-swirl" d="M27 39Q48 48 69 39"/>
+<g class="mix-sparks"><path d="m18 14 1.5 4.5L24 20l-4.5 1.5L18 26l-1.5-4.5L12 20l4.5-1.5Z"/><path d="m80 22 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/><path d="m40 6 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/></g>
+</svg><div><strong data-en="Baking your idea" data-es="Horneando tu idea"></strong><span data-en="Finding the right words" data-es="Buscando las palabras precisas"></span></div>
+</div>
+<main>
+<section id="home" class="page">
+  <div class="home-banner"><div><span class="eyebrow" data-en="YOUR PUBLISHING SPACE" data-es="TU ESPACIO DE PUBLICACIÓN"></span><h2 data-en="Good ideas deserve a clear plan." data-es="Las buenas ideas merecen un buen plan."></h2><p data-en="Everything you are preparing, in one place." data-es="Todo lo que estás preparando, en un solo lugar."></p></div><button id="start-post" class="primary" data-en="＋ New post" data-es="＋ Nueva publicación"></button></div>
+  <div id="health" class="health-row" aria-live="polite"></div>
+  <div class="overview-grid">
+    <button id="show-drafts" class="stat"><span data-en="Ready to review" data-es="Por revisar"></span><strong id="dash-drafts">—</strong><small data-en="Drafts in Postiz" data-es="Borradores en Postiz"></small></button>
+    <button id="show-queue" class="stat"><span data-en="Scheduled" data-es="Programadas"></span><strong id="dash-queue">—</strong><small data-en="Awaiting their moment" data-es="Esperando su momento"></small></button>
+    <div class="stat"><span data-en="Next publication" data-es="Próxima publicación"></span><strong id="dash-next" class="next-date">—</strong><small id="dash-updated"></small></div>
+  </div>
+  <details id="status-card" class="card" hidden><summary><span data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></span> <span id="status-count"></span></summary><div id="dashboard-status"></div><button id="wa-receipts" data-en="View delivery receipts" data-es="Ver recibos de entrega"></button><div id="wa-receipt-history"></div></details>
+  <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><div class="dashboard-actions"><button id="reconnect"></button><button id="home-calendar" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div></div><div id="dashboard-posts" class="post-list"></div></article>
+</section>
+
+<section id="compose" class="page" hidden>
+  <div class="workspace">
+    <article class="card">
+      <div class="section-title"><span class="number">1</span><div>
+        <h2 data-en="What are we sharing?" data-es="¿Qué vamos a compartir?"></h2>
+        <p data-en="Start with your message. Attach media if this post needs it." data-es="Empieza por tu mensaje. Adjunta archivos si esta publicación los necesita."></p>
+      </div></div>
+      <fieldset><legend data-en="Caption mode" data-es="Tipo de texto"></legend>
+        <div class="segmented">
+          <label><input type="radio" name="mode" value="idea" checked><span data-en="Generate a caption" data-es="Generar un texto"></span></label>
+          <label><input type="radio" name="mode" value="exact"><span data-en="Use my caption" data-es="Usar mi texto"></span></label>
+        </div>
+      </fieldset>
+      <label for="body" id="body-label"></label>
+      <textarea id="body" rows="5"></textarea>
+      <p class="hint" id="mode-hint"></p>
+      <div class="media-heading"><h3 data-en="Media · optional" data-es="Archivos · opcional"></h3>
+        <div><button id="add-media"></button><button id="clear-media"></button></div>
+      </div>
+      <div id="drop-zone" tabindex="0"><p id="drop-label"></p><ul id="media-list"></ul></div>
+      <div class="actions end"><button id="to-delivery" class="primary"></button></div>
+    </article>
+    <aside class="card quiet">
+      <h2 data-en="A review comes first" data-es="Primero revisas"></h2>
+      <ol>
+        <li data-en="Write an idea or your finished caption." data-es="Escribe una idea o el texto terminado."></li>
+        <li data-en="Choose destinations, time and formats." data-es="Elige destinos, hora y formatos."></li>
+        <li data-en="Review before creating drafts or scheduling." data-es="Revisa antes de crear borradores o programar."></li>
+      </ol>
+      <div class="creative-note"><span>✦ ✧ ✦</span><h3 data-en="Your voice. A little spark." data-es="Tu voz. Un toque de chispa."></h3><p data-en="Bake a fresh caption, or keep the words you already love. Nothing leaves without your review." data-es="Hornea un texto nuevo o conserva las palabras que ya te encantan. Tú revisas antes de continuar."></p></div>
+    </aside>
+  </div>
+</section>
+<section id="delivery" class="page" hidden>
+  <article class="card">
+    <div class="section-title"><span class="number">2</span><div>
+      <h2 data-en="Where and when?" data-es="¿Dónde y cuándo?"></h2>
+      <p data-en="These choices become the plan you will review." data-es="Estas opciones forman el plan que vas a revisar."></p>
+    </div></div>
+    <div id="text-warning" class="callout" hidden></div>
+    <fieldset><legend data-en="Destinations" data-es="Destinos"></legend><div id="destinations" class="destination-grid"></div><button id="select-all"></button></fieldset>
+    <div class="form-grid">
+      <label><span data-en="Local date and time" data-es="Fecha y hora local"></span><input id="post-at" type="datetime-local"><small id="zone"></small><button id="asap" type="button" data-en="Soon · +10 min" data-es="Pronto · +10 min"></button></label>
+      <label><span data-en="Formats" data-es="Formatos"></span>
+        <select id="placement">
+          <option value="both" data-en="Posts and stories where supported" data-es="Publicaciones e historias compatibles"></option>
+          <option value="feed" data-en="Posts only" data-es="Solo publicaciones"></option>
+          <option value="story" data-en="Stories only" data-es="Solo historias"></option>
+        </select>
+      </label>
+    </div>
+    <div class="form-grid" id="network-options">
+      <label id="youtube-options"><span data-en="YouTube format" data-es="Formato de YouTube"></span><select id="youtube-mode"><option value="shorts" data-en="Shorts · trim to 2:59 if longer" data-es="Shorts · recorta a 2:59 si dura más"></option><option value="regular" data-en="Full video · no trim" data-es="Video completo · sin recortar"></option></select></label>
+      <label id="wa-text-options"><span data-en="WhatsApp text Status background" data-es="Fondo del Estado de texto de WhatsApp"></span><input id="wa-background" type="color" value="#128C7E"><small data-en="Applies to text-only Status, after approval." data-es="Se aplica a los Estados solo de texto, después de aprobarlos."></small></label>
+    </div>
+    <details>
+      <summary data-en="Caption and cover options" data-es="Opciones del texto y la portada"></summary>
+      <div class="form-grid">
+        <label><span data-en="Business hashtag · optional" data-es="Etiqueta del negocio · opcional"></span><input id="final-tag" type="text"><small data-en="Added after the other relevant hashtags." data-es="Se añade después de las otras etiquetas del tema."></small></label>
+        <div id="cover-options">
+          <label for="cover-second" data-en="Cover frame · seconds" data-es="Fotograma de portada · segundos"></label>
+          <input id="cover-second" type="number" min="0" step=".1" placeholder="12.5">
+          <div class="actions"><button id="cover-image"></button><button id="cover-clear"></button></div>
+          <small id="cover-name"></small>
+        </div>
+      </div>
+    </details>
+    <div class="actions between"><button id="back-compose"></button><button id="bake" class="primary"></button></div>
+  </article>
+</section>
+<section id="review" class="page" hidden>
+  <div class="workspace review-grid">
+    <article class="card">
+      <div class="section-title"><span class="number">3</span><h2 data-en="Review the plan" data-es="Revisa el plan"></h2></div>
+      <div id="plan-meta"></div><div id="warnings"></div><button id="edit-inputs"></button>
+    </article>
+    <article class="card">
+      <div class="copy-toolbar"><h2 data-en="Caption" data-es="Texto"></h2><div>
+        <button id="previous" aria-label="Previous caption">‹</button><span id="version"></span><button id="next" aria-label="Next caption">›</button>
+      </div></div>
+      <div id="copy"></div>
+      <div id="caption-editor" hidden><textarea id="edited" rows="7"></textarea><div class="actions"><button id="save-caption"></button><button id="cancel-edit"></button></div></div>
+      <div class="actions wrap"><button id="another"></button><button id="edit-caption"></button></div>
+      <div class="finish">
+        <p data-en="Choose how this plan should continue." data-es="Elige cómo quieres continuar con este plan."></p>
+        <div class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
+        <small data-en="WhatsApp Status has its own approval after creation." data-es="El Estado de WhatsApp se aprueba por separado después de crear el plan."></small>
+      </div>
+    </article>
+  </div>
+</section>
+<section id="receipt" class="page" hidden>
+  <article class="card">
+    <h2 id="receipt-title"></h2><div id="receipt-content"></div>
+    <div class="actions wrap"><button id="calendar"></button><button id="approve-status"></button><button id="new-plan" class="primary"></button></div>
+  </article>
+</section>
+</main>
+<footer><span id="workspace-status"></span><button id="new"></button></footer>
+<dialog role="dialog" aria-modal="true" id="app-settings" aria-labelledby="settings-title">
+<h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
+<div class="settings-row"><label for="language" data-en="Language" data-es="Idioma"></label><select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></div>
+<div class="settings-section"><h3 data-en="App & data" data-es="App y datos"></h3>
+<div class="settings-row"><div><strong data-en="Updates" data-es="Actualizaciones"></strong><small data-en="Check the app and local services" data-es="Revisa la app y los servicios locales"></small></div><button id="updates-open" data-en="Check for updates" data-es="Buscar actualizaciones"></button></div>
+<div class="settings-row"><div><strong data-en="Backup & Move" data-es="Respaldo y traslado"></strong><small data-en="Export or restore an encrypted backup" data-es="Exporta o restaura un respaldo cifrado"></small></div><button id="backup-open" data-en="Open assistant" data-es="Abrir asistente"></button></div>
+<div class="settings-row"><div><strong data-en="Drafts & queue" data-es="Borradores y cola"></strong><small data-en="Review unpublished items before removing them" data-es="Revisa los elementos pendientes antes de eliminarlos"></small></div><button id="cleanup"></button></div>
+</div>
+<details><summary data-en="Advanced · recovery and migration" data-es="Avanzado · recuperación y migración"></summary><p data-en="Only use this when recovering an existing installation or connecting a migrated one. Services, credentials and media must belong to the same installation." data-es="Usa esta opción solo para recuperar una instalación existente o conectar una migrada. Los servicios, las credenciales y los archivos deben pertenecer a la misma instalación."></p><button id="workspace"></button><p id="storage-location" class="hint"></p></details>
+<div class="actions end"><button id="settings-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
+<dialog role="dialog" aria-modal="true" id="whatsapp-settings" aria-labelledby="whatsapp-title">
+<h2 id="whatsapp-title" data-en="Connect WhatsApp" data-es="Conecta WhatsApp"></h2>
+<div id="wa-state" class="callout" role="status"></div>
+<p data-en="On your phone: WhatsApp → Settings → Linked devices → Link a device. Scan the QR here. An existing working session is kept." data-es="En tu teléfono: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo. Escanea el QR aquí. Se conserva una sesión que ya funciona."></p>
+<img id="wa-qr" alt="WhatsApp pairing QR" hidden><div id="wa-feedback" role="status"></div>
+<div class="actions between"><button id="wa-refresh" data-en="Get / refresh QR" data-es="Obtener / renovar QR"></button><button id="wa-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
+
+<dialog role="dialog" aria-modal="true" id="modal" aria-labelledby="modal-title">
+  <h2 id="modal-title"></h2><div id="modal-body"></div>
+  <div class="actions end"><button id="modal-cancel"></button><button id="modal-confirm" class="primary"></button></div>
+</dialog>
+<dialog role="dialog" aria-modal="true" id="telegram-settings" aria-labelledby="telegram-title">
+  <h2 id="telegram-title" data-en="Telegram · your installation" data-es="Telegram · tu instalación"></h2>
+  <div id="telegram-feedback" role="status"></div>
+  <div class="telegram-body">
+  <p data-en="Optional. Use your own dedicated bot; PostForge has no shared global bot. Only the private owner selected here can control it." data-es="Opcional. Usa tu propio bot dedicado; PostForge no tiene un bot global compartido. Solo la cuenta privada que elijas aquí podrá controlarlo."></p>
+  <div id="telegram-summary" class="callout" role="status"></div>
+  <label class="toggle"><input id="telegram-enabled" type="checkbox"><span data-en="Enable Telegram on this computer" data-es="Activar Telegram en este equipo"></span></label>
+  <div class="settings-field">
+    <label for="telegram-token" data-en="BotFather token" data-es="Token de BotFather"></label>
+    <input id="telegram-token" type="password" autocomplete="new-password" spellcheck="false">
+    <small data-en="Create a dedicated bot with /newbot in @BotFather. Leave this field empty to keep a saved token. The saved token is never displayed." data-es="Crea un bot dedicado con /newbot en @BotFather. Deja este campo vacío para conservar el token guardado. El token guardado nunca se muestra."></small>
+    <button id="telegram-inspect" data-en="Validate bot" data-es="Validar bot"></button>
+  </div>
+  <div class="settings-field">
+    <label for="telegram-owner" data-en="Authorized private owner · Telegram numeric ID" data-es="Cuenta privada autorizada · ID numérico de Telegram"></label>
+    <input id="telegram-owner" inputmode="numeric" autocomplete="off">
+    <small data-en="Open your bot in Telegram, send /start, then find your account below. If changing an active bot's owner, disable and save first. Groups are not authorized." data-es="Abre tu bot en Telegram, envía /start y busca tu cuenta aquí abajo. Para cambiar el propietario de un bot activo, primero desactívalo y guarda. No se autorizan grupos."></small>
+    <button id="telegram-detect" data-en="Find my private account" data-es="Buscar mi cuenta privada"></button>
+    <select id="telegram-owners" aria-label="Detected private accounts" hidden></select>
+  </div>
+  <div class="form-grid">
+    <label><span data-en="Bot language" data-es="Idioma del bot"></span><select id="telegram-language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></label>
+    <label><span data-en="Heartbeat · minutes" data-es="Aviso de actividad · minutos"></span><input id="telegram-heartbeat" type="number" min="0" max="1440" step="1"><small data-en="0 = off. Otherwise 5–1440 minutes." data-es="0 = apagado. Si lo activas, de 5 a 1440 minutos."></small></label>
+  </div>
+  <p class="hint" data-en="Settings, including the secret token, are stored in the private .env and included in encrypted credentials backups. Restores keep Telegram paused until you confirm the old host is stopped. Keep group privacy enabled; no public webhook or inline mode is required." data-es="Los ajustes, incluido el token secreto, se guardan en el .env privado y viajan en los respaldos cifrados de credenciales. Al restaurar, Telegram queda en pausa hasta confirmar que el equipo anterior está detenido. Mantén activa la privacidad de grupos; no necesitas webhook público ni modo inline."></p>
+  </div>
+  <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
+</dialog>
+
+<dialog role="dialog" aria-modal="true" id="backup-dialog" aria-labelledby="backup-title">
+<h2 id="backup-title" data-en="Backup & Move" data-es="Respaldo y traslado"></h2>
+<p data-en="Your posts, media, credentials and gateway travel together in one encrypted file. Keep its passphrase somewhere safe." data-es="Las publicaciones, archivos, credenciales y el acceso seguro viajan juntos en un archivo cifrado. Guarda su contraseña en un lugar seguro."></p>
+<select id="backup-mode"><option value="export" data-en="Create a verified backup" data-es="Crear un respaldo verificado"></option><option value="inspect" data-en="Inspect a backup before restoring" data-es="Revisar un respaldo antes de restaurarlo"></option></select>
+<button id="backup-pick" data-en="Choose destination" data-es="Elegir destino"></button><p id="backup-path" class="hint"></p>
+<label><span data-en="Passphrase · at least 12 characters" data-es="Contraseña · al menos 12 caracteres"></span><input id="backup-password" type="password" autocomplete="new-password"></label>
+<label id="backup-confirm-row"><span data-en="Confirm passphrase" data-es="Confirma la contraseña"></span><input id="backup-confirm" type="password" autocomplete="new-password"></label>
+<progress id="backup-progress" value="0" max="100" hidden></progress><p id="backup-stage" role="status"></p><div id="backup-result"></div>
+<label id="backup-replace-row" hidden><input id="backup-replace" type="checkbox"><span data-en="Replace existing local Postiz data (a rollback backup is created first)." data-es="Reemplazar los datos locales de Postiz (primero se crea un respaldo de recuperación)."></span></label>
+<label id="backup-old-host-row" hidden><input id="backup-old-host" type="checkbox"><span data-en="The previous publishing host is stopped." data-es="El equipo que publicaba anteriormente está detenido."></span></label>
+<div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="primary" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></div>
+</dialog>
+</body>
+</html>

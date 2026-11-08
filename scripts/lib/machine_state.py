@@ -113,10 +113,12 @@ def now_iso():
 
 def whatsapp_state():
     pending = []
+    needs_review = 0
     try:
         with open(WHATSAPP_QUEUE, encoding="utf-8") as fh:
-            pending = [item for item in json.load(fh)
-                       if item.get("status") == "pending"]
+            items = json.load(fh)
+            pending = [item for item in items if item.get("status") == "pending"]
+            needs_review = sum(item.get("status") == "needs_review" for item in items)
     except (OSError, ValueError, TypeError):
         pass
     confirmations = 0
@@ -131,6 +133,7 @@ def whatsapp_state():
         "pending": len(pending),
         "awaiting_approval": len(pending) - len(approved),
         "approved": len(approved),
+        "needs_review": needs_review,
         "confirmations": confirmations,
         "next": min(pending_times) if pending_times else None,
     }

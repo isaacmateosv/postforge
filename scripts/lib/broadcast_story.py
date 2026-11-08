@@ -43,6 +43,8 @@ EVO_BATCH = 10
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif", ".tif", ".tiff"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
 MAX_VIDEO_SECONDS = STATUS_PART_SECONDS
+MAX_STATUS_VIDEO_BYTES = 6 * 1024 * 1024
+MAX_STATUS_VIDEO_SIDE = 1280
 MAX_SIDE = 1920
 LOG_FILE = "whatsapp-status.jsonl"
 STATUS_KINDS = {"conversation": "text", "extendedTextMessage": "text",
@@ -176,7 +178,7 @@ def prepare_video(src, tmp):
     if duration > MAX_VIDEO_SECONDS:
         warn("Video is %.0fs; WhatsApp statuses allow %ds, trimming to the first %ds."
              % (duration, MAX_VIDEO_SECONDS, MAX_VIDEO_SECONDS))
-    return pmlib.to_mp4(src, tmp, MAX_VIDEO_SECONDS, MAX_SIDE)
+    return pmlib.to_mp4(src, tmp, MAX_VIDEO_SECONDS, MAX_STATUS_VIDEO_SIDE, max_bytes=MAX_STATUS_VIDEO_BYTES)
 
 
 def prepare_media(kind, src):

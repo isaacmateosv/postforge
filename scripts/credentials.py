@@ -13,8 +13,11 @@ passes it in the PM_PASSPHRASE environment variable (read once, then removed).
 import argparse
 import getpass
 import os
+import sqlite3
 import subprocess
 import tempfile
+import zipfile
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV = os.path.join(ROOT, ".env")
@@ -40,10 +43,10 @@ def passphrase(prompt, confirm_prompt=None):
     return first, (getpass.getpass(confirm_prompt) if confirm_prompt else first)
 
 
-def export_credentials(path):
+def export_credentials(path, include_gateway=False, password=None):
     if not os.path.isfile(ENV):
         raise RuntimeError("No .env found at " + ENV)
-    password, confirmation = passphrase("Encryption passphrase: ", "Re-enter encryption passphrase: ")
+    password, confirmation = passphrase("Encryption passphrase: ", "Re-enter encryption passphrase: ") if password is None else (password, password)
     if password != confirmation:
         raise RuntimeError("Passphrases do not match")
     if len(password) < 12:
@@ -52,8 +55,21 @@ def export_credentials(path):
     fd, temporary = tempfile.mkstemp(prefix=".credentials-", dir=os.path.dirname(path))
     os.close(fd)
     try:
-        run_openssl("encrypt", password, ENV, temporary)
+        from telegram_settings import export_env
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(path)) as workspace:
+            snapshot = Path(workspace) / 'credentials'
+            snapshot.write_text(export_env(Path(ENV).read_text(encoding='utf-8'), Path(ROOT)), encoding='utf-8')
+            snapshot.chmod(0o600)
+            run_openssl("encrypt", password, str(snapshot), temporary)
         os.chmod(temporary, 0o600)
+        if include_gateway:
+            from gateway_backup import export_gateway
+
+            directory = Path(ROOT) / "data/gateway"
+            if directory.exists() or directory.is_symlink():
+                if directory.is_symlink() or directory.stat().st_mode & 0o077:
+                    raise RuntimeError("Gateway configuration directory must be private")
+                export_gateway(directory, Path(path).with_name("gateway.enc"), password)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -61,15 +77,26 @@ def export_credentials(path):
     print("Encrypted credentials written to %s" % path)
 
 
-def import_credentials(path, output=None):
+def import_credentials(path, output=None, gateway_stage=None, password=None):
     if not os.path.isfile(path):
         raise RuntimeError("Encrypted credentials file not found: " + path)
-    password, _ = passphrase("Decryption passphrase: ")
+    password, _ = passphrase("Decryption passphrase: ") if password is None else (password, password)
     fd, temporary = tempfile.mkstemp(prefix=".env-", dir=ROOT)
     os.close(fd)
     try:
         run_openssl("decrypt", password, path, temporary)
         os.chmod(temporary, 0o600)
+        from telegram_settings import hold_restored
+        staged = Path(temporary)
+        staged.write_text(hold_restored(staged.read_text(encoding='utf-8'), Path(ROOT)), encoding='utf-8')
+        if gateway_stage:
+            from gateway_backup import restore_gateway
+
+            gateway = Path(path).with_name("gateway.enc")
+            if gateway.exists() or gateway.is_symlink():
+                if gateway.is_symlink() or not gateway.is_file():
+                    raise RuntimeError("Gateway backup must be a regular file")
+                restore_gateway(gateway, Path(gateway_stage), password)
         os.replace(temporary, output or ENV)
     except Exception as exc:
         if os.path.exists(temporary):
@@ -85,14 +112,19 @@ def main():
     subparsers = parser.add_subparsers(dest="action", required=True)
     exporting = subparsers.add_parser("export")
     exporting.add_argument("path", nargs="?", default=os.path.join(ROOT, "exports", "credentials.env.enc"))
+    exporting.add_argument("--include-gateway", action="store_true")
     importing = subparsers.add_parser("import")
     importing.add_argument("path")
     importing.add_argument("--output", help="stage decrypted credentials at this path")
+    importing.add_argument("--gateway-stage", help="stage the optional encrypted gateway backup here")
     args = parser.parse_args()
-    if args.action == "export":
-        export_credentials(os.path.abspath(args.path))
-    else:
-        import_credentials(os.path.abspath(args.path), args.output)
+    try:
+        if args.action == "export":
+            export_credentials(os.path.abspath(args.path), args.include_gateway)
+        else:
+            import_credentials(os.path.abspath(args.path), args.output, args.gateway_stage)
+    except (OSError, ValueError, KeyError, RuntimeError, sqlite3.Error, zipfile.BadZipFile) as exc:
+        parser.exit(1, f"Error: {exc}\n")
 
 
 if __name__ == "__main__":

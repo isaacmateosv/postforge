@@ -59,6 +59,8 @@ APPROVE_WHATSAPP = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:whatsapp|wa)(?
                               re.IGNORECASE)
 APPROVE_PLAN = re.compile(r"^(?:aprobar|aprueba|approve)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                           re.IGNORECASE)
+IMPROVE_PLAN = re.compile(r"^(?:mejora|improve)\s+plan\s+([a-f0-9]{12}|\d+)$", re.IGNORECASE)
+TAG_PLAN = re.compile(r"^(?:etiqueta|tag)\s+plan\s+([a-f0-9]{12}|\d+)\s+(#?\w{1,60})$", re.IGNORECASE)
 REJECT_PLAN = re.compile(r"^(?:rechazar|rechaza|reject|decline)\s+(?:plan|publicaci[oó]n|post)(?:\s+([a-f0-9]{12}|\d+|latest|último))?$",
                          re.IGNORECASE)
 ES_DATES = {"Mon": "lun", "Tue": "mar", "Wed": "mié", "Thu": "jue", "Fri": "vie", "Sat": "sáb", "Sun": "dom",
@@ -297,6 +299,37 @@ def resolve_confirmation_ref(reference):
     return None, None
 
 
+def change_plan_tag(path, confirmation, value, env, dry_run=False):
+    result = confirmation["result"]
+    old_tag = result.get("final_tag", "")
+    tag = pmlib.final_tag(value)
+    body = pmlib.remove_final_tag(confirmation.get("caption_override") or result["caption"], old_tag)
+    caption = pmlib.apply_final_tag(body, tag)
+    if "threads" in result.get("networks", []):
+        thread_body = (body if confirmation.get("caption_override") else
+                       pmlib.remove_final_tag(result.get("threads_caption") or body, old_tag))
+        thread_text = plan_post.tagged_threads_caption(env, thread_body, confirmation["lang"], tag)
+        result["threads_caption"] = thread_text if thread_text != caption else None
+    result.update(caption=caption, final_tag=tag)
+    confirmation.pop("caption_override", None)
+    if not dry_run:
+        write_confirmation(path, confirmation)
+    return result
+
+
+def write_confirmation(path, confirmation):
+    metadata = os.stat(path)
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".plan-edit-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(confirmation, fh, ensure_ascii=False, indent=1)
+        os.utime(temporary, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def remove_confirmation(path):
     try:
         shutil.rmtree(os.path.splitext(path)[0], ignore_errors=True)
@@ -339,28 +372,65 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
     lines = [REPLY_MARK]
     if heard:
         lines.append(("🎙️ Entendí: “%s”" if es else "🎙️ I heard: “%s”") % heard)
-    targets = ", ".join(names[t["network"]] + (" (Short)" if t["network"] == "youtube" and result.get("short") else "")
-                        for t in result.get("targets", []))
+    targets = []
+    placements = {"feed": ("post", "publicación"), "story": ("story", "historia"),
+                  "status": ("Status", "Estado"), "both": ("post + story", "publicación + historia")}
+    for target in result.get("targets", []):
+        network = target["network"]
+        name = names[network]
+        if network == "youtube" and result.get("short"):
+            name += " (Short)"
+        if target.get("placement") in placements:
+            name += " · " + placements[target["placement"]][es]
+        if target.get("cover_second") is not None:
+            seconds = f'{target["cover_second"]:g}'
+            name += (" · portada en el segundo " + seconds.replace(".", ",") if es
+                     else " · cover at " + seconds + " s")
+        elif target.get("cover") == "image":
+            name += " · imagen de portada" if es else " · cover image"
+        targets.append(name)
     head = (("📝 Verificación para %s: %s" if es else "📝 Verify for %s: %s") if confirmation_id else
             (("✅ Borradores para %s: %s" if es else "✅ Drafts for %s: %s") if result["drafts"] else
              ("📝 Plan para %s: %s" if es else "📝 Plan for %s: %s")))
     when = result["when_local"]
     if es:
         when = " ".join(ES_DATES.get(part, part.lower() if part.isalpha() else part) for part in when.split())
-    lines.append(head % (when, targets))
+    lines.append(head % (when, ", ".join(targets)))
     if has_caption:
         lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
                         else "Caption follows in the next message:")]
+    if result.get("youtube_title"):
+        lines += ["", "Título de YouTube" if es else "YouTube title", result["youtube_title"]]
+    if result.get("threads_caption"):
+        lines += ["", ("Texto para Threads:" if es else "Threads caption:"),
+                  clean_caption(result["threads_caption"])]
     lines += ["· " + ("supuse: " if es else "assumed: ") + n for n in result["notes"]]
     lines += ["⚠ " + w for w in result["warnings"]]
     if result.get("review_url"):
         lines += ["", ("Nada se publica sin tu aprobación: revísalos en %s" if es else
                        "Nothing is published without your approval: review them at %s") % result["review_url"]]
     if confirmation_id:
-        lines += ["", ("¿Todos los detalles anteriores son correctos? Responde `aprobar plan %s` para continuar, "
-                       "o envía las correcciones." if es else
-                       "Are all the details above correct? Reply `approve plan %s` to proceed, "
-                       "or send your corrections.") % confirmation_id]
+        tag = result.get("final_tag")
+        if es:
+            lines += ["", (f"¿Dejamos {tag} al final?" if tag else "¿Quieres añadir una etiqueta al final?"),
+                      f"Para cambiarla, responde `etiqueta plan {confirmation_id} #MiNegocio`."]
+        else:
+            lines += ["", (f"Keep {tag} at the end?" if tag else "Want to add a final hashtag?"),
+                      f"To change it, reply `tag plan {confirmation_id} #MyBusiness`."]
+        if result.get("can_rewrite", (result.get("caption_source") or "").startswith("written by ")):
+            lines.append(f"Para probar otro texto, responde `mejora plan {confirmation_id}`."
+                         if es else f"To try another caption, reply `improve plan {confirmation_id}`.")
+        if es:
+            lines += ["", f"Responde `aprobar plan {confirmation_id}` para continuar.",
+                      f"Para cambiarlo, responde `rechazar plan {confirmation_id}` y vuelve a enviar tu pedido "
+                      "con los archivos. Puedes indicar «solo publicaciones», «solo historias» o "
+                      "«publicaciones e historias», y «portada en el segundo 12,5» o «imagen de portada» "
+                      "si adjuntas un video y una sola foto."]
+        else:
+            lines += ["", f"Reply `approve plan {confirmation_id}` to continue.",
+                      f"To change it, reply `reject plan {confirmation_id}` and resend your request with its files. "
+                      "You can say ‘only posts’, ‘only stories’, or ‘posts and stories’, and ‘cover at 12.5 s’ "
+                      "or ‘cover image’ if you attach one video and one photo."]
     return "\n".join(lines)
 
 
@@ -407,12 +477,54 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     normalized_instruction = approval_text(instruction)
     approval = APPROVE_WHATSAPP.fullmatch(normalized_instruction)
     if approval:
-        item_id = whatsapp_pending.approve(approval.group(1))
-        text = ("✅ WhatsApp Status aprobado. Se enviará a la hora programada." if item_id
-                else "No hay un WhatsApp Status pendiente para aprobar.")
+        item_id = None if dry_run else whatsapp_pending.approve(approval.group(1))
+        if ui_language() == "Spanish":
+            text = ("✅ Estado de WhatsApp aprobado. Se enviará a la hora programada o en cuanto se pueda si ya pasó."
+                    if item_id else "No hay un Estado de WhatsApp pendiente para aprobar.")
+        else:
+            text = ("✅ WhatsApp Status approved. It will send at the scheduled time or as soon as possible if overdue."
+                    if item_id else "There is no pending WhatsApp Status to approve.")
         reply(env, name, number, number, text, state, dry_run)
         if item_id and not dry_run:
             whatsapp_pending.process(env)
+        return True
+    improvement = IMPROVE_PLAN.fullmatch(normalized_instruction)
+    if improvement:
+        path, confirmation = resolve_confirmation_ref(improvement[1])
+        es = ui_language() == "Spanish"
+        if not path or not confirmation:
+            reply(env, name, number, number, "No encontré ese plan." if es else "I couldn’t find that plan.", state, dry_run)
+            return True
+        try:
+            result = plan_post.revise_copy(env, confirmation["result"], confirmation["instruction"])
+            confirmation["result"] = result
+            confirmation.pop("caption_override", None)
+            if not dry_run:
+                write_confirmation(path, confirmation)
+        except (PMError, OSError, KeyError, ValueError):
+            reply(env, name, number, number, "No pude mejorar el texto. Conservé la versión anterior." if es else
+                  "I couldn’t improve the caption. The previous version is still saved.", state, dry_run)
+            return True
+        reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
+                                                confirmation_id=improvement[1]), state, dry_run)
+        reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
+        return True
+    tag_change = TAG_PLAN.fullmatch(normalized_instruction)
+    if tag_change:
+        confirmation_path, confirmation = resolve_confirmation_ref(tag_change[1])
+        es = ui_language() == "Spanish"
+        if not confirmation_path or not confirmation:
+            reply(env, name, number, number, "No encontré ese plan." if es else "I couldn’t find that plan.", state, dry_run)
+            return True
+        try:
+            result = change_plan_tag(confirmation_path, confirmation, tag_change[2], env, dry_run)
+        except (PMError, OSError, KeyError, ValueError):
+            reply(env, name, number, number, "No pude cambiar la etiqueta. El plan sigue pendiente."
+                  if es else "I couldn’t change the hashtag. The plan is still pending.", state, dry_run)
+            return True
+        reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
+                                                confirmation_id=tag_change[1]), state, dry_run)
+        reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
         return True
     plan_approval = APPROVE_PLAN.fullmatch(normalized_instruction)
     if plan_approval:
@@ -427,17 +539,28 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
                 remove_confirmation(confirmation_path)
                 raise PMError("Ese plan ya venció. Envía una hora nueva." if ui_language() == "Spanish"
                               else "That plan has expired. Send a new time.")
-            p = plan_post.plan(env, confirmation["instruction"], confirmation.get("media") or [], None, now)
+            p = plan_post.plan(env, confirmation["instruction"], confirmation.get("media") or [],
+                               confirmation.get("lang"), now, ui_lang=ui_language())
             if scheduled:
                 p["when"] = scheduled.astimezone(tz)
             override = (confirmation.get("caption_override") or "").strip()
+            saved_result = confirmation.get("result") or {}
+            if "final_tag" in saved_result:
+                p["final_tag"] = saved_result["final_tag"]
             if override:  # edited in the PostForge app's WhatsApp window: use it as the exact caption
                 p["exact"] = override
+            elif saved_result.get("caption"):
+                p["reviewed_caption"] = saved_result["caption"]
+                p["reviewed_threads_caption"] = saved_result.get("threads_caption")
+                p["reviewed_youtube_title"] = saved_result.get("youtube_title")
             with pmlib.Job("draft", "WhatsApp approval: " + confirmation["instruction"][:50]):
                 result = plan_post.run(env, p, dry_run)
             caption = clean_caption(result.get("caption") or "")
-            result["notes"] = [note for note in result["notes"] if "WhatsApp Status waits for approval" not in note]
-            result["notes"].append("WhatsApp Status approved; it will wait until the scheduled time")
+            result["notes"] = [note for note in result["notes"] if note not in ("WhatsApp Status waits for approval", "El Estado de WhatsApp espera aprobación.")]
+            if any(target.get("network") == "whatsapp" for target in result["targets"]):
+                result["notes"].append("Estado de WhatsApp aprobado para la hora programada."
+                                       if ui_language() == "Spanish" else
+                                       "WhatsApp Status approved for the scheduled time.")
             text = summary(result, p["lang"], confirmation.get("heard"), bool(caption))
             if not dry_run:
                 pending_id = result.get("whatsapp_pending_id")
@@ -467,7 +590,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     caption = ""
     confirmation_id = None
     try:
-        p = plan_post.plan(env, instruction, [], None, now)
+        p = plan_post.plan(env, instruction, [], None, now, ui_lang=ui_language())
         with pmlib.Job("draft", "WhatsApp: " + instruction[:50]):
             p["media"] = [download(env, name, m, folder) for m in media_rows]
             result = plan_post.run(env, p, True)
@@ -557,6 +680,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="one pass, then exit")
     parser.add_argument("--dry-run", action="store_true", help="no drafts, no replies, nothing marked done")
     parser.add_argument("--reject-plan", metavar="ID", help="reject a saved confirmation plan")
+    parser.add_argument("--send-status-approval", metavar="ID", help="send a specific Status approval to your own chat")
     parser.add_argument("--send-plan-approval", metavar="ID", help="send a plan approval to your own WhatsApp chat")
     args = parser.parse_args()
     if args.idle_notice:
@@ -566,6 +690,15 @@ def main():
                    if ui_language() == "Spanish" else
                    "PostForge is about to go idle. Intake will pause until you turn it on at the Mac.")
         reply(env, instance, number, number, REPLY_MARK + "\n" + message, {}, False, timeout=5)
+        return 0
+    if args.send_status_approval:
+        reference = args.send_status_approval
+        if not re.fullmatch(r"[a-f0-9]{12}", reference):
+            raise PMError("Invalid WhatsApp Status reference")
+        env = pmlib.load_env()
+        instance, _, number, _ = own_identity(env)
+        command = ("aprobar whatsapp " if ui_language() == "Spanish" else "approve whatsapp ") + reference
+        reply(env, instance, number, number, command, {}, args.dry_run)
         return 0
     if args.reject_plan or args.send_plan_approval:
         env = pmlib.load_env()
@@ -587,6 +720,10 @@ def main():
     env = pmlib.load_env()
     state = load_state()
     log("listening to your own chat (dry run)" if args.dry_run else "listening to your own chat")
+    if not args.dry_run:
+        interrupted = whatsapp_pending.recover_interrupted()
+        if interrupted:
+            log("%d interrupted WhatsApp Status send(s) held for review" % interrupted)
     next_cleanup = 0
     while True:
         try:
