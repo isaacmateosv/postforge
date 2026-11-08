@@ -2,7 +2,7 @@
 
 ## [2.0.0-rc.22]
 
-- Rust desktop opens maximized within the available desktop, with a scrolling work area, persistent window controls, compact short-screen spacing and bounded dialogs.
+- Rust desktop opens tall and centered at a comfortable width, bounded by the monitor work area, with scrolling content, persistent controls and compact short-screen spacing. Native Cmd/Ctrl+N reopens the hidden composer; macOS Dock reopening also restores the window.
 - Native tray, active-task badges, six-hour release checks and a private encrypted Backup & Move assistant now share the main window workflows. Restore requires inspection and confirmation, preserves a rollback backup when replacing data, and leaves publishing services paused.
 
 

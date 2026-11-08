@@ -255,3 +255,5 @@ dialog > .actions:last-child { position:sticky; bottom:-24px; background:var(--p
 #backup-dialog label > input:not([type=checkbox]) { display:block; width:100%; margin-top:6px; }
 #backup-dialog progress { width:100%; accent-color:#83d8b9; }
 #backup-result { white-space:pre-wrap; overflow-wrap:anywhere; }
+
+footer > div { display:flex; flex-wrap:wrap; gap:8px; }
