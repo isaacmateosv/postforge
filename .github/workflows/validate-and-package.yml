@@ -18,7 +18,7 @@ permissions:
 jobs:
   recheck:
     name: Recheck and build the app
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
@@ -51,7 +51,7 @@ jobs:
   package:
     name: Build the installer package
     needs: [recheck, v2-smoke]
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
