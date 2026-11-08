@@ -3,11 +3,30 @@
   "productName": "PostForge Desktop",
   "version": "2.0.0-rc.20",
   "identifier": "local.postforge.desktop",
-  "build": {"frontendDist": "ui"},
+  "build": {
+    "frontendDist": "ui"
+  },
   "app": {
     "withGlobalTauri": true,
-    "windows": [{"label": "main", "title": "PostForge Desktop", "width": 1120, "height": 820, "minWidth": 900, "minHeight": 680}],
-    "security": {"csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"}
+    "windows": [
+      {
+        "label": "main",
+        "title": "PostForge Desktop",
+        "width": 1120,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 680
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
   },
-  "bundle": {"active": false, "icon": ["../docs/images/postforge-mark.png"]}
+  "bundle": {
+    "active": false,
+    "icon": [
+      "../docs/images/postforge-mark.png",
+      "icons/icon.ico"
+    ]
+  }
 }
