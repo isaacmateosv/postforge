@@ -1,6 +1,7 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Shared, reviewed posting workflow for Rust desktop and Telegram."""
+import copy
 import hashlib
 import json
 import os
@@ -16,9 +17,10 @@ import plan_post
 import pmlib
 
 TICKET_AGE = 24 * 3600
+PIPELINE_REVISION = 2
 ID = re.compile(r"[a-f0-9]{32}")
 FIELDS = ("body", "mode", "networks", "post_at", "media", "placement", "cover_image",
-          "cover_second", "final_tag", "language", "text_confirmed")
+          "cover_second", "final_tag", "language", "text_confirmed", "whatsapp_background", "youtube_mode")
 VIDEO_EXT = pmlib.VIDEO_EXT
 
 
@@ -76,6 +78,10 @@ def fields(value):
     if not media:
         if not data.get("text_confirmed") or not set(networks) <= {"facebook", "threads", "whatsapp"}:
             raise pmlib.PMError("Confirm text-only destinations: Facebook posts, Threads posts, or WhatsApp Status.")
+    if data.get("youtube_mode", "shorts") not in ("shorts", "regular"):
+        raise pmlib.PMError("Choose a YouTube format.")
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", data.get("whatsapp_background", "#128C7E")):
+        raise pmlib.PMError("Choose a valid WhatsApp background color.")
     data["body"] = body.strip()
     data["networks"] = list(dict.fromkeys(networks))
     data["media"] = [str(Path(item).resolve()) for item in media]
@@ -119,6 +125,8 @@ def build_plan(env, data):
     p["exact"] = data["body"] if data["mode"] == "exact" else None
     p["idea"] = data["body"] if data["mode"] == "idea" else None
     p["final_tag"] = data.get("final_tag", env.get("CAPTION_FINAL_TAG", ""))
+    p["youtube_trim"] = data.get("youtube_mode", "shorts") == "shorts"
+    p["whatsapp_background"] = data.get("whatsapp_background", "#128C7E")
     return p
 
 
@@ -139,23 +147,30 @@ def preview(env, value):
 def issue_ticket(data, result, family, expected):
     identifier = secrets.token_hex(16)
     ticket = {"created_at": time.time(), "fields": data, "plan": result,
-              "family": family, "signature": expected}
+              "family": family, "signature": expected, "pipeline_revision": PIPELINE_REVISION}
     write_record(path_for(identifier), ticket)
     return {"review_id": identifier, "plan": result}
 
 
-def revise(env, identifier, edited=None):
+def revise(env, identifier, edited=None, youtube_title=None):
     ticket = load_ticket(identifier)
     with file_lock.exclusive(str(path_for(ticket["family"])) + ".lock"):
         state = json.loads(path_for(ticket["family"]).read_text())
         if state["state"] != "review":
             raise pmlib.PMError("This plan has already been submitted. Check the calendar.")
+        if ticket.get("pipeline_revision") != PIPELINE_REVISION:
+            raise pmlib.PMError("The planner changed. Check saved posts, then prepare a fresh plan. / El planificador cambió. Revisa las publicaciones guardadas y prepara otro plan.")
         data = ticket["fields"]
         if signature(data) != ticket["signature"]:
             raise pmlib.PMError("An attached file changed. Prepare a fresh plan.")
         instruction = ("idea: " if data["mode"] == "idea" else "caption: ") + data["body"]
-        with pmlib.Job("compose-caption", "Revise a caption"):
-            result = plan_post.revise_copy(env, ticket["plan"], instruction, edited)
+        if youtube_title is not None:
+            if not isinstance(youtube_title, str) or not youtube_title.strip() or len(youtube_title.strip()) > 100:
+                raise pmlib.PMError("YouTube titles must contain 1–100 characters. / El título de YouTube debe tener entre 1 y 100 caracteres.")
+            result = dict(copy.deepcopy(ticket["plan"]), youtube_title=youtube_title.strip(), youtube_title_manual=True)
+        else:
+            with pmlib.Job("compose-caption", "Revise a caption"):
+                result = plan_post.revise_copy(env, ticket["plan"], instruction, edited)
         return issue_ticket(data, result, ticket["family"], ticket["signature"])
 
 
@@ -170,6 +185,8 @@ def submit(env, identifier, mode):
             return dict(state["receipt"], already_submitted=True)
         if state["state"] != "review":
             raise pmlib.PMError("Submission needs review. Check Postiz before preparing another batch.")
+        if ticket.get("pipeline_revision") != PIPELINE_REVISION:
+            raise pmlib.PMError("The planner changed. Check saved posts, then prepare a fresh plan. / El planificador cambió. Revisa las publicaciones guardadas y prepara otro plan.")
         data = fields(ticket["fields"])
         if signature(data) != ticket["signature"]:
             raise pmlib.PMError("An attached file changed. Prepare a fresh plan.")

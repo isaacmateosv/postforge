@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.22]
+
+- Restore a colorful, status-aware dashboard as the opening view, with saved drafts, upcoming posts and focused refreshes.
+- Hide installation paths in advanced recovery, remove duplicate Telegram setup actions, add in-window WhatsApp QR linking and a compact animated mixer.
+- Clarify Story segment counts, caption adaptations and version history; add separate YouTube title editing, a +10-minute shortcut and text Status background colors.
+- Prepare an independent 2:59 YouTube Shorts copy for longer portrait/square videos while retaining other destinations' full media; offer explicit full-video mode.
+- Keep the optional business hashtag empty for fresh installations and retain explicitly configured tags.
+
 ## [2.0.0-rc.21]
 
 - Add per-installation Telegram configuration in the Rust UI: private token entry, bot validation, private owner discovery, language, heartbeat and enable/disable.

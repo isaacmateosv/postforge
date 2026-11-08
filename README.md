@@ -32,7 +32,7 @@ silently publish content.
 **Rust/Tauri is the desktop client going forward.** Use the [Rust desktop guide](desktop/README.md)
 for the current preview. The Swift controller is retained as legacy source for
 compatibility and reference, rather than a second app to run alongside Rust.
-Some system integrations are still being ported; this is a beta, not a feature-complete
+Installation paths stay inside advanced recovery; WhatsApp pairs by QR in the window. Some system integrations are still being ported; this is a beta, not a feature-complete
 replacement release. The legacy macOS installer below targets the Swift controller.
 
 ## Contents
@@ -77,7 +77,7 @@ Open **Help → PostForge Help** in the Mac app to read either guide offline in 
 
 ## Rust desktop and Telegram
 
-The new Rust/Tauri composer has structured Compose, Delivery and Review steps
+The Rust/Tauri client opens on a live draft/schedule dashboard and has structured Compose, Delivery and Review steps
 and shares the existing Python planner. See the [desktop setup guide](desktop/README.md).
 The legacy Swift source documents the system integrations still being ported.
 Native builds run on macOS, Windows and Linux in CI; installation and real-device

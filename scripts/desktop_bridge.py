@@ -18,6 +18,17 @@ import manage_posts
 
 def dispatch(operation, payload):
     env = pmlib.load_env()
+    if operation == "whatsapp_finish":
+        import desktop_status
+        import subprocess
+        result = desktop_status.whatsapp(env)
+        if not result["connected"]:
+            raise pmlib.PMError("WhatsApp is not linked yet.")
+        outcome = subprocess.run([sys.executable, str(ROOT / "scripts/lib/wa_settings.py")], capture_output=True, timeout=25)
+        return dict(result, receipts_ready=outcome.returncode == 0)
+    if operation in ("dashboard", "whatsapp_state", "whatsapp_connect"):
+        import desktop_status
+        return desktop_status.dashboard(env) if operation == "dashboard" else desktop_status.whatsapp(env, connect=operation == "whatsapp_connect")
     if operation == "options":
         result = composer.options(env)
         raw = env.get("FRONTEND_URL", env.get("POSTIZ_LOCAL_URL", "http://localhost:4200"))
@@ -33,7 +44,7 @@ def dispatch(operation, payload):
     if operation == "preview":
         return composer.preview(env, payload)
     if operation == "revise":
-        return composer.revise(env, payload["review_id"], payload.get("edited"))
+        return composer.revise(env, payload["review_id"], payload.get("edited"), payload.get("youtube_title"))
     if operation == "submit":
         return composer.submit(env, payload["review_id"], payload["mode"])
     if operation in ("cleanup_preview", "cleanup"):
@@ -45,6 +56,9 @@ def dispatch(operation, payload):
         level = "technical" if payload.get("technical") else "quick"
         return {"markdown": (ROOT / "docs/help" / (level + "-" + language + ".md")).read_text()}
     if operation == "approve_status":
+        import desktop_status
+        if not desktop_status.whatsapp(env)["connected"]:
+            raise pmlib.PMError("Connect WhatsApp before approving this Status. / Vincula WhatsApp antes de aprobar este Estado.")
         import host_agent
         import whatsapp_pending
         host_agent.start()

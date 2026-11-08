@@ -6,13 +6,13 @@ const invoke = (command, args = {}) => window.__TAURI__.core.invoke(command, arg
 const $ = id => document.getElementById(id);
 const state = {
   language: localStorage.getItem("language") || "en",
-  page: "compose", media: [], cover: null, options: null,
+  page: "home", media: [], cover: null, options: null,
   history: [], selected: -1, busy: false, receipt: null
 };
 const text = (en, es) => state.language === "es" ? es : en;
 const labels = {
   subtitle: ["Compose, choose delivery, then review", "Redacta, elige destinos y revisa"],
-  help: ["Help", "Ayuda"], reconnect: ["Retry connection", "Volver a conectar"], workspace: ["Project folder…", "Carpeta del proyecto…"],
+  help: ["Help", "Ayuda"], reconnect: ["Refresh status", "Actualizar estado"], workspace: ["Locate recovered installation…", "Localizar instalación recuperada…"],
   "add-media": ["Choose files…", "Elegir archivos…"], "clear-media": ["Clear files", "Quitar archivos"],
   "to-delivery": ["Choose delivery →", "Elegir destinos →"], "back-compose": ["← Compose", "← Redactar"],
   bake: ["👨‍🍳 Bake and review", "👨‍🍳 Hornea y revisa"],
@@ -26,8 +26,7 @@ const labels = {
   "new-plan": ["New post", "Nueva publicación"],
   "approve-status": ["Approve WhatsApp Status…", "Aprobar Estado de WhatsApp…"],
   new: ["Clear composer", "Limpiar formulario"],
-  cleanup: ["Manage drafts & queue…", "Gestionar borradores y cola…"],
-  "telegram-info": ["Telegram setup", "Configurar Telegram"]
+  cleanup: ["Remove posts…", "Eliminar publicaciones…"]
 };
 
 function localize() {
@@ -50,6 +49,8 @@ function localize() {
   renderSteps();
   renderDestinations();
   if (state.selected >= 0) renderReview();
+  $("workspace-status").textContent = text("Private data · on your device", "Datos privados · en tu equipo");
+  if (state.dashboard) renderDashboard();
 }
 
 function updateModeHint() {
@@ -68,7 +69,9 @@ function renderSteps() {
   ];
   for (const [id, label] of steps) {
     const button = document.createElement("button");
-    button.textContent = label;
+    const done = id === "compose" ? !!$("body").value.trim() : id === "delivery" ? state.selected >= 0 : !!state.receipt;
+    button.textContent = done ? "✓ " + label : label;
+    button.classList.toggle("complete", done);
     button.classList.toggle("active", state.page === id);
     button.disabled = state.busy || (id === "review" && state.selected < 0)
       || (id === "delivery" && !$("body").value.trim());
@@ -79,6 +82,8 @@ function renderSteps() {
 
 function showPage(page) {
   state.page = page;
+  $("steps").hidden = page === "home";
+  if (page === "home") refreshDashboard(true);
   document.querySelectorAll(".page").forEach(node => node.hidden = node.id !== page);
   renderSteps();
 }
@@ -93,19 +98,21 @@ async function engine(operation, payload = {}) {
   return invoke("engine", { operation, payload });
 }
 
-async function work(message, action) {
+async function work(message, action, baking=false) {
   if (state.busy) return;
   state.busy = true;
   renderSteps();
   const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
   controls.forEach(node => node.disabled = true);
   notice(message, true);
+  $("baking-visual").hidden = !baking;
   try {
     await action();
     notice();
   } catch (error) {
     notice(text("Please review this before continuing.\n", "Revisa esto antes de continuar.\n") + friendlyError(error));
   } finally {
+    $("baking-visual").hidden = true;
     state.busy = false;
     controls.forEach(node => node.disabled = false);
     $("placement").disabled = state.media.length === 0;
@@ -152,11 +159,12 @@ function delivery() {
     return;
   }
   if (!state.options) {
-    notice(text("Connect your PostForge folder and start its services first.", "Conecta la carpeta de PostForge y enciende sus servicios."));
+    notice(text("Start local services first. Settings includes advanced recovery.", "Primero enciende los servicios locales. Ajustes incluye la recuperación avanzada."));
     return;
   }
   $("text-warning").hidden = state.media.length > 0;
   $("placement").disabled = state.media.length === 0;
+  $("wa-text-options").hidden = state.media.length > 0;
   renderDestinations();
   showPage("delivery");
 }
@@ -176,15 +184,22 @@ function renderDestinations() {
     input.value = network.id;
     input.disabled = blocked;
     input.checked = !blocked && (first || previous.has(network.id));
-    input.onchange = invalidate;
+    input.onchange = () => { invalidate(); updateNetworkOptions(); };
     const description = document.createElement("span");
     description.textContent = network.id === "whatsapp" ? text("WhatsApp Status", "Estado de WhatsApp") : network.name;
     const sub = document.createElement("small");
-    sub.textContent = blocked ? text("Photo or video required", "Requiere foto o video") : network.accounts.join(" · ");
+    sub.textContent = network.id === "whatsapp" && !state.dashboard?.whatsapp?.connected ? text("Link WhatsApp before approving Status", "Vincula WhatsApp antes de aprobar el Estado") : blocked ? text("Photo or video required", "Requiere foto o video") : network.accounts.join(" · ");
     description.append(sub);
     label.append(input, description);
     $("destinations").append(label);
   }
+  updateNetworkOptions();
+}
+
+function updateNetworkOptions() {
+  const selected = new Set([...$("destinations").querySelectorAll("input:checked")].map(input => input.value));
+  $("youtube-options").hidden = !selected.has("youtube");
+  $("wa-text-options").hidden = state.media.length > 0 || !selected.has("whatsapp");
 }
 
 function form() {
@@ -199,6 +214,8 @@ function form() {
     cover_second: $("cover-second").value || null,
     final_tag: $("final-tag").value,
     language: state.language,
+    youtube_mode: $("youtube-mode").value,
+    whatsapp_background: $("wa-background").value,
     text_confirmed: state.media.length === 0
   };
 }
@@ -206,6 +223,8 @@ function form() {
 function current() { return state.history[state.selected]; }
 
 function remember(result) {
+  const same = state.history.findIndex(item => item.plan.caption === result.plan.caption && item.plan.threads_caption === result.plan.threads_caption);
+  if (same >= 0) { state.history[same] = result; state.selected = same; return; }
   state.history.push(result);
   if (state.history.length > 8) state.history.shift();
   state.selected = state.history.length - 1;
@@ -227,7 +246,8 @@ function renderReview() {
       : state.options.networks.find(item => item.id === target.network)?.name || target.network;
     const placement = target.placement === "story" ? text(" · Story", " · Historia")
       : target.placement === "feed" ? text(" · Post", " · Publicación") : "";
-    item.textContent = network + (target.network === "whatsapp" ? "" : " · " + target.channel + placement);
+    item.textContent = network + (target.network === "whatsapp" ? "" : " · " + target.channel + placement)
+      + (target.parts > 1 ? text(" · ", " · ") + target.parts + text(" segments / drafts", " segmentos / borradores") : "");
     destinations.append(item);
   }
   $("plan-meta").append(when, destinations);
@@ -242,18 +262,22 @@ function renderCopy() {
   const main = document.createElement("div");
   main.textContent = plan.caption;
   $("copy").append(main);
-  const extra = [
-    ["youtube_title", text("YouTube title", "Título de YouTube")],
-    ["threads_caption", text("Threads caption", "Texto para Threads")]
-  ];
-  for (const [key, title] of extra) {
-    if (!plan[key]) continue;
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    const value = document.createElement("div");
-    value.textContent = plan[key];
-    $("copy").append(heading, value);
+  main.className = "copy-primary";
+  if (plan.youtube_title) {
+    const section = document.createElement("div"); section.className = "platform-copy";
+    const heading = document.createElement("h3"); heading.textContent = text("YouTube title", "Título de YouTube");
+    const value = document.createElement("p"); value.textContent = plan.youtube_title;
+    const button = document.createElement("button"); button.textContent = text("Edit title…", "Editar título…");
+    button.onclick = editYoutubeTitle;
+    section.append(heading,value,button); $("copy").append(section);
   }
+  if (plan.threads_caption) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary"); summary.textContent = text("Threads adaptation · same idea, shorter", "Adaptación para Threads · misma idea, más corta");
+    const value = document.createElement("p"); value.textContent = plan.threads_caption;
+    details.append(summary,value); $("copy").append(details);
+  }
+
 }
 
 function updateVersionControls() {
@@ -315,7 +339,7 @@ async function bake() {
     remember(result);
     renderReview();
     showPage("review");
-  });
+  }, true);
 }
 
 async function revise(edited) {
@@ -324,7 +348,9 @@ async function revise(edited) {
   await work(text("Preparing another caption…", "Preparando otro texto…"), async () => {
     const payload = { review_id: id };
     if (edited !== undefined) payload.edited = edited;
-    remember(await engine("revise", payload));
+    const revised = await engine("revise", payload);
+    if (edited !== undefined) state.history[state.selected] = revised;
+    else remember(revised);
     renderCopy();
     $("caption-editor").hidden = true;
     $("copy").hidden = false;
@@ -342,6 +368,7 @@ async function submit(mode) {
   if (!await modal(text("Confirm this plan", "Confirma este plan"), prompt, confirm)) return;
   await work(text("Submitting the reviewed plan…", "Enviando el plan revisado…"), async () => {
     state.receipt = await engine("submit", { review_id: result.review_id, mode });
+    refreshDashboard(true);
     $("receipt-title").textContent = mode === "schedule" ? text("Posts scheduled", "Publicaciones programadas") : text("Drafts prepared", "Borradores preparados");
     $("receipt-content").textContent = text("Postiz entries: ", "Elementos de Postiz: ")
       + (state.receipt.drafts || []).filter(item => item.post_id).length
@@ -365,23 +392,24 @@ async function approveStatus() {
 async function cleanup() {
   const choices = document.createElement("select");
   for (const [value, label] of [
-    ["drafts", text("Drafts and failed posts", "Borradores y publicaciones fallidas")],
-    ["queue", text("Queue and pending WhatsApp Status", "Cola y Estados pendientes de WhatsApp")],
-    ["all", text("All unpublished Postiz work and pending Status", "Todo lo pendiente de Postiz y Estados")]
+    ["drafts", text("Unpublished drafts (including failed attempts)", "Borradores sin publicar (incluye intentos fallidos)")],
+    ["queue", text("Cancel scheduled posts and pending WhatsApp Status", "Cancelar publicaciones programadas y Estados pendientes")],
+    ["all", text("Both drafts and scheduled posts", "Ambos: borradores y publicaciones programadas")]
   ]) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = label;
     choices.append(option);
   }
-  if (!await modal(text("Choose cleanup scope", "Elige qué limpiar"), choices)) return;
+  if (!await modal(text("What would you like to remove?", "¿Qué publicaciones quieres eliminar?"), choices)) return;
   await work(text("Reading unpublished work…", "Leyendo los elementos pendientes…"), async () => {
     const snapshot = await engine("cleanup_preview", { scope: choices.value });
     const prompt = snapshot.post_count + text(" Postiz entries and ", " elementos de Postiz y ")
       + snapshot.whatsapp_count + text(" WhatsApp Status items. A send already underway may finish. Media follows its retention setting.",
                                        " Estados de WhatsApp. Un envío que ya empezó podría completarse. Los archivos siguen su retención.");
-    if (!await modal(text("Confirm cleanup", "Confirma la limpieza"), prompt, text("Clear selected work", "Eliminar elementos seleccionados"))) return;
+    if (!await modal(text("Review before removing", "Revisa antes de eliminar"), prompt, text("Clear selected work", "Eliminar elementos seleccionados"))) return;
     const result = await engine("cleanup", snapshot);
+    await refreshDashboard(true);
     if (result.errors?.length) throw new Error(text("Some entries could not be cancelled. Review Postiz.", "No se pudieron cancelar algunos elementos. Revisa Postiz."));
     await modal(text("Cleanup finished", "Limpieza terminada"),
       result.deleted + text(" Postiz entries cleared. ", " elementos eliminados de Postiz. ") + result.cancelled_whatsapp + text(" Status items cancelled.", " Estados cancelados."),
@@ -389,8 +417,8 @@ async function cleanup() {
   });
 }
 
-async function reset() {
-  if (($("body").value || state.history.length) && !await modal(text("Clear this composer?", "¿Limpiar este formulario?"),
+async function reset(force=false) {
+  if (!force && ($("body").value || state.history.length) && !await modal(text("Clear this composer?", "¿Limpiar este formulario?"),
       text("Saved Postiz drafts and queue are managed separately.", "Los borradores guardados y la cola se gestionan por separado."))) return;
   $("body").value = "";
   state.media = [];
@@ -400,6 +428,147 @@ async function reset() {
   renderMedia();
   showPage("compose");
   notice();
+}
+
+function momentLabel(value) {
+  if (!value) return text("Nothing scheduled", "Nada programado");
+  const normalized = /(?:Z|[+-]\d\d:?\d\d)$/.test(value) ? value : value + "Z";
+  return new Intl.DateTimeFormat(state.language === "es" ? "es-EC" : "en", {
+    dateStyle: "medium", timeStyle: "short", timeZone: state.options?.timezone || "America/Guayaquil"
+  }).format(new Date(normalized));
+}
+
+function renderDashboard() {
+  const data = state.dashboard;
+  if (!data) return;
+  $("start-post").textContent = $("body").value.trim() && !state.receipt ? text("Continue your post →", "Continúa tu publicación →") : text("＋ New post", "＋ Nueva publicación");
+  $("dash-drafts").textContent = data.available ? data.drafts : "—";
+  $("dash-queue").textContent = data.available ? data.queue : "—";
+  $("dash-next").textContent = data.available ? momentLabel(data.next) : text("Services offline", "Servicios apagados");
+  $("dash-updated").textContent = text("Updated ", "Actualizado ") + new Date().toLocaleTimeString(state.language === "es" ? "es-EC" : "en", {hour:"2-digit",minute:"2-digit"});
+  $("whatsapp-open").textContent = (data.whatsapp?.connected ? "✓ " : "○ ") + "WhatsApp";
+  $("whatsapp-open").classList.toggle("ready", !!data.whatsapp?.connected);
+  $("telegram-open").textContent = (data.telegram?.running ? "✓ " : "○ ") + "Telegram";
+  $("telegram-open").classList.toggle("ready", !!data.telegram?.running);
+  $("health").replaceChildren();
+  for (const [label, ready, configured, action] of [
+    ["Postiz", data.postiz_online, data.available, () => invoke("open_calendar")],
+    ["WhatsApp", data.whatsapp?.connected, data.whatsapp?.connected, whatsappSettings],
+    ["Telegram", data.telegram?.running, data.telegram?.configured, telegramSettings]
+  ]) {
+    const button = document.createElement("span");
+    button.className = "health-pill " + (ready ? "ready" : "waiting");
+    button.textContent = (ready ? "✓ " : "○ ") + label + " · " + (ready ? text("Connected", "Conectado")
+      : configured ? text("Paused", "En pausa") : text("Set up", "Configurar"));
+    $("health").append(button);
+  }
+  const statusItems = data.status_items || [];
+  $("status-card").hidden = statusItems.length === 0;
+  $("dashboard-status").replaceChildren();
+  for (const item of statusItems) {
+    const row = document.createElement("article"); row.className = "post-row";
+    const content = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = item.caption.slice(0,120) || text("Media Status", "Estado con archivos");
+    const note = document.createElement("p"); note.textContent = momentLabel(item.when) + " · " + (item.status === "needs_review"
+      ? text("Delivery needs review · automatic retry is held", "Revisa la entrega · el reintento automático está detenido")
+      : item.approved ? text("Approved · waiting for delivery", "Aprobado · esperando el envío") : text("Awaiting your approval", "Espera tu aprobación"));
+    content.append(title,note); row.append(content);
+    if (item.status === "pending" && !item.approved) {
+      const approve = document.createElement("button"); approve.textContent = text("Review Status…", "Revisar Estado…");
+      approve.onclick = async () => {
+        const note = item.caption + "\n\n" + momentLabel(item.when) + "\n" + item.media.join("\n") + "\n" + text("Text background: ", "Fondo del texto: ") + item.background
+          + text("\nIf the time has passed, approval sends it now.", "\nSi la hora ya pasó, aprobarlo lo enviará ahora.");
+        if (!await modal(text("Approve this WhatsApp Status?", "¿Aprobar este Estado de WhatsApp?"), note, text("Approve Status", "Aprobar Estado"))) return;
+        await work(text("Approving Status…", "Aprobando Estado…"), async () => { await engine("approve_status",{id:item.id}); await refreshDashboard(true); });
+      };
+      row.append(approve);
+    }
+    $("dashboard-status").append(row);
+  }
+  $("dashboard-posts").replaceChildren();
+  const list = (data.posts || []).filter(post => !state.dashFilter || post.state === state.dashFilter);
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "dashboard-empty";
+    empty.textContent = data.available ? text("A little room for your next idea. Your recent drafts and scheduled posts appear here.",
+      "Aquí hay espacio para tu próxima idea. Tus borradores y publicaciones programadas aparecerán aquí.")
+      : text("Start your local services, then refresh to see saved posts.", "Enciende los servicios locales y actualiza para ver tus publicaciones.");
+    $("dashboard-posts").append(empty);
+  }
+  for (const post of list) {
+    const row = document.createElement("article"); row.className = "post-row";
+    const badge = document.createElement("span"); badge.className = "post-badge " + post.state.toLowerCase();
+    badge.textContent = post.state === "DRAFT" ? text("Draft", "Borrador") : post.state === "QUEUE" ? text("Scheduled", "Programada") : text("Needs review", "Por revisar");
+    const content = document.createElement("div");
+    const heading = document.createElement("strong");
+    const names = {facebook:"Facebook",instagram:"Instagram","instagram-standalone":"Instagram",threads:"Threads",youtube:"YouTube",tiktok:"TikTok"};
+    heading.textContent = (names[post.network] || post.network) + " · " + post.channel;
+    const caption = document.createElement("p"); caption.textContent = post.text || text("Media post", "Publicación con archivos");
+    const date = document.createElement("small"); date.textContent = momentLabel(post.at);
+    content.append(heading,caption,date); row.append(badge,content); $("dashboard-posts").append(row);
+  }
+}
+
+async function refreshDashboard(force=false) {
+  if (state.dashboardPending || (!force && Date.now() - (state.dashboardAt || 0) < 20000)) return;
+  state.dashboardPending = true;
+  try { state.dashboard = await engine("dashboard"); state.dashboardAt = Date.now(); renderDashboard(); }
+  catch (error) { $("dashboard-posts").textContent = text("Local services are unavailable. Open Settings for recovery.", "Los servicios locales no están disponibles. Abre Ajustes para recuperarlos."); }
+  finally { state.dashboardPending = false; }
+}
+
+function soon() {
+  const date = new Date(Date.now() + 10 * 60000);
+  $("post-at").value = new Intl.DateTimeFormat("sv-SE", {timeZone:state.options?.timezone || "America/Guayaquil",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(date).replace(" ", "T");
+  invalidate();
+}
+
+let waTimer = null;
+let waChecking = false;
+let waHadQR = false;
+function waClose() {
+  clearInterval(waTimer); waTimer = null;
+  $("wa-qr").removeAttribute("src"); $("wa-qr").hidden = true;
+}
+async function waState() {
+  if (waChecking || !$("whatsapp-settings").open) return;
+  waChecking = true;
+  try {
+    const result = await engine("whatsapp_state");
+    $("wa-state").textContent = result.connected ? text("✓ WhatsApp connected", "✓ WhatsApp conectado") : text("○ Waiting for the phone…", "○ Esperando al teléfono…");
+    $("wa-state").classList.toggle("connected", result.connected);
+    $("wa-refresh").hidden = result.connected;
+    if (result.connected) {
+      waClose();
+      if (waHadQR) {
+        waHadQR = false;
+        const finish = await engine("whatsapp_finish");
+        if (!finish.receipts_ready) $("wa-feedback").textContent = text("Linked. Status receipt setup still needs review.", "Vinculado. Falta revisar la configuración de los recibos de Estado.");
+      }
+      await refreshDashboard(true);
+    }
+  } catch (error) { $("wa-feedback").textContent = friendlyError(error); }
+  finally { waChecking = false; }
+}
+async function whatsappSettings() {
+  waClose(); waHadQR = false;
+  $("wa-feedback").textContent = "";
+  $("wa-state").textContent = text("Checking connection…", "Comprobando conexión…");
+  $("wa-refresh").hidden = false;
+  $("whatsapp-settings").showModal();
+  await waState();
+  if ($("whatsapp-settings").open && !$("wa-refresh").hidden) waTimer = setInterval(waState, 4000);
+}
+
+async function editYoutubeTitle() {
+  const input = document.createElement("textarea"); input.rows = 3; input.maxLength = 100;
+  input.value = current().plan.youtube_title || "";
+  input.setAttribute("aria-label", text("YouTube title · up to 100 characters", "Título de YouTube · hasta 100 caracteres"));
+  if (!await modal(text("Edit YouTube title · 100 characters", "Editar título de YouTube · 100 caracteres"), input, text("Save title", "Guardar título"))) return;
+  await work(text("Saving title…", "Guardando título…"), async () => {
+    state.history[state.selected] = await engine("revise", {review_id:current().review_id, youtube_title:input.value});
+    renderCopy();
+  });
 }
 
 function friendlyError(error) {
@@ -499,7 +668,7 @@ async function help() {
 async function loadOptions() {
   try {
     state.options = await engine("options");
-    $("workspace-status").textContent = state.options.workspace;
+    $("storage-location").textContent = state.options.workspace;
     $("zone").textContent = state.options.timezone;
     $("final-tag").value = state.options.final_tag;
     const tomorrow = new Date(Date.now() + 86400000);
@@ -511,7 +680,7 @@ async function loadOptions() {
     notice();
   } catch (error) {
     state.options = null;
-    notice(text("Postiz is unavailable. Start PostForge services, then choose Retry connection. Use Project folder if this installation is elsewhere.", "Postiz no está disponible. Enciende los servicios de PostForge y pulsa Volver a conectar. Usa Carpeta del proyecto si esta instalación está en otro lugar."));
+    notice(text("Postiz is unavailable. Start local services and refresh. Settings includes advanced recovery if needed.", "Postiz no está disponible. Enciende los servicios locales y actualiza. Ajustes incluye la recuperación avanzada si la necesitas."));
   }
 }
 
@@ -526,15 +695,15 @@ $("language").onchange = () => {
   notice();
   if (!state.options) loadOptions();
 };
-bind("reconnect", loadOptions);
-bind("workspace", async () => { if (await invoke("choose_workspace")) await loadOptions(); });
+bind("reconnect", async () => { await loadOptions(); await refreshDashboard(true); });
+bind("workspace", async () => { if (await invoke("choose_workspace")) { await loadOptions(); await refreshDashboard(true); } });
 $("body").oninput = () => {
   invalidate();
   $("body").style.height = "auto";
   $("body").style.height = Math.min(300, $("body").scrollHeight) + "px";
 };
 document.querySelectorAll('input[name="mode"]').forEach(input => input.onchange = () => { invalidate(); updateModeHint(); });
-for (const id of ["post-at", "placement", "final-tag", "cover-second"]) {
+for (const id of ["post-at", "placement", "final-tag", "cover-second", "youtube-mode", "wa-background"]) {
   $(id).onchange = () => { if (id === "cover-second") state.cover = null; invalidate(); };
 }
 bind("add-media", addMedia);
@@ -547,6 +716,27 @@ bind("cover-clear", () => { state.cover = null; $("cover-second").value = ""; in
 bind("select-all", () => {
   $("destinations").querySelectorAll("input:not(:disabled)").forEach(input => input.checked = true);
   invalidate();
+  updateNetworkOptions();
+});
+bind("go-home", () => showPage("home"));
+bind("start-post", async () => { if (state.receipt) await reset(true); else showPage("compose"); });
+bind("home-calendar", () => invoke("open_calendar"));
+bind("show-drafts", () => { state.dashFilter = state.dashFilter === "DRAFT" ? null : "DRAFT"; renderDashboard(); });
+bind("show-queue", () => { state.dashFilter = state.dashFilter === "QUEUE" ? null : "QUEUE"; renderDashboard(); });
+bind("asap", soon);
+bind("settings-open", () => $("app-settings").showModal());
+bind("settings-close", () => $("app-settings").close());
+bind("whatsapp-open", whatsappSettings);
+bind("wa-close", () => { waClose(); $("whatsapp-settings").close(); });
+$("whatsapp-settings").oncancel = waClose;
+bind("wa-refresh", async () => {
+  $("wa-refresh").disabled = true;
+  try {
+    const result = await engine("whatsapp_connect");
+    if (result.qr) { $("wa-qr").src = result.qr; $("wa-qr").hidden = false; waHadQR = true; }
+    else await waState();
+  } catch (error) { $("wa-feedback").textContent = friendlyError(error); }
+  finally { $("wa-refresh").disabled = false; }
 });
 bind("to-delivery", delivery);
 bind("back-compose", () => showPage("compose"));
@@ -566,7 +756,7 @@ bind("new-plan", reset);
 bind("new", reset);
 bind("cleanup", cleanup);
 bind("help", help);
-bind("telegram-info", telegramSettings);
+
 bind("telegram-open", telegramSettings);
 bind("telegram-inspect", () => telegramAction(async () => {
   const bot = await engine("telegram_inspect", { token: $("telegram-token").value });
@@ -625,7 +815,7 @@ bind("telegram-save", async () => {
   });
 });
 document.addEventListener("keydown", event => {
-  if (!$("telegram-settings").open && (event.metaKey || event.ctrlKey) && event.key === "Enter" && !state.busy) {
+  if (!document.querySelector("dialog[open]") && (event.metaKey || event.ctrlKey) && event.key === "Enter" && !state.busy) {
     event.preventDefault();
     if (state.page === "compose") delivery();
     else if (state.page === "delivery") bake();
@@ -641,7 +831,10 @@ if (window.__TAURI__?.event) {
   });
 }
 localize();
+showPage("home");
 loadOptions();
+setInterval(() => { if (!state.busy && state.page === "home" && document.visibilityState === "visible" && document.hasFocus()) refreshDashboard(); }, 30000);
+window.addEventListener("focus", () => { if (state.page === "home") refreshDashboard(); });
 engine("telegram_resume").catch(() => {
   $("telegram-open").textContent = text("Telegram · paused", "Telegram · en pausa");
 });

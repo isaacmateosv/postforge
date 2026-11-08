@@ -383,7 +383,8 @@ def revise_copy(env, snapshot, instruction, edited=None):
     caption = pmlib.apply_final_tag(caption, tag)
     networks = {target["network"] for target in snapshot.get("targets", [])}
     threads = tagged_threads_caption(env, caption, lang, tag) if "threads" in networks else caption
-    title = (reviewed_youtube_title(env, caption, idea, lang, snapshot.get("short", False))
+    title = (snapshot.get("youtube_title") if snapshot.get("youtube_title_manual") else
+             reviewed_youtube_title(env, caption, idea, lang, snapshot.get("short", False))
              if "youtube" in networks else None)
     return dict(snapshot, caption=caption, caption_source=source,
                 threads_caption=threads if threads != caption else None, youtube_title=title)
@@ -502,6 +503,14 @@ def run(env, p, dry_run, schedule=False):
         ready = [pmlib.normalize_media(os.path.expanduser(path), tmp) for path in paths]
         kinds = [kind for kind, _ in ready]
         short = kinds == ["video"] and pmlib.is_short(ready[0][1])
+        youtube_trim = False
+        if kinds == ["video"] and any(n == "youtube" for n, _, _ in targets) and p.get("youtube_trim", True):
+            duration, _, _, width, height = pmlib.ffprobe(ready[0][1])
+            youtube_trim = duration > 179 and height >= width
+            short = height >= width
+            if youtube_trim:
+                result["warnings"].append("YouTube: se preparará una copia de exactamente 2:59; el archivo de las otras redes se conserva completo."
+                                          if es else "YouTube: a separate 2:59 copy will be prepared; other destinations keep the full video.")
         if not kinds and not p["text_approved"] and any(n in ("facebook", "threads") for n, _, _ in targets):
             raise PMError(
                 "Sin archivos, confirma los destinos del anuncio. Facebook y Threads admiten publicaciones de texto; WhatsApp admite Estados de texto. Instagram requiere una foto o un video. Para confirmar, vuelve a enviar los destinos y la hora con «solo texto aprobado; texto: tu anuncio»."
@@ -523,7 +532,7 @@ def run(env, p, dry_run, schedule=False):
             elif second >= pmlib.ffprobe(ready[0][1])[0]:
                 raise PMError("El segundo de la portada debe estar dentro del video." if es else
                               "The cover timestamp must be within the video.")
-        shorts_requested = re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
+        shorts_requested = p.get("youtube_trim", False) or re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
         usable = []
         for network, channel, _ in targets:
             places = draft_placements(network, requested, bool(kinds))
@@ -585,16 +594,16 @@ def run(env, p, dry_run, schedule=False):
             if duration > 60:
                 story_part_count = math.ceil(duration / 59.5)
                 result["warnings"].append(
-                    f"Facebook e Instagram: se crearán {story_part_count} borradores de historias de menos de un minuto. Revisa y aprueba cada parte en orden."
+                    f"Facebook e Instagram: se crearán {story_part_count} borradores de historias de menos de un minuto, separados por un minuto. Revisa y aprueba cada parte en orden."
                     if es else
-                    f"Facebook and Instagram: this video creates {story_part_count} Story drafts under one minute. Review and approve each part in order.")
+                    f"Facebook and Instagram: this video creates {story_part_count} Story drafts under one minute, scheduled one minute apart. Review and approve each part in order.")
 
         video_networks = {network for network, _, _ in usable} & {"youtube", "whatsapp"}
         if kinds == ["video"] and any(network == "instagram" and place == "feed" for network, _, place in usable):
             video_networks.add("instagram")
         if video_networks:
             durations = [pmlib.ffprobe(path)[0] for kind, path in ready if kind == "video"]
-            result["warnings"].extend(video_warnings(video_networks, durations, p.get("ui_lang", p["lang"]), short))
+            result["warnings"].extend(video_warnings(video_networks - ({"youtube"} if youtube_trim else set()), durations, p.get("ui_lang", p["lang"]), short))
 
         if p.get("reviewed_caption"):
             caption, source = p["reviewed_caption"], "reviewed caption"
@@ -636,7 +645,9 @@ def run(env, p, dry_run, schedule=False):
         youtube_title = None
         if any(network == "youtube" for network, _, _ in usable):
             selected_title = p.get("reviewed_youtube_title")
-            youtube_title = (pmlib.youtube_title(selected_title, short) if selected_title else
+            if selected_title and not 1 <= len(selected_title.strip()) <= 100:
+                raise PMError("YouTube titles must contain 1–100 characters.")
+            youtube_title = (selected_title.strip() if selected_title else
                              reviewed_youtube_title(env, caption, p["idea"], p["lang"], short))
         cover_available = kinds == ["video"] and any(
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
@@ -645,19 +656,29 @@ def run(env, p, dry_run, schedule=False):
                        "can_rewrite": bool(p["idea"] or p["exact"]),
                        "direct_schedule_available": has_social_posts and not media_blocked,
                        "direct_schedule_blocked_by_gateway": has_social_posts and media_blocked,
-                       "youtube_title": youtube_title,
+                       "youtube_title": youtube_title, "youtube_trim_seconds": 179 if youtube_trim else None,
+                       "whatsapp_background": p.get("whatsapp_background", "#128C7E"),
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
                        "threads_caption": thread_caption if thread_caption != caption else None,
                        "targets": [{"network": n, "channel": c.get("name") if c else "WhatsApp Status",
                                     "integration_id": c.get("id") if c else None,
-                                    "placement": place, "cover": mode, "cover_second": second if mode else None}
+                                    "placement": place, "parts": story_part_count if place == "story" else 1, "cover": mode, "cover_second": second if mode else None}
                                    for (n, c, place), mode in zip(usable, modes)]})
         if dry_run:
             return result
 
+        youtube_media = []
+        if youtube_trim and any(n == "youtube" for n, _, _ in usable):
+            youtube_dir = os.path.join(tmp, "youtube")
+            os.mkdir(youtube_dir)
+            trimmed = pmlib.to_mp4(ready[0][1], youtube_dir, max_seconds=179)
+            if not 178.8 <= pmlib.ffprobe(trimmed)[0] <= 179.05:
+                raise PMError("Could not verify the 2:59 YouTube copy. / No se pudo verificar la copia de YouTube de 2:59.")
+            uploaded = postiz.upload(trimmed)
+            youtube_media = [{"id": uploaded["id"], "path": uploaded["path"]}]
         media = []
-        for kind, path in ready:
+        for kind, path in (ready if any(n != "youtube" for n, _, _ in usable) or not youtube_media else []):
             uploaded = postiz.upload(path)
             media.append({"id": uploaded["id"], "path": uploaded["path"]})
         story_media = []
@@ -682,21 +703,22 @@ def run(env, p, dry_run, schedule=False):
         when_utc = p["when"].astimezone(timezone.utc)
         library_media = media
         library_story_media = story_media
+        library_youtube_media = youtube_media
         if media_key and has_social_posts:
             expiry = int((max(when_utc, datetime.now(timezone.utc)) + timedelta(days=2)).timestamp())
             try:
-                signed = [dict(item, path=media_links.signed_url(
-                    media_key, env["FRONTEND_URL"], item["path"], expiry))
-                    for item in media + story_media + ([cover_upload] if cover_upload else [])]
+                def signed_items(items):
+                    output = [dict(item, path=media_links.signed_url(media_key, env["FRONTEND_URL"], item["path"], expiry)) for item in items]
+                    if not all(media_links.serves_media(item["path"]) for item in output):
+                        raise PMError("Secure media delivery could not be verified. No posts were created.")
+                    return output
+                media = signed_items(media)
+                story_media = signed_items(story_media)
+                youtube_media = signed_items(youtube_media)
+                if cover_upload:
+                    cover_upload = signed_items([cover_upload])[0]
             except ValueError as exc:
                 raise PMError(str(exc)) from exc
-            if not all(media_links.serves_media(item["path"]) for item in signed):
-                raise PMError("No se pudo verificar la descarga segura de los archivos. No se crearon publicaciones."
-                              if es else "Secure media delivery could not be verified. No posts were created.")
-            if cover_upload:
-                cover_upload = signed.pop()
-            media = signed[:len(media)]
-            story_media = signed[len(media):]
         whatsapp_requested = any(network == "whatsapp" for network, _, _ in usable)
         whatsapp_post_ids = []
         for (network, channel, item_placement), mode in zip(usable, modes):
@@ -708,7 +730,7 @@ def run(env, p, dry_run, schedule=False):
             settings = {"post_type": "story"} if item_placement == "story" else {}
             if network == "youtube":
                 settings["title"] = youtube_title
-            target_media = media
+            target_media = youtube_media if network == "youtube" and youtube_media else media
             if mode and network == "youtube":
                 settings["thumbnail"] = {key: cover_upload[key] for key in ("id", "path")}
             elif mode == "image":
@@ -731,9 +753,9 @@ def run(env, p, dry_run, schedule=False):
                                                   "channel": channel.get("identifier"), "placement": item_placement,
                                                   "integration_id": channel.get("id"), "when": part_time.isoformat(),
                                                   "media": ([library_story_media[part_index]["path"]] if item_placement == "story" and library_story_media
-                                                            else [m["path"] for m in library_media]), "caption": target_caption[:500]})
+                                                            else [m["path"] for m in (library_youtube_media if network == "youtube" and library_youtube_media else library_media)]), "part": part_index + 1, "parts": len(batches), "caption": target_caption[:500]})
         if whatsapp_requested and not dry_run:
-            pending_id = whatsapp_pending.enqueue(caption, [path for _, path in ready], whatsapp_post_ids, when_utc)
+            pending_id = whatsapp_pending.enqueue(caption, [path for _, path in ready], whatsapp_post_ids, when_utc, background=p.get("whatsapp_background", "#128C7E"))
             result["whatsapp_pending_id"] = pending_id
             result["notes"].append("El Estado de WhatsApp espera aprobación." if es else
                                    "WhatsApp Status waits for approval")

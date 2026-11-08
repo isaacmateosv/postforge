@@ -226,3 +226,35 @@ and conversation state, dropping older commands. Saved settings and runtime
 conversation files are restored on startup failure. Disabling requires no API
 call. A failed validation changes no credentials. OpenSSL is needed for the
 encrypted credentials workflow on every OS.
+
+## Desktop studio revision · rc.22
+
+The default dashboard is read-only and organization-scoped, listing only
+unpublished parent records. Counts use the full organization; the recent list
+is bounded to 40. Refresh happens on dashboard focus/foreground at most every
+30 seconds, rather than while the app is hidden. Indicators distinguish API
+reachability, WhatsApp pairing and the Telegram agent state; they are not
+promises that every provider token remains valid.
+
+Backend discovery checks saved installation configuration and known installed
+locations. Advanced recovery is the only folder-picker flow. It locates rather
+than relocates an installation, avoiding changes to Docker bind mounts.
+
+The reviewed fields include YouTube format and WhatsApp text background.
+Portrait/square Shorts inputs over 179 seconds are transcoded to a separate
+verified 179-second file at submission; preview does not encode or upload.
+Only YouTube receives that variant. Existing signed media delivery and retention
+cover the variant, and transient files are removed in finally. Story targets
+expose their segment counts. Logs include part/parts for each actual record.
+YouTube title revisions preserve delivery and caption, enforce 100 characters
+and retain manually edited titles through subsequent caption revisions.
+Pipeline revision 2 invalidates older unsubmitted previews, while completed
+families still return their cached receipt.
+
+WhatsApp pairing returns only a size-bounded PNG data URL after an explicit QR
+request. It never returns Evolution API credentials, recreates an open session,
+or persists the QR. Connection polling runs only inside the open dialog. After
+new pairing, the existing receipt configuration helper runs once. Text-only
+Status background colors are validated as hex colors and persisted with the
+approval-gated queue item. Telegram group commands remain unsupported; adding
+a bot to a group does not grant posting authority.

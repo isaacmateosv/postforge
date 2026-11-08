@@ -4,11 +4,36 @@ This is the current v2 desktop workflow. The older Swift instructions are retain
 
 ## Rust desktop and guided Telegram
 
-The Rust/Tauri client separates **Compose**, **Delivery** and **Review & finish**.
-Enter the message without schedule commands, choose idea generation or exact
-words, then attach optional media. Choose destinations and a local date/time
-on the next screen. Review the baked plan before finishing. Cover and business
-hashtag settings live in one options section. Caption versions preserve delivery.
+Start on **Dashboard** to see draft/scheduled counts, the next post and connection
+indicators. Open Postiz to review saved work, or choose **New post**.
+
+1. **Compose**: enter an idea or select exact words, then attach optional media.
+2. **Delivery**: choose networks, formats and date/time. **Soon · +10 min** fills
+   a nearby future time. New installations have an empty business hashtag.
+   Existing configured tags are retained. For text-only WhatsApp Status, pick
+   a background color. Cover and hashtag options are grouped below.
+3. **Bake and review**: a small animated mixer shows preparation. One initial
+   caption appears. **Try Another Caption** adds another take; arrows browse
+   them. Editing the caption updates the selected take. The shortened Threads
+   adaptation is labelled separately. **Edit title…** changes the YouTube title
+   independently (up to 100 characters). Review the destination/segment counts,
+   then create drafts or explicitly confirm direct scheduling.
+
+Long Facebook/Instagram stories create multiple segments, scheduled one minute
+apart. A 205-second video means **one feed post + four Story drafts** per network
+when both formats are selected. YouTube Shorts uses a separate **2:59** copy for
+longer portrait/square videos; the other networks keep the full video. Choose
+**Full video** to retain the entire YouTube upload instead. Landscape sources
+are not silently cropped to Shorts.
+
+Use **WhatsApp** in the header to see connection status or scan its QR directly
+in the window. A working connection stays paired. **Remove posts…** first asks
+whether to remove drafts or cancel scheduled posts, then shows counts before
+confirmation. Published posts remain online.
+
+The local backend is discovered automatically; folder selection is not part
+of normal use. **Settings → Advanced · recovery and migration** is only for
+locating a recovered or migrated installation. No path clutters the dashboard.
 
 Open **Telegram** in the app header. Each installation uses its own dedicated
 bot and one authorized private owner; there is no shared global bot. Create it

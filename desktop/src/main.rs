@@ -26,9 +26,9 @@ fn python() -> (&'static str, Vec<&'static str>) {
 
 fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Value, String> {
     if !valid_workspace(&project) {
-        return Err("Choose the PostForge project folder to connect this client.".into());
+        return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["options", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["options", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
@@ -88,7 +88,7 @@ async fn choose_workspace(app: tauri::AppHandle) -> Result<Option<String>, Strin
     if let Some(file) = root {
         let path = file.into_path().map_err(|_| "Select a local folder.")?;
         if !valid_workspace(&path) {
-            return Err("This folder does not contain the current PostForge project.".into());
+            return Err("This folder does not contain a current PostForge installation.".into());
         }
         let state = app.state::<Workspace>();
         *state.0.lock().map_err(|_| "Workspace is busy.")? = path.clone();
@@ -119,6 +119,10 @@ fn main() {
             let fallback = std::env::var("POSTFORGE_PROJECT_DIR").map(PathBuf::from).unwrap_or_else(|_| {
                 app.path().home_dir().unwrap_or_default().join("postforge")
             });
+            let fallback = if valid_workspace(&fallback) { fallback } else {
+                let installed = PathBuf::from("/usr/local/share/postforge");
+                if valid_workspace(&installed) { installed } else { fallback }
+            };
             let saved = app.path().app_config_dir().ok()
                 .and_then(|directory| std::fs::read_to_string(directory.join("workspace")).ok())
                 .map(PathBuf::from).filter(|path| valid_workspace(path));
