@@ -19,11 +19,12 @@ ZIP_BYTES = b'PK\x03\x04' + b'synthetic-desktop-build' * 64
 DIGEST = hashlib.sha256(ZIP_BYTES).hexdigest()
 
 
-def release(tag='v2.0.1', assets=None):
+def release(tag='v2.0.1', assets=None, prerelease=False, draft=False):
     name = installer._expected_name(tag)
     if assets is None:
         assets = [name, name + '.sha256']
-    return {'tag_name': tag, 'assets': [{'name': item, 'browser_download_url': 'https://downloads.example/' + item} for item in assets]}
+    return {'tag_name': tag, 'prerelease': prerelease, 'draft': draft,
+            'assets': [{'name': item, 'browser_download_url': 'https://downloads.example/' + item} for item in assets]}
 
 
 class Response(io.BytesIO):
@@ -36,9 +37,13 @@ class Response(io.BytesIO):
 
 
 def fake_opener(release_data, digest=DIGEST, payload=ZIP_BYTES):
+    # The planner now lists releases, so RELEASES returns an array; a single
+    # release dict is wrapped for convenience.
+    releases = release_data if isinstance(release_data, list) else [release_data]
+
     def opener(url, accept):
-        if url == installer.RELEASES:
-            return Response(json.dumps(release_data).encode())
+        if url.startswith(installer.RELEASES):
+            return Response(json.dumps(releases).encode())
         if url.endswith('.sha256'):
             return Response((digest + '  file.zip\n').encode())
         return Response(payload)
@@ -104,6 +109,17 @@ class DownloadTests(unittest.TestCase):
     def test_oversized_download_is_stopped(self):
         with self.with_version('2.0.0'), patch.object(installer, 'MAX_BYTES', 8), \
                 patch.object(installer, '_open', fake_opener(release())):
+            with self.assertRaises(pmlib.PMError):
+                installer.download()
+
+    def test_prerelease_install_downloads_newest_prerelease(self):
+        payload = [release(tag='v2.0.0-rc.23', prerelease=True), release(tag='v2.0.0-rc.22', prerelease=True)]
+        with self.with_version('2.0.0-rc.22'), patch.object(installer, '_open', fake_opener(payload)):
+            result = installer.download()
+        self.assertEqual(result['version'], '2.0.0-rc.23')
+
+    def test_stable_install_declines_a_prerelease(self):
+        with self.with_version('2.0.0'), patch.object(installer, '_open', fake_opener(release(tag='v2.0.1-rc.1', prerelease=True))):
             with self.assertRaises(pmlib.PMError):
                 installer.download()
 

@@ -10,7 +10,6 @@ release that is not strictly newer or not built for this OS/architecture.
 """
 import hashlib
 import json
-import platform
 import sys
 import tempfile
 import urllib.parse
@@ -21,7 +20,7 @@ import pmlib
 import desktop_updates
 
 ROOT = Path(__file__).resolve().parent.parent
-RELEASES = 'https://api.github.com/repos/isaacmateosv/postforge/releases/latest'
+RELEASES = desktop_updates.RELEASES
 MAX_BYTES = 120 * 1024 * 1024  # a desktop ZIP is a few MB; bound the download hard.
 CHUNK = 65536
 
@@ -35,9 +34,7 @@ def _open(url, accept):
 
 
 def _expected_name(tag):
-    system = 'windows' if sys.platform == 'win32' else sys.platform
-    architecture = platform.machine().lower().replace('amd64', 'x86_64')
-    return 'PostForge-Desktop-' + tag.lstrip('v') + '-' + system + '-' + architecture + '.zip'
+    return desktop_updates.asset_name(tag)
 
 
 def _bundle_name():
@@ -50,13 +47,12 @@ def _bundle_name():
 
 def download():
     installed = (ROOT / 'VERSION').read_text().strip()
-    with _open(RELEASES, 'application/vnd.github+json') as response:
-        release = json.load(response)
-    tag = release.get('tag_name') or ''
-    newer = (desktop_updates.version(tag) and desktop_updates.version(installed)
-             and desktop_updates.version(tag) > desktop_updates.version(installed))
-    if not newer:
+    with _open(RELEASES + '?per_page=40', 'application/vnd.github+json') as response:
+        releases = json.load(response)
+    release = desktop_updates.select_release(releases, installed)
+    if not release:
         raise pmlib.PMError('No newer compatible update was found. / No se encontró una actualización más reciente.')
+    tag = release.get('tag_name') or ''
     name = _expected_name(tag)
     assets = {asset.get('name'): asset.get('browser_download_url') for asset in release.get('assets', [])}
     if not assets.get(name) or not assets.get(name + '.sha256'):
