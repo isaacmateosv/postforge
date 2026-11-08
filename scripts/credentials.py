@@ -43,10 +43,10 @@ def passphrase(prompt, confirm_prompt=None):
     return first, (getpass.getpass(confirm_prompt) if confirm_prompt else first)
 
 
-def export_credentials(path, include_gateway=False):
+def export_credentials(path, include_gateway=False, password=None):
     if not os.path.isfile(ENV):
         raise RuntimeError("No .env found at " + ENV)
-    password, confirmation = passphrase("Encryption passphrase: ", "Re-enter encryption passphrase: ")
+    password, confirmation = passphrase("Encryption passphrase: ", "Re-enter encryption passphrase: ") if password is None else (password, password)
     if password != confirmation:
         raise RuntimeError("Passphrases do not match")
     if len(password) < 12:
@@ -77,10 +77,10 @@ def export_credentials(path, include_gateway=False):
     print("Encrypted credentials written to %s" % path)
 
 
-def import_credentials(path, output=None, gateway_stage=None):
+def import_credentials(path, output=None, gateway_stage=None, password=None):
     if not os.path.isfile(path):
         raise RuntimeError("Encrypted credentials file not found: " + path)
-    password, _ = passphrase("Decryption passphrase: ")
+    password, _ = passphrase("Decryption passphrase: ") if password is None else (password, password)
     fd, temporary = tempfile.mkstemp(prefix=".env-", dir=ROOT)
     os.close(fd)
     try:

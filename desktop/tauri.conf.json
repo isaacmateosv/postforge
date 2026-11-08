@@ -14,8 +14,9 @@
         "title": "PostForge Desktop",
         "width": 1120,
         "height": 880,
-        "minWidth": 900,
-        "minHeight": 760
+        "minWidth": 720,
+        "minHeight": 600,
+        "maximized": true
       }
     ],
     "security": {

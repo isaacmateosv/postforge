@@ -82,6 +82,7 @@ function renderSteps() {
 
 function showPage(page) {
   state.page = page;
+  document.querySelector("main").scrollTop = 0;
   $("steps").hidden = page === "home";
   if (page === "home") refreshDashboard(true);
   document.querySelectorAll(".page").forEach(node => node.hidden = node.id !== page);
@@ -101,6 +102,7 @@ async function engine(operation, payload = {}) {
 async function work(message, action, baking=false) {
   if (state.busy) return;
   state.busy = true;
+  updateTray();
   renderSteps();
   const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
   controls.forEach(node => node.disabled = true);
@@ -114,6 +116,7 @@ async function work(message, action, baking=false) {
   } finally {
     $("baking-visual").hidden = true;
     state.busy = false;
+    updateTray();
     controls.forEach(node => node.disabled = false);
     $("placement").disabled = state.media.length === 0;
     renderDestinations();
@@ -452,9 +455,7 @@ function renderDashboard() {
   $("telegram-open").classList.toggle("ready", !!data.telegram?.running);
   $("health").replaceChildren();
   for (const [label, ready, configured, action] of [
-    ["Postiz", data.postiz_online, data.available, () => invoke("open_calendar")],
-    ["WhatsApp", data.whatsapp?.connected, data.whatsapp?.connected, whatsappSettings],
-    ["Telegram", data.telegram?.running, data.telegram?.configured, telegramSettings]
+    ["Postiz", data.postiz_online, data.available, () => invoke("open_calendar")]
   ]) {
     const button = document.createElement("span");
     button.className = "health-pill " + (ready ? "ready" : "waiting");
@@ -463,7 +464,8 @@ function renderDashboard() {
     $("health").append(button);
   }
   const statusItems = data.status_items || [];
-  $("status-card").hidden = statusItems.length === 0;
+  $("status-card").hidden = false;
+  $("status-count").textContent = " · " + statusItems.length + text(" pending", " pendientes");
   $("dashboard-status").replaceChildren();
   for (const item of statusItems) {
     const row = document.createElement("article"); row.className = "post-row";
@@ -512,7 +514,13 @@ function renderDashboard() {
 async function refreshDashboard(force=false) {
   if (state.dashboardPending || (!force && Date.now() - (state.dashboardAt || 0) < 20000)) return;
   state.dashboardPending = true;
-  try { state.dashboard = await engine("dashboard"); state.dashboardAt = Date.now(); renderDashboard(); }
+  try {
+    const data = await engine("dashboard");
+    const changed = JSON.stringify(data) !== JSON.stringify(state.dashboard);
+    state.dashboard = data; state.dashboardAt = Date.now();
+    updateTray();
+    if (changed || force) renderDashboard();
+  }
   catch (error) { $("dashboard-posts").textContent = text("Local services are unavailable. Open Settings for recovery.", "Los servicios locales no están disponibles. Abre Ajustes para recuperarlos."); }
   finally { state.dashboardPending = false; }
 }
@@ -837,4 +845,122 @@ setInterval(() => { if (!state.busy && state.page === "home" && document.visibil
 window.addEventListener("focus", () => { if (state.page === "home") refreshDashboard(); });
 engine("telegram_resume").catch(() => {
   $("telegram-open").textContent = text("Telegram · paused", "Telegram · en pausa");
+});
+
+// Native tray mirrors the same window workflows, without creating a second app.
+function updateTray() {
+  invoke("tray_state", { language:state.language, drafts:state.dashboard?.drafts || 0,
+    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!state.backupBusy), update:!!state.updateAvailable }).catch(() => {});
+}
+async function checkUpdates(manual=false) {
+  if (state.updateChecking) return;
+  state.updateChecking=true;
+  try {
+    if (manual) notice(text("Checking app and service updates…", "Buscando actualizaciones de la app y los servicios…"),true);
+    const result=await engine("updates",{components:manual});
+    state.updateAvailable=result.available || !!(result.services?.updates_available || result.services?.evolution?.update_available);
+    $("updates-open").textContent=state.updateAvailable ? text("Updates Available…","Actualizaciones disponibles…") : text("Check for Updates…","Buscar actualizaciones…");
+    if (manual) {
+      const message=text("Installed: ","Instalada: ")+result.installed+"\n"+
+        (!result.checked ? text("The release check could not finish. Try again later.","No se pudo completar la consulta. Vuelve a intentarlo más tarde.") :
+         result.available ? text("A compatible desktop update is available.","Hay una actualización de escritorio compatible.") :
+         text("No newer compatible desktop release was found.","No se encontró una versión de escritorio compatible más reciente."))+
+        (result.services ? "\n"+text("Service check: ","Servicios: ")+((result.services.updates_available || result.services.evolution?.update_available) ? text("updates available.","hay actualizaciones.") : (result.services.check_complete && result.services.evolution) ? text("current.","actualizados.") : text("some checks could not finish.","algunas consultas no se completaron.")) : "");
+      notice();
+      if (await modal(text("Updates", "Actualizaciones"),message,text("Open releases", "Abrir versiones"))) await invoke("open_releases");
+    }
+  } catch (error) { if (manual) notice(friendlyError(error)); }
+  finally {state.updateChecking=false;updateTray();}
+}
+function backupOpen() { $("backup-dialog").showModal(); }
+function backupClearInspection() {
+  state.backupInspection=null;
+  ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=true);
+  $("backup-old-host").checked=false;$("backup-replace").checked=false;
+}
+function backupClose() {
+  $("backup-password").value="";$("backup-confirm").value="";backupClearInspection();$("backup-dialog").close();
+}
+async function backupRun(action) {
+  if (state.backupBusy) return;
+  const password=$("backup-password").value;
+  if (!state.backupPath || password.length<12) {$("backup-stage").textContent=text("Choose a location and a passphrase of at least 12 characters.","Elige una ubicación y una contraseña de al menos 12 caracteres.");return;}
+  if (action==="export" && password!==$("backup-confirm").value) {$("backup-stage").textContent=text("Passphrases do not match.","Las contraseñas no coinciden.");return;}
+  const payload={action,password};
+  if (action==="export") payload.folder=state.backupPath;else payload.file=state.backupPath;
+  if (action==="restore") {
+    if (!state.backupInspection || !$("backup-old-host").checked) {$("backup-stage").textContent=text("Confirm that the previous host is stopped.","Confirma que el equipo anterior esté detenido.");return;}
+    if (!await modal(text("Restore local data?","¿Restaurar los datos locales?"),text("Local publishing services will stop. Verify restored channels before starting them again. Telegram stays paused.","Los servicios locales de publicación se detendrán. Verifica los canales restaurados antes de iniciarlos otra vez. Telegram queda en pausa."),text("Restore","Restaurar"))) return;
+    Object.assign(payload,{confirmed:true,fingerprint:state.backupInspection.fingerprint,replace:$("backup-replace").checked});
+  }
+  state.backupBusy=true;updateTray();$("backup-progress").hidden=false;
+  document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore").forEach(node=>node.disabled=true);
+  try {
+    const job=await engine("backup_start",payload);
+    $("backup-password").value="";$("backup-confirm").value="";
+    let result;
+    do {
+      await new Promise(resolve=>setTimeout(resolve,1000));
+      result=await engine("backup_status",{id:job.id});
+      $("backup-progress").value=result.percent || 0;
+      $("backup-stage").textContent=result.stage ? friendlyError(result.stage) : "";
+    } while (result.state==="running");
+    if (result.state!=="done") throw new Error(result.error);
+    const data=result.result;
+    if (action==="inspect") {
+      state.backupInspection=data;
+      $("backup-result").textContent=text("Verified backup", "Respaldo verificado")+"\n"+data.rows+text(" database rows · "," registros · ")+data.media_files+text(" media files", " archivos")+"\n"+text("Gateway: ","Acceso seguro: ")+(data.gateway ? "✓" : "—")+text(" · Telegram: "," · Telegram: ")+(data.telegram ? "✓" : "—");
+      ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=false);
+      $("backup-stage").textContent=text("Enter the passphrase again when ready to restore.","Ingresa otra vez la contraseña cuando vayas a restaurarlo.");
+    } else if (action==="export") {
+      $("backup-result").textContent=text("Verified encrypted backup saved:\n", "Respaldo cifrado y verificado guardado:\n")+data.file+"\nSHA-256: "+data.sha256;
+      $("backup-stage").textContent=text("Complete", "Completado");
+    } else {
+      backupClearInspection();$("backup-result").textContent=text("Restored. Services remain stopped. Before starting: verify the public URL, gateway login, channels and schedules. Check WhatsApp linking. Enable Telegram only after the previous host is stopped.","Restaurado. Los servicios siguen detenidos. Antes de iniciarlos, verifica la URL pública, el acceso seguro, los canales y los horarios. Revisa la vinculación de WhatsApp. Activa Telegram solo cuando el equipo anterior esté detenido.")+(data.rollback ? "\n"+text("Rollback backup: ","Respaldo de recuperación: ")+data.rollback : "");
+    }
+  } catch(error) {$("backup-stage").textContent=friendlyError(error);}
+  finally {state.backupBusy=false;updateTray();document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore").forEach(node=>node.disabled=false);}
+}
+bind("backup-open",backupOpen);
+bind("updates-open",()=>checkUpdates(true));
+bind("backup-close",backupClose);
+$("backup-dialog").addEventListener("cancel",()=>{$("backup-password").value="";$("backup-confirm").value="";backupClearInspection();});
+$("backup-mode").onchange=()=>{backupClearInspection();state.backupPath=null;$("backup-path").textContent="";$("backup-confirm-row").hidden=$("backup-mode").value!=="export";$("backup-start").textContent=$("backup-mode").value==="export" ? text("Create backup","Crear respaldo") : text("Inspect backup","Revisar respaldo");};
+bind("backup-pick",async()=>{const path=await invoke("backup_location",{restore:$("backup-mode").value!=="export"});if(path){state.backupPath=path;$("backup-path").textContent=path;backupClearInspection();}});
+bind("backup-start",()=>backupRun($("backup-mode").value));
+bind("backup-restore",()=>backupRun("restore"));
+if (window.__TAURI__?.event) {
+  window.__TAURI__.event.listen("postforge-tray-action",async event=>{
+    if (document.querySelector("dialog[open]") || state.busy) return;
+    try {
+      const action=event.payload;
+      if(action==="home") showPage("home");
+      else if(action==="new") $("start-post").click();
+      else if(action==="calendar") await invoke("open_calendar");
+      else if(action==="wa-review") {showPage("home");await refreshDashboard(true);$("status-card").open=true;$("status-card").scrollIntoView({block:"nearest"});}
+      else if(action==="whatsapp") await whatsappSettings();
+      else if(action==="telegram") await telegramSettings();
+      else if(action==="backup") backupOpen();
+      else if(action==="updates") await checkUpdates(true);
+      else if(action==="settings") $("app-settings").showModal();
+      else if(action==="help") await help();
+      else if(action==="about") await modal("PostForge · "+(state.options?.version || ""),text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
+    } catch(error) {notice(friendlyError(error));}
+  });
+  window.__TAURI__.event.listen("postforge-tray-refresh",updateTray);
+}
+checkUpdates();
+setInterval(()=>checkUpdates(),6*60*60*1000);
+
+bind("wa-receipts",async()=>{
+  try {
+    const result=await engine("whatsapp_receipts");
+    $("wa-receipt-history").replaceChildren();
+    for(const item of result.items) {
+      const row=document.createElement("p");
+      row.textContent=new Date(item.at*1000).toLocaleString(state.language==="es"?"es-EC":"en")+" · "+text("Received: ","Recibido: ")+(item.received ?? "—")+" · "+text("Viewed: ","Visto: ")+(item.viewed ?? "—");
+      $("wa-receipt-history").append(row);
+    }
+    const note=document.createElement("p");note.className="hint";note.textContent=text("Views depend on both phones enabling read receipts. No history means no recorded receipts yet.","Las vistas dependen de que ambos teléfonos tengan activadas las confirmaciones de lectura. Si no hay historial, aún no hay recibos registrados.");$("wa-receipt-history").append(note);
+  } catch(error) {$("wa-receipt-history").textContent=friendlyError(error);}
 });

@@ -2,6 +2,10 @@
 
 ## [2.0.0-rc.22]
 
+- Rust desktop opens maximized within the available desktop, with a scrolling work area, persistent window controls, compact short-screen spacing and bounded dialogs.
+- Native tray, active-task badges, six-hour release checks and a private encrypted Backup & Move assistant now share the main window workflows. Restore requires inspection and confirmation, preserves a rollback backup when replacing data, and leaves publishing services paused.
+
+
 - Restore a colorful, status-aware dashboard as the opening view, with saved drafts, upcoming posts and focused refreshes.
 - Hide installation paths in advanced recovery, remove duplicate Telegram setup actions, add in-window WhatsApp QR linking and a compact animated mixer.
 - Clarify Story segment counts, caption adaptations and version history; add separate YouTube title editing, a +10-minute shortcut and text Status background colors.

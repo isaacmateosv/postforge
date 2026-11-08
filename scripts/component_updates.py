@@ -7,6 +7,7 @@ import json
 import os
 import re
 import signal
+import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -20,7 +21,7 @@ EVOLUTION_VERSION = '2.3.7'
 def run(args):
     try:
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   text=True, start_new_session=True)
+                                   text=True, **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}))
     except OSError:
         return None
     try:
@@ -30,8 +31,13 @@ def run(args):
         # Docker may spawn its buildx plugin. Kill this isolated command group so
         # a plugin cannot keep the output pipe open after the parent times out.
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
+        except (OSError, subprocess.SubprocessError):
+            process.kill()
             pass
         process.communicate()
         return None
@@ -62,12 +68,12 @@ def evolution_status(declared):
     image = next((image for image in declared if image.startswith("evoapicloud/evolution-api")), "")
     installed = EVOLUTION_VERSION if image == EVOLUTION_PIN else None
     if installed is None and image:
-        response = run(["/usr/bin/curl", "-fsS", "--max-time", "5", "http://127.0.0.1:8080/"])
+        response = run([(shutil.which("curl") or "curl"), "-fsS", "--max-time", "5", "http://127.0.0.1:8080/"])
         try:
             installed = json.loads(response).get("version")
         except (ValueError, TypeError, AttributeError):
             pass
-    remote = run(["/usr/bin/curl", "-fsS", "--max-time", "6", EVOLUTION_RELEASE])
+    remote = run([(shutil.which("curl") or "curl"), "-fsS", "--max-time", "6", EVOLUTION_RELEASE])
     try:
         release = json.loads(remote)
         latest = release.get("tag_name") if not release.get("prerelease") and not release.get("draft") else None

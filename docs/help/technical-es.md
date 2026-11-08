@@ -273,3 +273,11 @@ recibos existente. El fondo del Estado de texto se valida como color hexadecimal
 y se guarda con el elemento de la cola que requiere aprobación. Los comandos
 en grupos de Telegram siguen sin admitirse; añadir el bot a un grupo no concede
 permiso para publicar.
+
+
+## Ventana, bandeja y migración
+La ventana Rust se abre maximizada dentro del escritorio disponible y conserva el acceso a la barra de menús del sistema. La cabecera y los controles inferiores permanecen visibles; el área de trabajo y los diálogos largos permiten desplazarse. En pantallas de menor altura, el espaciado se vuelve más compacto. Cerrar oculta la ventana; Salir en la bandeja cierra el cliente y los servicios de publicación siguen activos.
+
+Usa **Respaldo y traslado** desde la ventana o la bandeja. La exportación crea un archivo `.pfbackup` cifrado y autenticado con las credenciales, la configuración del acceso seguro, los datos de Postiz y los archivos multimedia; además, verifica la restauración en una base temporal. Guarda por separado la contraseña de al menos 12 caracteres: no se puede recuperar. Revisar un respaldo no modifica los datos activos. Para restaurar, revisa el mismo archivo, vuelve a ingresar la contraseña y confirma que el equipo anterior esté detenido. Reemplazar datos existentes requiere marcar una casilla y primero crea un respaldo cifrado de recuperación. Si las credenciales de la base son distintas, necesitas una instalación de destino nueva. Los servicios restaurados quedan detenidos y Telegram permanece en pausa: verifica la URL pública, el acceso seguro, las sesiones de los canales y los horarios antes de iniciar los servicios o activar Telegram. WhatsApp puede necesitar vincularse otra vez.
+
+La bandeja incluye Inicio, Nueva publicación, planes y aprobaciones de WhatsApp, conexiones, respaldos, actualizaciones, ajustes y Ayuda. Acerca de está casi al final, antes de Salir. Un número pequeño junto al ícono monocromático indica tareas activas. La app busca actualizaciones al iniciar y cada seis horas; la consulta manual incluye los componentes de Docker y Evolution. Las consultas incompletas se indican como tales; el cliente solo ofrece archivos ZIP Rust compatibles, no paquetes anteriores.

@@ -258,3 +258,11 @@ new pairing, the existing receipt configuration helper runs once. Text-only
 Status background colors are validated as hex colors and persisted with the
 approval-gated queue item. Telegram group commands remain unsupported; adding
 a bot to a group does not grant posting authority.
+
+
+## Window, tray and migration
+The Rust window opens maximized within the available desktop, keeping the system menu bar accessible. Its header and bottom controls stay visible; the working area and long dialogs scroll. On shorter displays, spacing becomes more compact. Close hides the window; Quit in the tray exits the client while publishing services continue.
+
+Use **Backup & Move** in the window or tray. Export creates one authenticated, encrypted `.pfbackup` containing credentials, gateway configuration, Postiz data and media, and rehearses restoration in a disposable database. Keep the passphrase (at least 12 characters) separately; it cannot be recovered. Inspection does not change live data. Restore requires inspecting the same file, entering the passphrase again and confirming the old host is stopped. Replacing initialized data needs an explicit checkbox and creates an encrypted rollback backup first. Different database credentials require a fresh destination installation. Restored services stay stopped and Telegram stays paused: verify the public URL, gateway access, channel sessions and schedules before starting services or enabling Telegram. WhatsApp may need linking again.
+
+The tray provides Dashboard, New Post, WhatsApp plans and approvals, connections, backups, updates, settings and Help. About is near the bottom before Quit. A small count beside the monochrome icon indicates active work. Update checks run at startup and every six hours; manual checks include Docker components and Evolution. An incomplete check is reported as incomplete; the desktop checker only offers matching Rust desktop ZIP assets, not legacy packages.
