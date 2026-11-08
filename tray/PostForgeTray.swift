@@ -3075,7 +3075,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         ])
         stats.distribution = .fillEqually
         stats.spacing = 12
-        for card in stats.arrangedSubviews { card.heightAnchor.constraint(equalToConstant: 52).isActive = true }
+        for card in stats.arrangedSubviews { card.heightAnchor.constraint(equalToConstant: 70).isActive = true }
 
         // Media
         let drop = DropView()
@@ -3368,6 +3368,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate, NSTextFieldDelegate {
         body.alignment = .top
         body.spacing = 22
         inputColumn.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.43, constant: -11).isActive = true
+        planColumn.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.57, constant: -11).isActive = true
         inputColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
         planColumn.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
         let main = NSStackView(views: [header, steps, stats, body, footer])
@@ -5201,6 +5202,12 @@ if CommandLine.arguments.contains("--verify-ui") {
     delegate.newPost!.placementMenu.selectItem(at: 0)
     let composer = delegate.newPost!
     let composerStack = composer.window.contentView!.subviews.compactMap { $0 as? NSStackView }.last!
+    composer.window.contentView!.layoutSubtreeIfNeeded()
+    let composerBody = composerStack.arrangedSubviews[3] as! NSStackView
+    let reviewColumn = composerBody.arrangedSubviews[1]
+    precondition(abs(reviewColumn.frame.maxX - composerBody.bounds.maxX) < 2, "Review column must fill the remaining width")
+    let overview = composerStack.arrangedSubviews[2] as! NSStackView
+    precondition(overview.arrangedSubviews.allSatisfy { $0.frame.height >= 70 }, "Overview cards must fit title and count")
     let steps = composerStack.arrangedSubviews[1] as! ComposerSteps
     precondition(steps.stringValue.hasPrefix("1. Compose"))
     precondition(composer.connectionsButton.title == "Connections")
