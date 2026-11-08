@@ -1,0 +1,123 @@
+<!-- Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors. -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PostForge Desktop</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
+  <div class="tools">
+    <select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select>
+    <button id="reconnect"></button><button id="help"></button><button id="workspace"></button>
+  </div>
+</header>
+<nav id="steps" aria-label="Workflow"></nav>
+<div id="notice" role="status" hidden></div>
+<main>
+<section id="compose" class="page">
+  <div class="workspace">
+    <article class="card">
+      <div class="section-title"><span class="number">1</span><div>
+        <h2 data-en="What are we sharing?" data-es="¿Qué vamos a compartir?"></h2>
+        <p data-en="Start with your message. Attach media if this post needs it." data-es="Empieza por tu mensaje. Adjunta archivos si esta publicación los necesita."></p>
+      </div></div>
+      <fieldset><legend data-en="Caption mode" data-es="Tipo de texto"></legend>
+        <div class="segmented">
+          <label><input type="radio" name="mode" value="idea" checked><span data-en="Write from my idea" data-es="Redactar a partir de mi idea"></span></label>
+          <label><input type="radio" name="mode" value="exact"><span data-en="Keep my exact words" data-es="Conservar mis palabras"></span></label>
+        </div>
+      </fieldset>
+      <label for="body" id="body-label"></label>
+      <textarea id="body" rows="5"></textarea>
+      <p class="hint" id="mode-hint"></p>
+      <div class="media-heading"><h3 data-en="Media · optional" data-es="Archivos · opcional"></h3>
+        <div><button id="add-media"></button><button id="clear-media"></button></div>
+      </div>
+      <div id="drop-zone" tabindex="0"><p id="drop-label"></p><ul id="media-list"></ul></div>
+      <div class="actions end"><button id="to-delivery" class="primary"></button></div>
+    </article>
+    <aside class="card quiet">
+      <h2 data-en="A review comes first" data-es="Primero revisas"></h2>
+      <ol>
+        <li data-en="Write an idea or your finished caption." data-es="Escribe una idea o el texto terminado."></li>
+        <li data-en="Choose destinations, time and formats." data-es="Elige destinos, hora y formatos."></li>
+        <li data-en="Review before creating drafts or scheduling." data-es="Revisa antes de crear borradores o programar."></li>
+      </ol>
+      <button id="telegram-info"></button>
+    </aside>
+  </div>
+</section>
+<section id="delivery" class="page" hidden>
+  <article class="card">
+    <div class="section-title"><span class="number">2</span><div>
+      <h2 data-en="Where and when?" data-es="¿Dónde y cuándo?"></h2>
+      <p data-en="These choices become the plan you will review." data-es="Estas opciones forman el plan que vas a revisar."></p>
+    </div></div>
+    <div id="text-warning" class="callout" hidden></div>
+    <fieldset><legend data-en="Destinations" data-es="Destinos"></legend><div id="destinations" class="destination-grid"></div><button id="select-all"></button></fieldset>
+    <div class="form-grid">
+      <label><span data-en="Local date and time" data-es="Fecha y hora local"></span><input id="post-at" type="datetime-local"><small id="zone"></small></label>
+      <label><span data-en="Formats" data-es="Formatos"></span>
+        <select id="placement">
+          <option value="both" data-en="Posts and stories where supported" data-es="Publicaciones e historias compatibles"></option>
+          <option value="feed" data-en="Posts only" data-es="Solo publicaciones"></option>
+          <option value="story" data-en="Stories only" data-es="Solo historias"></option>
+        </select>
+      </label>
+    </div>
+    <details>
+      <summary data-en="Caption and cover options" data-es="Opciones del texto y la portada"></summary>
+      <div class="form-grid">
+        <label><span data-en="Business hashtag · optional" data-es="Etiqueta del negocio · opcional"></span><input id="final-tag" type="text"><small data-en="Added after the other relevant hashtags." data-es="Se añade después de las otras etiquetas del tema."></small></label>
+        <div id="cover-options">
+          <label for="cover-second" data-en="Cover frame · seconds" data-es="Fotograma de portada · segundos"></label>
+          <input id="cover-second" type="number" min="0" step=".1" placeholder="12.5">
+          <div class="actions"><button id="cover-image"></button><button id="cover-clear"></button></div>
+          <small id="cover-name"></small>
+        </div>
+      </div>
+    </details>
+    <div class="actions between"><button id="back-compose"></button><button id="bake" class="primary"></button></div>
+  </article>
+</section>
+<section id="review" class="page" hidden>
+  <div class="workspace review-grid">
+    <article class="card">
+      <div class="section-title"><span class="number">3</span><h2 data-en="Review the plan" data-es="Revisa el plan"></h2></div>
+      <div id="plan-meta"></div><div id="warnings"></div><button id="edit-inputs"></button>
+    </article>
+    <article class="card">
+      <div class="copy-toolbar"><h2 data-en="Caption" data-es="Texto"></h2><div>
+        <button id="previous" aria-label="Previous caption">‹</button><span id="version"></span><button id="next" aria-label="Next caption">›</button>
+      </div></div>
+      <div id="copy"></div>
+      <div id="caption-editor" hidden><textarea id="edited" rows="7"></textarea><div class="actions"><button id="save-caption"></button><button id="cancel-edit"></button></div></div>
+      <div class="actions wrap"><button id="another"></button><button id="edit-caption"></button></div>
+      <div class="finish">
+        <p data-en="Choose how this plan should continue." data-es="Elige cómo quieres continuar con este plan."></p>
+        <div class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
+        <small data-en="WhatsApp Status has its own approval after creation." data-es="El Estado de WhatsApp se aprueba por separado después de crear el plan."></small>
+      </div>
+    </article>
+  </div>
+</section>
+<section id="receipt" class="page" hidden>
+  <article class="card">
+    <h2 id="receipt-title"></h2><div id="receipt-content"></div>
+    <div class="actions wrap"><button id="calendar"></button><button id="approve-status"></button><button id="new-plan" class="primary"></button></div>
+  </article>
+</section>
+</main>
+<footer><span id="workspace-status"></span><div><button id="cleanup"></button><button id="new"></button></div></footer>
+<dialog id="modal">
+  <h2 id="modal-title"></h2><div id="modal-body"></div>
+  <div class="actions end"><button id="modal-cancel"></button><button id="modal-confirm" class="primary"></button></div>
+</dialog>
+</body>
+</html>

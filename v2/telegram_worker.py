@@ -78,7 +78,8 @@ def handle(call, update, owner, es):
 
 def save_state(state):
     temporary = STATE.with_suffix(".tmp")
-    temporary.write_text(json.dumps(state), encoding="utf-8")
+    with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as handle:
+        json.dump(state, handle)
     temporary.replace(STATE)
 
 
@@ -101,6 +102,19 @@ def run():
     def call(method, **payload):
         return telegram(token, method, **payload)
 
+    conversation = None
+    actions = None
+    if os.environ.get("POSTFORGE_HOST_WORKER") == "1":
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts/lib"))
+        import composer
+        import pmlib
+        from telegram_actions import Actions
+        from telegram_flow import Conversation
+        actions = Actions(pmlib.load_env(), call, token, lambda: send_status(call, owner, es))
+        conversation = Conversation(STATE.with_name("conversation-" + token.split(":", 1)[0] + ".json"),
+                                    owner, es, actions, call, composer.write_record)
+
     state = {"offset": 0, "heartbeat": 0}
     if STATE.exists():
         try:
@@ -117,9 +131,16 @@ def run():
     state.update(bot_id=bot_id, owner_id=owner)
     save_state(state)
     delay = 1
-    while True:
+    stop_file = os.environ.get("POSTFORGE_STOP_FILE")
+
+    def stopping():
+        return bool(stop_file and Path(stop_file).exists())
+
+    while not stopping():
         try:
             now = int(time.time())
+            if actions:
+                actions.tick()
             if minutes and now >= state["heartbeat"] + minutes * 60:
                 send_status(call, owner, es, heartbeat=True)
                 state["heartbeat"] = now
@@ -127,12 +148,18 @@ def run():
             updates = call("getUpdates", offset=state["offset"], timeout=25, limit=25,
                            allowed_updates=["message", "callback_query"])
             for update in updates:
-                handle(call, update, owner, es)
+                if conversation:
+                    conversation.handle(update)
+                else:
+                    handle(call, update, owner, es)
                 state["offset"] = update["update_id"] + 1
                 save_state(state)
             delay = 1
         except TelegramError as exc:
             wait = max(delay, min(exc.retry_after, 900))
             print(f"Telegram is unavailable; retrying in {wait}s.", flush=True)
-            time.sleep(wait)
+            for _ in range(wait):
+                if stopping():
+                    return
+                time.sleep(1)
             delay = min(delay * 2, 60)

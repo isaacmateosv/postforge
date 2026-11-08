@@ -11,18 +11,15 @@ backups, retention and safe update checks.
 - Authenticated HTTPS gateway for optional remote access. Keep the local deployment usable without ngrok.
 - Telegram private-chat setup, service reachability, and optional heartbeat with persisted state.
 - External missed-heartbeat monitoring for host or network loss.
-- Later Telegram workflow buttons for reviewing drafts and fixing issues, with explicit authorization and human approval.
+- Guided Telegram posting buttons with private ownership, versioned callbacks and explicit final approval.
 
-The cross-platform host dashboard is Python and browser based, with no Electron
-shell. The native Mac composer is Swift/AppKit. A Rust desktop wrapper and a
-cross-platform composer are pending, including their keyboard shortcuts.
+The Rust/Tauri composer now adds structured delivery fields and a shared desktop
+workflow. Native CI builds are separate from real-device installation and
+publishing validation. The Swift Mac controller retains its system integrations.
 
-For guided publishing, share the planner and confirmation state across clients.
-Telegram inline buttons can collect destinations, formats, date/time, caption
-mode and approval. WhatsApp can use numbered replies and stable plan references
-first, with native interactive controls conditional on Evolution support.
-Keep every publishing action tied to a reviewed plan and reject stale callbacks.
-Announcement image cards for media-only placements are also pending.
+Telegram buttons use shared reviewed snapshots and versioned callbacks.
+WhatsApp numbered plan replies remain supported. Announcement image cards and
+full cross-platform system integration remain future work.
 
 See [the v2 release candidate](v2/README.md) for setup and verification status.
 

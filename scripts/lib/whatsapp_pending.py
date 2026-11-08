@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
 """Approval-gated WhatsApp Status queue used by the WhatsApp door."""
-import fcntl
 import json
 import math
 import os
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import pmlib
+import file_lock
 
 STATUS_PART_SECONDS = 60
 QUEUE_FILE = os.path.join(pmlib.RUN_DIR, "whatsapp-pending.json")
@@ -39,8 +40,7 @@ def _write(items):
 @contextmanager
 def _queue_lock():
     os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
-    with open(QUEUE_FILE + ".lock", "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with file_lock.exclusive(QUEUE_FILE + ".lock"):
         yield
 
 
@@ -67,7 +67,7 @@ def enqueue(caption, media_paths, post_ids, when):
     return item["id"]
 
 
-def approve(item_id=None):
+def approve(item_id=None, source="explicit-whatsapp-command"):
     with _queue_lock():
         items = _read()
         candidates = [i for i in items if i.get("status") == "pending"]
@@ -77,7 +77,7 @@ def approve(item_id=None):
             return None
         item = candidates[-1]
         item["approved"] = True
-        item["approval_source"] = "explicit-whatsapp-command"
+        item["approval_source"] = source
         item["approved_at"] = int(time.time())
         _write(items)
         return item["id"]
@@ -112,7 +112,7 @@ def _video_parts(path, folder):
 
 
 def _send_item(item):
-    script = os.path.join(pmlib.ROOT, "scripts", "broadcast-story.sh")
+    script = os.path.join(pmlib.ROOT, "scripts", "lib", "broadcast_story.py")
     audience = pmlib.load_env().get("WA_STATUS_AUDIENCE", "all")
     with tempfile.TemporaryDirectory(prefix="status-", dir=pmlib.whatsapp_scratch()) as folder:
         commands = []
@@ -122,7 +122,7 @@ def _send_item(item):
             else:
                 commands.append(("--image", path))
         for flag, path in commands or [(None, None)]:
-            args = [script, "--to", audience]
+            args = [sys.executable, script, "--to", audience]
             if audience != "test":
                 args.append("--yes")
             if flag:
@@ -134,7 +134,7 @@ def _send_item(item):
 
 def _ready(item):
     return (item.get("status") == "pending" and item.get("approved")
-            and item.get("approval_source") == "explicit-whatsapp-command" and _due(item))
+            and item.get("approval_source") in ("explicit-whatsapp-command", "desktop-review", "telegram-review") and _due(item))
 
 
 def _claim(item_id):

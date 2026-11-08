@@ -20,6 +20,7 @@ fi
 TELEGRAM_SETTINGS="$DIR/run/telegram/settings.env"
 if [ -s "$DIR/run/telegram/token" ] && [ -s "$TELEGRAM_SETTINGS" ]; then
   set -a; . "$TELEGRAM_SETTINGS"; set +a
+  if [ "${TELEGRAM_TRANSPORT:-docker}" != host ]; then
   if [ -z "${COMPOSE_FILE:-}" ]; then
     COMPOSE_FILE="docker-compose.yml"
     for override in compose.override.yaml compose.override.yml docker-compose.override.yml docker-compose.override.yaml; do
@@ -29,6 +30,7 @@ if [ -s "$DIR/run/telegram/token" ] && [ -s "$TELEGRAM_SETTINGS" ]; then
   case ":$COMPOSE_FILE:" in *:v2/compose.yml:*) ;; *) COMPOSE_FILE="$COMPOSE_FILE:v2/compose.yml" ;; esac
   case ",${COMPOSE_PROFILES:-}," in *,telegram,*) ;; *) COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}telegram" ;; esac
   export COMPOSE_FILE COMPOSE_PROFILES
+  fi
 fi
 
 MODEL="${LOCAL_LLM_MODEL:-llama3.2:3b}"
@@ -537,8 +539,8 @@ case "${1:-}" in
       exit 1
     fi
     case "${2:-}" in
-      start) docker compose up -d --build --force-recreate --no-deps postforge-telegram ;;
-      status) docker compose ps postforge-telegram ;;
+      start) python3 "$DIR/scripts/host_agent.py" restart ;;
+      status) python3 "$DIR/scripts/host_agent.py" status ;;
       *) echo "Usage: ./postforge.sh telegram {start|status}" >&2; exit 2 ;;
     esac
     ;;

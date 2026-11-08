@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "composer",
+  "description": "Local PostForge composer window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

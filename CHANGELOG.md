@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.20]
+
+- Reorder the Mac composer around request, optional media, grouped options and review-side completion.
+- Add a Rust/Tauri composer with structured delivery fields and native build artifacts.
+- Share reviewed snapshots and replay-safe submission guards between desktop and Telegram.
+- Add private Telegram workflow buttons, caption versions and explicit confirmations.
+- Add a local Status agent, portable locks and conversion, native CI, and bilingual setup guides.
+
 ## [2.0.0-rc.19]
 
 - Use a wide two-column composer and prominent bake and draft actions.

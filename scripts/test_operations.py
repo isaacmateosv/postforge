@@ -191,6 +191,23 @@ class Operations(unittest.TestCase):
             plan_post.plan({}, "Instagram tomorrow at 7pm; idea: an announcement", [], "English", now,
                            text_networks=["instagram"])
 
+    def test_reviewed_accounts_exclude_new_connections(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="feed")
+        p["reviewed_integrations"] = ["original"]
+        with patch.object(pmlib, "Postiz") as client, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False):
+            client.return_value.integrations.return_value = [
+                {"id": "original", "identifier": "facebook", "name": "Original"},
+                {"id": "new", "identifier": "facebook", "name": "New connection"}]
+            result = plan_post.run({}, p, True)
+            self.assertEqual([target["integration_id"] for target in result["targets"]], ["original"])
+            p["reviewed_integrations"] = ["missing"]
+            with self.assertRaisesRegex(pmlib.PMError, "no longer connected"):
+                plan_post.run({}, p, True)
+
     def test_video_warnings_respect_platform_thresholds(self):
         networks = {"instagram", "youtube", "whatsapp"}
         self.assertEqual(plan_post.video_warnings(networks, [60], "English"), [])

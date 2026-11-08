@@ -25,6 +25,7 @@ ROOTS = (
     os.path.join(ROOT, "logs"),
     os.path.join(ROOT, "run", "wa-confirmations"),
     os.path.join(ROOT, "run", "wa-cache"),
+    os.path.join(ROOT, "run", "composer-plans"),
 )
 
 

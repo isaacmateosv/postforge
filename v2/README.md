@@ -1,14 +1,8 @@
 # PostForge 2 release candidate
 
-This branch adds a local, read-only browser dashboard and an optional Telegram
-health worker. It uses Docker Compose and Python on macOS, Windows with
-Docker Desktop, and Linux with Docker Engine and the Compose plugin.
-The shared Compose services and the existing Postiz web app handle publishing.
-The dashboard has no Electron dependency. A Rust desktop wrapper and a browser
-composer have not been implemented. The native Mac composer uses Swift/AppKit.
-See the bilingual offline guides in docs/help for the current Mac workflows,
-announcement destination confirmation, caption versions, and cleanup behavior.
-The release candidate still needs end-to-end Windows and Linux host validation.
+This branch includes the read-only browser dashboard, a Rust/Tauri desktop
+composer and a private Telegram guided posting flow. The Mac controller remains
+Swift/AppKit. See [desktop setup](../desktop/README.md).
 
 ## Local web dashboard
 
@@ -104,49 +98,32 @@ When moving to a new domain, provision TLS and attach the access gate before
 routing traffic to Postiz. Update the Postiz origin and OAuth callback URLs,
 then disable the old public route after checking the new one.
 
-## Optional Telegram status and heartbeat
+## Guided Telegram and heartbeat
 
-Create a dedicated bot with BotFather and open its private chat in Telegram.
-From the project folder, run the setup helper. It asks for the token through
-a hidden prompt, validates the bot, and identifies your numeric user ID from
-a private `/start` message. If automatic detection finds more than one candidate,
-use `--owner-id YOUR_NUMERIC_ID` and confirm the account explicitly.
-
-```sh
-python3 v2/telegram_setup.py --language en --heartbeat 0
-./postforge.sh telegram start
-./postforge.sh telegram status
-```
-
-Use `--language es` for Ecuadorian Spanish. Set heartbeat to `0` (off) or
-`5`–`1440` minutes. On macOS, the worker follows the PostForge stack lifecycle,
-including idle shutdown. Run the start command again after changing the token
-or settings. The worker remembers its update cursor and restarts with the
-same settings when the stack comes back on.
-
-On Windows or Linux, start the optional worker with Compose from the project
-folder. Include your gateway override if you use one.
+Create a dedicated bot with /newbot in @BotFather. Keep group privacy enabled.
+Run setup locally and enter the token in its hidden prompt. It discovers a
+private /start, confirms the numeric owner and registers commands.
 
 ```text
-docker compose --env-file .env --env-file run/telegram/settings.env -f docker-compose.yml -f v2/compose.yml --profile telegram up -d --build --force-recreate --no-deps postforge-telegram
+python3 v2/telegram_setup.py --language en --heartbeat 15
+python3 scripts/host_agent.py restart
+python3 scripts/host_agent.py status
 ```
 
-The token lives in `run/telegram/token`, separate from `.env`. Compose mounts
-it as a file readable by the non-root container. On macOS and Linux the
-enclosing directory is private. On Windows, use a private user folder and
-restrict access with Windows ACLs. Keep the token out of chats, screenshots
-and source control.
+Use --language es for Ecuadorian Spanish and py -3 for Python on Windows.
+Send /new for the guided flow, /status for reachability and /cancel to discard
+an unfinished plan. Media, destinations, formats, time and caption choices are
+reviewed before a separate submission confirmation. Status approval is separate.
 
-Send `/status` and use the **Refresh status** button. The worker uses outbound
-long polling, so it has no public webhook. Remove any existing webhook from a
-bot before using long polling. Its Compose volume preserves the update cursor
-and last heartbeat across restarts. No Telegram action publishes content.
+The host agent uses outbound long polling and one private owner. No public
+webhook or domain is required. One bot needs one poller. It takes over from the
+legacy Docker health worker. Restart after configuration changes and arrange
+OS autostart if needed. Keep the host awake and services running for due work.
 
-Health messages show service reachability, separately from the worker’s own
-liveness. If the host or internet goes down, an external monitor must detect
-the missed heartbeat. A bot on the stopped host cannot send its own outage alert.
-
-See [Telegram’s Bot API](https://core.telegram.org/bots/api) for bot behavior.
+Cloud bot downloads are capped at 20 MB. Use the desktop path for larger files.
+Token/settings stay private under run/telegram. Before migration stop the old
+agent and reconfigure on the destination. See the bilingual Technical Help for
+state persistence, replay guards, retention and deployment limitations.
 
 ## Release candidate acceptance checks
 

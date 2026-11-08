@@ -30,8 +30,8 @@ Create a dedicated bot with BotFather. In Terminal, from the PostForge folder,
 run `python3 v2/telegram_setup.py --language en --heartbeat 0`. Enter the bot
 token at the hidden prompt and send `/start` from your private chat when asked.
 Confirm the owner, run `./postforge.sh telegram start`, then send `/status`.
-The worker follows the PostForge stack, including idle shutdown. A heartbeat
-of `0` is off. Choose 5–1440 minutes to enable it.
+The host agent can remain available while the heavy stack is idle. Drafting
+and sending need the corresponding services. A heartbeat of `0` is off. Choose 5–1440 minutes to enable it.
 
 ## Standalone access without ngrok
 
@@ -149,9 +149,55 @@ Mac UI. The CLI accepts --text-networks facebook,threads,whatsapp with no media.
 WhatsApp uses the explicit “only text approved” / “solo texto aprobado” command.
 Facebook and Threads use feed posts and WhatsApp uses Status. Instagram and
 Facebook Story publishing in this app use media. Text-to-image announcement
-cards and interactive Telegram publishing buttons are future work.
+cards remain future work. Guided Telegram buttons use the shared composer described below.
 
-Windows/Linux currently use the Python browser dashboard and shared Docker
-services. It is read-only and has no native composer or Rust desktop wrapper.
-There is no Electron shell. The Mac app is Swift/AppKit. Ctrl+Enter for a
-cross-platform composer remains pending that implementation.
+Windows/Linux also have the new Rust/Tauri desktop composer described below.
+The existing browser dashboard remains read-only.
+
+
+## Rust and Telegram implementation
+
+The Rust/Tauri client embeds its UI and invokes the local Python bridge over
+stdin/stdout. It exposes known operations and opens no command HTTP server.
+Credentials stay out of the renderer. Python, Docker, FFmpeg and Ollama for
+generation remain host dependencies. Windows needs Python's py launcher and
+tzdata. See desktop/README.md for native dependencies and artifact details.
+
+Private records in run/composer-plans preserve reviewed fields, time offsets,
+file fingerprints and a submission family. Previews expire after 24 hours.
+All caption versions share the submission guard. A completed submission returns
+its receipt; a partial or uncertain one becomes needs_review and cannot repeat
+automatically. Changed media requires another review. Retention covers these
+records. The native CI matrix is distinct from real-device acceptance tests.
+
+scripts/host_agent.py handles approved WhatsApp Status dispatch and the guided
+bot. It supports start, stop, restart and status. Stop is cooperative so an
+in-flight operation can record its outcome. Unix and Windows process locks
+protect shared records. Image conversion uses sips on Mac and FFmpeg elsewhere.
+Status dispatch invokes Python directly. The agent has no model running at idle.
+
+Telegram setup uses a token file, numeric private owner and persisted polling
+offsets. Buttons include conversation/version references and expire with the
+plan. Other users and groups are ignored. Submission requires another confirmation.
+Interrupted submissions stay held for calendar review. Long polling is outbound;
+the gateway configuration is unchanged. Legacy Docker polling is stopped before
+the host agent takes over. Only one poller may use a bot.
+
+Use v2/telegram_setup.py locally with --language en or es and optionally
+--heartbeat 15. It refuses an existing webhook, validates the token, discovers
+a private /start, confirms the owner and registers commands. Settings are under
+run/telegram and must remain private. Restart after changes. Configure OS
+autostart separately. A stopped or sleeping host cannot send its own outage
+notice; external monitoring is required to detect missed heartbeats.
+
+The cloud download cap is 20 MB. Intake streams into
+data/postiz-uploads/telegram-intake with size checks. Completed/cancelled source
+files are removed after staging, and abandoned intake follows retention.
+Before migration stop the old agent, configure the bot on the destination and
+start a fresh conversation. Active conversation state is not a portable job.
+
+The Rust beta covers the composer, revision, submission, cleanup and Status
+approval. Siri, OS-login integration, auto-updates, notifications and uninstall
+remain the existing Mac controller's features. macOS desktop ZIPs are ad-hoc
+signed; Windows builds are unsigned. Production signing and installation tests
+are separate release checks.

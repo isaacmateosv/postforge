@@ -1,0 +1,51 @@
+name: Rust desktop client
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "codex/v2-*"]
+    paths: ["desktop/**", "scripts/lib/**", "scripts/desktop_bridge.py", "v2/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", "scripts/lib/**", "scripts/desktop_bridge.py", "v2/**", ".github/workflows/desktop.yml"]
+permissions:
+  contents: read
+env:
+  PYTHONUTF8: "1"
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux webview dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Rust toolchain
+        run: rustup update stable --profile minimal
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/target
+          key: desktop-${{ runner.os }}-${{ hashFiles('desktop/Cargo.lock') }}
+      - name: Timezone database for Python on Windows
+        run: python -m pip install tzdata
+      - name: Planner replay and media safety tests
+        run: python -m unittest discover -s scripts -p test_composer.py
+      - name: Telegram owner and callback tests
+        run: python -m unittest discover -s v2 -p test_telegram_flow.py
+      - name: Compile native client
+        run: cargo build --release --locked --manifest-path desktop/Cargo.toml
+      - name: Package native artifact and notices
+        run: python desktop/package.py --no-build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PostForge-Desktop-${{ runner.os }}
+          path: desktop/dist/*

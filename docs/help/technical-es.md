@@ -30,7 +30,7 @@ Crea un bot exclusivo con BotFather. En Terminal, desde la carpeta de PostForge,
 ejecuta `python3 v2/telegram_setup.py --language es --heartbeat 0`. Ingresa el
 token en el campo oculto y envía `/start` en tu chat privado con el bot cuando
 se te indique. Confirma la cuenta, ejecuta `./postforge.sh telegram start` y
-envía `/status`. El bot se detiene cuando PostForge se apaga por inactividad.
+envía `/status`. El agente sigue disponible mientras la infraestructura está inactiva; redactar y enviar requiere los servicios correspondientes.
 Con `0` no se envían avisos periódicos. Para activarlos, elige entre 5 y 1440
 minutos.
 
@@ -154,11 +154,62 @@ del Mac. La CLI acepta --text-networks facebook,threads,whatsapp sin archivos.
 En WhatsApp se usa la confirmación “solo texto aprobado” / “only text approved”.
 Facebook y Threads usan publicaciones del feed; WhatsApp usa Estados.
 Las historias de Instagram y Facebook en esta app requieren archivos. Las
-tarjetas que convierten texto en imagen y los botones de Telegram para publicar
-quedan pendientes de implementación.
+tarjetas que convierten texto en imagen siguen pendientes. Los botones guiados
+de Telegram usan el formulario compartido descrito abajo.
 
-Windows y Linux usan actualmente el panel web en Python y los servicios de
-Docker compartidos. El panel es de solo lectura y carece de un formulario nativo
-o una aplicación de escritorio en Rust. No usa Electron. La app del Mac está
-hecha con Swift/AppKit. Ctrl+Enter queda pendiente para el futuro formulario
-multiplataforma.
+Windows y Linux también cuentan con el nuevo formulario Rust/Tauri descrito
+abajo. El panel web existente conserva su modo de solo lectura.
+
+
+## Implementación de Rust y Telegram
+
+El cliente Rust/Tauri integra su interfaz e invoca el puente local de Python
+por entrada/salida estándar. Acepta operaciones conocidas y no abre un servidor
+HTTP de comandos. Las credenciales quedan fuera de la interfaz. Python, Docker,
+FFmpeg y Ollama para generar textos siguen siendo requisitos. Windows necesita
+el iniciador py y tzdata. desktop/README.md describe dependencias y artefactos.
+
+Los registros privados en run/composer-plans conservan los campos revisados,
+el desplazamiento horario, las huellas de archivos y una familia de envío.
+Las vistas previas vencen después de 24 horas. Todas las versiones del texto
+comparten la protección contra repeticiones. Un envío terminado devuelve su
+confirmación; uno parcial o incierto queda en needs_review y no se repite
+automáticamente. Cambiar archivos requiere otra revisión. La retención incluye
+estos registros. La compilación en CI y la aceptación en equipos reales son
+verificaciones separadas.
+
+scripts/host_agent.py despacha Estados de WhatsApp aprobados y ejecuta el bot.
+Permite start, stop, restart y status. Se detiene de forma cooperativa para que
+una operación en curso registre su resultado. Los bloqueos de procesos en Unix
+y Windows protegen los datos compartidos. Las imágenes usan sips en Mac y FFmpeg
+en otros sistemas. Los Estados se envían invocando Python directamente. El agente
+no mantiene un modelo activo mientras espera.
+
+Telegram usa un token local, un propietario numérico privado y la posición
+persistida del receptor. Los botones incluyen referencias de conversación y
+versión y vencen con el plan. Se ignoran otros usuarios y grupos. Enviar requiere
+otra confirmación. Los envíos interrumpidos quedan retenidos para revisar el
+calendario. Las consultas son salientes y se conserva el acceso seguro. El
+receptor antiguo en Docker se detiene antes de activar el agente local. Un bot
+debe tener un solo receptor.
+
+Usa v2/telegram_setup.py localmente con --language es o en y, si deseas,
+--heartbeat 15. Rechaza un webhook existente, valida el token, identifica un
+/start privado, pide confirmar al propietario y registra comandos. Los ajustes
+están en run/telegram y deben ser privados. Reinicia después de cambiarlos.
+Configura por separado el inicio automático del sistema. Un equipo apagado o
+suspendido no avisa de su propia caída; hace falta un monitor externo para
+detectar la ausencia de avisos de actividad.
+
+Las descargas del bot tienen un límite de 20 MB. Se guardan por bloques y con
+verificación de tamaño en data/postiz-uploads/telegram-intake. Las fuentes de
+planes terminados o cancelados se eliminan después de guardar su contenido
+necesario; las abandonadas siguen la retención. Antes de migrar, detén el agente
+anterior, configura el bot en el destino y empieza otra conversación. Una
+conversación activa no es un trabajo portátil.
+
+La beta Rust cubre redacción, revisión, envío, limpieza y aprobación de Estados.
+Siri, inicio de sesión, actualizaciones, notificaciones y desinstalación siguen
+en el controlador del Mac. Los ZIP de escritorio del Mac tienen firma ad hoc;
+los de Windows carecen de firma de publicación. La firma de producción y las
+pruebas de instalación son verificaciones separadas.
