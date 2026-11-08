@@ -39,7 +39,7 @@ def whatsapp(env, connect=False):
 
 def dashboard(env):
     import telegram_settings
-    result = {'available': False, 'postiz_online': False, 'drafts': 0, 'queue': 0, 'next': None, 'posts': [], 'telegram': telegram_settings.status()}
+    result = {'timezone': env.get('PM_TIMEZONE', 'America/Guayaquil'), 'available': False, 'postiz_online': False, 'drafts': 0, 'queue': 0, 'next': None, 'posts': [], 'telegram': telegram_settings.status()}
     try:
         client = pmlib.Postiz(env)
         org = "'" + client.org_id.replace("'", "''") + "'"
@@ -53,7 +53,7 @@ def dashboard(env):
                      left(regexp_replace(p.content, '<[^>]*>', ' ', 'g'),160) AS text
               FROM "Post" p JOIN "Integration" i ON i.id=p."integrationId"
               WHERE p."organizationId"=''' + org + ''' AND p."deletedAt" IS NULL AND p."parentPostId" IS NULL
-              AND p.state IN ('DRAFT','QUEUE','ERROR') ORDER BY p."createdAt" DESC LIMIT 40) x), '[]'::json))::jsonb::text''', env)
+              AND p.state IN ('DRAFT','QUEUE','ERROR') ORDER BY p."createdAt" DESC,p.id DESC LIMIT 40) x), '[]'::json))::jsonb::text''', env)
         result.update(json.loads(rows[0][0]), available=True)
         for post in result["posts"]:
             post["text"] = html.unescape(post.get("text") or "")
@@ -76,3 +76,12 @@ def dashboard(env):
                                    'background': item.get('background','#128C7E')}
                                   for item in whatsapp_pending._read() if item.get('status') in ('pending','needs_review')]
     return result
+
+
+def receipts(env):
+    """Bounded aggregate receipt history; never return recipients or phone numbers."""
+    import broadcast_story
+    instance="'"+env.get('WA_INSTANCE','status-engine').replace("'","''")+"'"
+    count='(SELECT count(DISTINCT u.participant) FROM evolution."MessageUpdate" u WHERE u."messageId"=m.id AND u.participant IS DISTINCT FROM i."ownerJid"%s)'
+    rows=pmlib.psql('SELECT m."messageTimestamp", m."messageType", '+count%''+', '+count%" AND u.status='READ'"+' FROM evolution."Message" m JOIN evolution."Instance" i ON i.id=m."instanceId" WHERE i.name='+instance+' AND m.key->>\'remoteJid\'=\'status@broadcast\' AND (m.key->>\'fromMe\')::boolean ORDER BY m."messageTimestamp" DESC LIMIT 12;',env)
+    return {'items':[{'at':int(row[0]),'kind':row[1],'received':int(row[2]) if int(row[0])>=broadcast_story.RECEIPTS_SINCE else None,'viewed':int(row[3]) if int(row[0])>=broadcast_story.RECEIPTS_SINCE else None} for row in rows]}

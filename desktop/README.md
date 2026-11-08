@@ -71,13 +71,17 @@ remain separate release requirements. The native CI matrix builds all three OSes
 Rust/Tauri is the active desktop development target and the only client needed
 for this beta's composer workflow. Close the legacy Swift app before using it.
 Swift remains in source history and compatibility code, rather than a companion
-application. Tray, Siri, OS-login, automatic updates and maintenance integration
-are still being ported; the beta does not yet offer their full existing Mac behavior.
+application. The Rust tray now exposes the dashboard, composer, WhatsApp review,
+connections, encrypted Backup & Move, update checks, settings, Help and About.
+Closing the window hides it; Quit exits the client and leaves services running.
+Siri, OS-login and automatic update installation still require further integration;
+this beta checks releases but does not silently replace the installed client.
 
 The Rust bridge invokes a fixed list of local Python operations over stdin/stdout.
 It opens no command HTTP listener. Credentials stay out of renderer responses,
 and a strict CSP protects the embedded frontend. Models are unloaded after use
-by the existing planner; the client has no periodic background polling.
+by the existing planner; dashboard refreshes run only while the dashboard is visible and focused.
+Release checks run at startup and every six hours; active backup tasks report progress.
 
 ## Telegram · per-installation settings
 

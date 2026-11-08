@@ -199,3 +199,59 @@ footer { border-top:1px solid #3d4d6455; padding-top:15px; }
 .tools select { font-size:12px; max-width:165px; padding:8px; }
 .post-row strong { overflow-wrap:anywhere; }
 .post-row > button { flex-shrink:0; }
+
+.home-banner { padding:12px 0 6px; }
+.home-banner h2 { font-size:25px; }
+.home-banner p { font-size:14px; }
+.health-row { margin:14px 0; }
+.stat { padding:16px; gap:4px; }
+.stat strong { font-size:31px; }
+#status-card { padding:14px 20px; margin:0 0 20px; border-color:#447665; }
+#status-card > summary { color:#a9dfcb; font-size:14px; }
+#dashboard-posts .post-row { padding:14px 0; font-size:14px; }
+
+/* The viewport owns the chrome; only the working area scrolls. */
+html { height:100%; }
+body { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+body > header, body > nav, body > footer, #notice, #baking-visual { flex-shrink:0; width:100%; }
+body > main { flex:1 1 auto; min-height:0; width:100%; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; overscroll-behavior:contain; padding-top:8px; }
+header { padding-top:14px; padding-bottom:12px; }
+footer { padding-top:10px; padding-bottom:10px; background:var(--bg); flex-wrap:wrap; gap:8px; }
+.page:not(#home) .card { min-height:0; }
+#compose .card > .actions:last-child, #delivery .card > .actions:last-child, .finish { position:sticky; bottom:-24px; z-index:2; background:var(--panel); padding:14px 0; box-shadow:0 -12px 16px var(--panel); }
+#copy { max-height:clamp(130px,calc(100dvh - 410px),500px); scrollbar-gutter:stable; }
+dialog { max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); overflow-y:auto; overscroll-behavior:contain; }
+dialog > .actions:last-child { position:sticky; bottom:-24px; background:var(--panel); padding:14px 0 0; box-shadow:0 -10px 12px var(--panel); z-index:2; }
+#modal-body { overflow-wrap:anywhere; }
+#notice { max-height:100px; overflow-y:auto; margin-bottom:8px; }
+#baking-visual { margin-bottom:8px; padding:3px; }
+.workspace > *, .form-grid > *, .tools { min-width:0; }
+@media(max-height:740px) {
+ header { padding-top:10px; padding-bottom:8px; }
+ .brand img { width:38px; height:38px; }
+ .brand h1 { font-size:23px; }
+ nav { padding-bottom:8px; }
+ .card { padding:18px; }
+ .home-banner h2 { font-size:22px; }
+ .stat { padding:12px; }
+ .stat strong { font-size:25px; }
+ .overview-grid { margin-bottom:16px; }
+ textarea { min-height:95px; }
+ #compose .card > .actions:last-child, #delivery .card > .actions:last-child { bottom:-18px; }
+}
+@media(max-width:760px) {
+ header { gap:8px; }
+ header .tools { gap:6px; }
+ .brand p { display:none; }
+ .review-grid, .form-grid { grid-template-columns:1fr; }
+ .overview-grid { grid-template-columns:1fr 1fr; gap:10px; }
+ .overview-grid > :last-child { grid-column:1 / -1; }
+ .media-heading { flex-wrap:wrap; }
+ main, nav, header, footer { padding-left:16px; padding-right:16px; }
+ #notice { width:calc(100% - 32px); }
+ .home-banner { flex-wrap:wrap; gap:12px; }
+}
+#backup-dialog label { display:block; margin:14px 0; }
+#backup-dialog label > input:not([type=checkbox]) { display:block; width:100%; margin-top:6px; }
+#backup-dialog progress { width:100%; accent-color:#83d8b9; }
+#backup-result { white-space:pre-wrap; overflow-wrap:anywhere; }

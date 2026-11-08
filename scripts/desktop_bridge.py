@@ -17,7 +17,16 @@ import manage_posts
 
 
 def dispatch(operation, payload):
+    if operation in ("backup_start", "backup_status"):
+        import backup_assistant
+        return backup_assistant.start(payload) if operation == "backup_start" else backup_assistant.status(payload["id"])
+    if operation == "updates":
+        import desktop_updates
+        return desktop_updates.check(payload.get("components") is True)
     env = pmlib.load_env()
+    if operation == "whatsapp_receipts":
+        import desktop_status
+        return desktop_status.receipts(env)
     if operation == "whatsapp_finish":
         import desktop_status
         import subprocess

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::Manager;
+mod tray_ui;
 use tauri_plugin_dialog::DialogExt;
 
 struct Workspace(Mutex<PathBuf>);
@@ -28,7 +29,7 @@ fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Val
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["options", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["options", "updates", "backup_start", "backup_status", "whatsapp_receipts", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
@@ -111,8 +112,24 @@ async fn open_calendar(app: tauri::AppHandle) -> Result<(), String> {
     app.opener().open_url(url, None::<&str>).map_err(|_| "Could not open Postiz.".into())
 }
 
+#[tauri::command]
+async fn open_releases(app: tauri::AppHandle) -> Result<(),String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().open_url("https://github.com/isaacmateosv/postforge/releases",None::<&str>).map_err(|_|"Could not open releases".into())
+}
+
+#[tauri::command]
+async fn backup_location(app: tauri::AppHandle, restore: bool) -> Result<Option<String>,String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let result=if restore {app.dialog().file().add_filter("PostForge private backup", &["pfbackup"]).blocking_pick_file()}
+                   else {app.dialog().file().blocking_pick_folder()};
+        Ok(result.and_then(|file|file.into_path().ok()).map(|path|path.to_string_lossy().into_owned()))
+    }).await.map_err(|_|"File selection stopped".to_string())?
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app,_,_| {tray_ui::show(app);} ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -127,9 +144,13 @@ fn main() {
                 .and_then(|directory| std::fs::read_to_string(directory.join("workspace")).ok())
                 .map(PathBuf::from).filter(|path| valid_workspace(path));
             app.manage(Workspace(Mutex::new(saved.unwrap_or(fallback))));
+            tray_ui::install(app.handle())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![engine, choose_files, choose_workspace, open_calendar])
+        .on_window_event(|window,event| {
+            if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
+        })
+        .invoke_handler(tauri::generate_handler![engine, choose_files, choose_workspace, open_calendar, open_releases, backup_location, tray_ui::tray_state])
         .run(tauri::generate_context!())
         .expect("PostForge desktop could not start");
 }

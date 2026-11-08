@@ -29,7 +29,7 @@
     <button id="show-queue" class="stat"><span data-en="Scheduled" data-es="Programadas"></span><strong id="dash-queue">—</strong><small data-en="Awaiting their moment" data-es="Esperando su momento"></small></button>
     <div class="stat"><span data-en="Next publication" data-es="Próxima publicación"></span><strong id="dash-next" class="next-date">—</strong><small id="dash-updated"></small></div>
   </div>
-  <article id="status-card" class="card" hidden><h2 data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></h2><div id="dashboard-status"></div></article>
+  <details id="status-card" class="card" hidden><summary><span data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></span> <span id="status-count"></span></summary><div id="dashboard-status"></div><button id="wa-receipts" data-en="View delivery receipts…" data-es="Ver recibos de entrega…"></button><div id="wa-receipt-history"></div></details>
   <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><button id="home-calendar" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div><div id="dashboard-posts" class="post-list"></div></article>
 </section>
 
@@ -131,7 +131,7 @@
   </article>
 </section>
 </main>
-<footer><span id="workspace-status"></span><button id="reconnect"></button><div><button id="cleanup"></button><button id="new"></button></div></footer>
+<footer><span id="workspace-status"></span><button id="reconnect"></button><div><button id="updates-open" data-en="Check for Updates…" data-es="Buscar actualizaciones…"></button><button id="backup-open" data-en="Backup & Move…" data-es="Respaldo y traslado…"></button><button id="cleanup"></button><button id="new"></button></div></footer>
 <dialog id="app-settings" aria-labelledby="settings-title">
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
 <p data-en="Your installation and data are managed locally. Normal use needs no folder selection." data-es="La instalación y los datos se administran localmente. No necesitas seleccionar carpetas para usar la app."></p>
@@ -179,5 +179,17 @@
   <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
 </dialog>
 
+<dialog id="backup-dialog" aria-labelledby="backup-title">
+<h2 id="backup-title" data-en="Backup & Move" data-es="Respaldo y traslado"></h2>
+<p data-en="Your posts, media, credentials and gateway travel together in one encrypted file. Keep its passphrase somewhere safe." data-es="Las publicaciones, archivos, credenciales y el acceso seguro viajan juntos en un archivo cifrado. Guarda su contraseña en un lugar seguro."></p>
+<select id="backup-mode"><option value="export" data-en="Create a verified backup" data-es="Crear un respaldo verificado"></option><option value="inspect" data-en="Inspect a backup before restoring" data-es="Revisar un respaldo antes de restaurarlo"></option></select>
+<button id="backup-pick" data-en="Choose destination…" data-es="Elegir destino…"></button><p id="backup-path" class="hint"></p>
+<label><span data-en="Passphrase · at least 12 characters" data-es="Contraseña · al menos 12 caracteres"></span><input id="backup-password" type="password" autocomplete="new-password"></label>
+<label id="backup-confirm-row"><span data-en="Confirm passphrase" data-es="Confirma la contraseña"></span><input id="backup-confirm" type="password" autocomplete="new-password"></label>
+<progress id="backup-progress" value="0" max="100" hidden></progress><p id="backup-stage" role="status"></p><div id="backup-result"></div>
+<label id="backup-replace-row" hidden><input id="backup-replace" type="checkbox"><span data-en="Replace existing local Postiz data (a rollback backup is created first)." data-es="Reemplazar los datos locales de Postiz (primero se crea un respaldo de recuperación)."></span></label>
+<label id="backup-old-host-row" hidden><input id="backup-old-host" type="checkbox"><span data-en="The previous publishing host is stopped." data-es="El equipo que publicaba anteriormente está detenido."></span></label>
+<div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="primary" hidden data-en="Restore this backup…" data-es="Restaurar este respaldo…"></button></div>
+</dialog>
 </body>
 </html>
