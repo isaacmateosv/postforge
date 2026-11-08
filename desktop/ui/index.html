@@ -14,13 +14,26 @@
   <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
   <div class="tools">
     <select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select>
-    <button id="telegram-open">Telegram</button><button id="reconnect"></button><button id="help"></button><button id="workspace"></button>
+    <button id="go-home" data-en="Dashboard" data-es="Inicio"></button><button id="whatsapp-open">WhatsApp</button><button id="telegram-open">Telegram</button><button id="settings-open" data-en="Settings" data-es="Ajustes"></button><button id="help"></button>
   </div>
 </header>
 <nav id="steps" aria-label="Workflow"></nav>
 <div id="notice" role="status" hidden></div>
+<div id="baking-visual" hidden><svg viewBox="0 0 160 90" aria-hidden="true"><path class="bowl" d="M35 46H122Q116 82 79 82Q42 82 35 46Z"/><g class="whisk"><path d="M85 47L113 12M78 52Q62 39 80 30Q96 20 94 36Q92 54 78 52ZM77 50L90 33"/></g><g class="sparks"><text x="20" y="25">✦</text><text x="123" y="37">✧</text><text x="48" y="16">✦</text><text x="135" y="12">✦</text></g></svg><span data-en="A little mixing, a little magic…" data-es="Un poco de mezcla, un toque de magia…"></span></div>
 <main>
-<section id="compose" class="page">
+<section id="home" class="page">
+  <div class="home-banner"><div><span class="eyebrow" data-en="YOUR PUBLISHING SPACE" data-es="TU ESPACIO DE PUBLICACIÓN"></span><h2 data-en="Good ideas deserve a clear plan." data-es="Las buenas ideas merecen un buen plan."></h2><p data-en="Everything you are preparing, in one place." data-es="Todo lo que estás preparando, en un solo lugar."></p></div><button id="start-post" class="primary" data-en="＋ New post" data-es="＋ Nueva publicación"></button></div>
+  <div id="health" class="health-row" aria-live="polite"></div>
+  <div class="overview-grid">
+    <button id="show-drafts" class="stat"><span data-en="Ready to review" data-es="Por revisar"></span><strong id="dash-drafts">—</strong><small data-en="Drafts in Postiz" data-es="Borradores en Postiz"></small></button>
+    <button id="show-queue" class="stat"><span data-en="Scheduled" data-es="Programadas"></span><strong id="dash-queue">—</strong><small data-en="Awaiting their moment" data-es="Esperando su momento"></small></button>
+    <div class="stat"><span data-en="Next publication" data-es="Próxima publicación"></span><strong id="dash-next" class="next-date">—</strong><small id="dash-updated"></small></div>
+  </div>
+  <article id="status-card" class="card" hidden><h2 data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></h2><div id="dashboard-status"></div></article>
+  <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><button id="home-calendar" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div><div id="dashboard-posts" class="post-list"></div></article>
+</section>
+
+<section id="compose" class="page" hidden>
   <div class="workspace">
     <article class="card">
       <div class="section-title"><span class="number">1</span><div>
@@ -49,7 +62,7 @@
         <li data-en="Choose destinations, time and formats." data-es="Elige destinos, hora y formatos."></li>
         <li data-en="Review before creating drafts or scheduling." data-es="Revisa antes de crear borradores o programar."></li>
       </ol>
-      <button id="telegram-info"></button>
+      <div class="creative-note"><span>✦ ✧ ✦</span><h3 data-en="Your voice. A little spark." data-es="Tu voz. Un toque de chispa."></h3><p data-en="Bake a fresh caption, or keep the words you already love. Nothing leaves without your review." data-es="Hornea un texto nuevo o conserva las palabras que ya te encantan. Tú revisas antes de continuar."></p></div>
     </aside>
   </div>
 </section>
@@ -62,7 +75,7 @@
     <div id="text-warning" class="callout" hidden></div>
     <fieldset><legend data-en="Destinations" data-es="Destinos"></legend><div id="destinations" class="destination-grid"></div><button id="select-all"></button></fieldset>
     <div class="form-grid">
-      <label><span data-en="Local date and time" data-es="Fecha y hora local"></span><input id="post-at" type="datetime-local"><small id="zone"></small></label>
+      <label><span data-en="Local date and time" data-es="Fecha y hora local"></span><input id="post-at" type="datetime-local"><small id="zone"></small><button id="asap" type="button" data-en="Soon · +10 min" data-es="Pronto · +10 min"></button></label>
       <label><span data-en="Formats" data-es="Formatos"></span>
         <select id="placement">
           <option value="both" data-en="Posts and stories where supported" data-es="Publicaciones e historias compatibles"></option>
@@ -70,6 +83,10 @@
           <option value="story" data-en="Stories only" data-es="Solo historias"></option>
         </select>
       </label>
+    </div>
+    <div class="form-grid" id="network-options">
+      <label id="youtube-options"><span data-en="YouTube format" data-es="Formato de YouTube"></span><select id="youtube-mode"><option value="shorts" data-en="Shorts · trim to 2:59 if longer" data-es="Shorts · recorta a 2:59 si dura más"></option><option value="regular" data-en="Full video · no trim" data-es="Video completo · sin recortar"></option></select></label>
+      <label id="wa-text-options"><span data-en="WhatsApp text Status background" data-es="Fondo del Estado de texto de WhatsApp"></span><input id="wa-background" type="color" value="#128C7E"><small data-en="Applies to text-only Status, after approval." data-es="Se aplica a los Estados solo de texto, después de aprobarlos."></small></label>
     </div>
     <details>
       <summary data-en="Caption and cover options" data-es="Opciones del texto y la portada"></summary>
@@ -114,7 +131,21 @@
   </article>
 </section>
 </main>
-<footer><span id="workspace-status"></span><div><button id="cleanup"></button><button id="new"></button></div></footer>
+<footer><span id="workspace-status"></span><button id="reconnect"></button><div><button id="cleanup"></button><button id="new"></button></div></footer>
+<dialog id="app-settings" aria-labelledby="settings-title">
+<h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
+<p data-en="Your installation and data are managed locally. Normal use needs no folder selection." data-es="La instalación y los datos se administran localmente. No necesitas seleccionar carpetas para usar la app."></p>
+<details><summary data-en="Advanced · recovery and migration" data-es="Avanzado · recuperación y migración"></summary><p data-en="Only use this when recovering an existing installation or connecting a migrated one. Services, credentials and media must belong to the same installation." data-es="Usa esta opción solo para recuperar una instalación existente o conectar una migrada. Los servicios, las credenciales y los archivos deben pertenecer a la misma instalación."></p><button id="workspace"></button><p id="storage-location" class="hint"></p></details>
+<div class="actions end"><button id="settings-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
+<dialog id="whatsapp-settings" aria-labelledby="whatsapp-title">
+<h2 id="whatsapp-title" data-en="Connect WhatsApp" data-es="Conecta WhatsApp"></h2>
+<div id="wa-state" class="callout" role="status"></div>
+<p data-en="On your phone: WhatsApp → Settings → Linked devices → Link a device. Scan the QR here. An existing working session is kept." data-es="En tu teléfono: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo. Escanea el QR aquí. Se conserva una sesión que ya funciona."></p>
+<img id="wa-qr" alt="WhatsApp pairing QR" hidden><div id="wa-feedback" role="status"></div>
+<div class="actions between"><button id="wa-refresh" data-en="Get / refresh QR" data-es="Obtener / renovar QR"></button><button id="wa-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
+
 <dialog id="modal" aria-labelledby="modal-title">
   <h2 id="modal-title"></h2><div id="modal-body"></div>
   <div class="actions end"><button id="modal-cancel"></button><button id="modal-confirm" class="primary"></button></div>

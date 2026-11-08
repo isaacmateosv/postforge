@@ -240,3 +240,36 @@ y se omiten los comandos anteriores. Si falla el inicio, se restauran los
 ajustes y los archivos previos de conversación. Desactivar no llama a la API.
 Una validación fallida no cambia credenciales. El respaldo cifrado requiere
 OpenSSL en todos los sistemas operativos.
+
+## Revisión del estudio de escritorio · rc.22
+
+El inicio consulta datos de solo lectura de la organización actual y muestra
+registros principales sin publicar. Los contadores incluyen toda la organización;
+la lista reciente se limita a 40 elementos. Se actualiza al volver al inicio
+y, como máximo, cada 30 segundos mientras tiene el foco. No sigue consultando
+con la app oculta. Los indicadores distinguen respuesta de la API, sesión de
+WhatsApp y agente de Telegram; no garantizan la vigencia de todos los tokens.
+
+La app encuentra la instalación mediante la configuración guardada y rutas
+conocidas. Solo la recuperación avanzada permite seleccionar una carpeta. La
+localiza sin moverla para conservar los montajes de Docker.
+
+Los campos revisados incluyen formato de YouTube y fondo del Estado de texto.
+Un Short vertical o cuadrado de más de 179 segundos genera una copia aparte,
+verificada de 179 segundos, al enviar. La vista previa no codifica ni sube esa
+copia. Solo YouTube recibe la variante; se aplican los enlaces firmados y la
+retención existentes. Los temporales se eliminan en finally. Los destinos de
+historias indican sus segmentos y los registros incluyen part/parts. Editar el
+título de YouTube conserva texto y destinos, limita a 100 caracteres y mantiene
+el título manual al pedir otra versión del texto. La revisión 2 del flujo exige
+volver a hornear los planes antiguos sin enviar; un envío completado devuelve
+su recibo guardado sin repetirlo.
+
+El QR de WhatsApp se devuelve como PNG limitado en tamaño solo después de una
+solicitud expresa. No incluye credenciales de Evolution ni se guarda en disco.
+Una sesión abierta no se recrea. Se consulta la conexión solo con el diálogo
+abierto; después de una vinculación nueva se aplica una vez la configuración de
+recibos existente. El fondo del Estado de texto se valida como color hexadecimal
+y se guarda con el elemento de la cola que requiere aprobación. Los comandos
+en grupos de Telegram siguen sin admitirse; añadir el bot a un grupo no concede
+permiso para publicar.

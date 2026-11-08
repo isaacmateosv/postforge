@@ -86,6 +86,38 @@ class ComposerTests(unittest.TestCase):
         run.assert_called_once()
         self.assertEqual(sum(bool(result.get("already_submitted")) for result in results), 1)
 
+    def test_older_unsubmitted_previews_require_review_after_media_policy_change(self):
+        original = self.preview()
+        path = composer.path_for(original["review_id"])
+        ticket = json.loads(path.read_text())
+        ticket.pop("pipeline_revision")
+        composer.write_record(path, ticket)
+        with self.assertRaisesRegex(pmlib.PMError, "planner changed"), patch.object(composer.plan_post, "run") as submit:
+            composer.submit(self.env, original["review_id"], "draft")
+        submit.assert_not_called()
+        composer.write_record(composer.path_for(ticket["family"]), {"state":"completed", "receipt":{"drafts":[]}})
+        self.assertTrue(composer.submit(self.env, original["review_id"], "draft")["already_submitted"])
+
+    def test_title_only_edit_preserves_caption_and_delivery(self):
+        original = self.preview()
+        revised = composer.revise(self.env, original["review_id"], youtube_title="A complete short title")
+        self.assertEqual(revised["plan"]["caption"], original["plan"]["caption"])
+        self.assertEqual(revised["plan"]["targets"], original["plan"]["targets"])
+        self.assertEqual(revised["plan"]["when_utc"], original["plan"]["when_utc"])
+        self.assertEqual(revised["plan"]["youtube_title"], "A complete short title")
+        with self.assertRaises(pmlib.PMError):
+            composer.revise(self.env, original["review_id"], youtube_title="x" * 101)
+
+    def test_new_install_has_no_business_hashtag_and_background_is_validated(self):
+        with patch.object(pmlib, "Postiz") as api:
+            api.return_value.integrations.return_value = []
+            self.assertEqual(composer.options({})["final_tag"], "")
+        self.fields["whatsapp_background"] = "#8244aa"
+        self.assertEqual(composer.build_plan(self.env, composer.fields(self.fields))["whatsapp_background"], "#8244aa")
+        self.fields["whatsapp_background"] = "not-a-color"
+        with self.assertRaises(pmlib.PMError):
+            composer.fields(self.fields)
+
     def test_host_stop_is_cooperative(self):
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import host_agent

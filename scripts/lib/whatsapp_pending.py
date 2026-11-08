@@ -44,7 +44,7 @@ def _queue_lock():
         yield
 
 
-def enqueue(caption, media_paths, post_ids, when):
+def enqueue(caption, media_paths, post_ids, when, background="#128C7E"):
     media = []
     for path in media_paths:
         rel = pmlib.stage_into_uploads(path, "whatsapp-pending")
@@ -54,6 +54,7 @@ def enqueue(caption, media_paths, post_ids, when):
         "created_at": int(time.time()),
         "when": when.isoformat(),
         "caption": caption,
+        "background": background,
         "media": media,
         "post_ids": post_ids,
         "approved": False,
@@ -122,7 +123,7 @@ def _send_item(item):
             else:
                 commands.append(("--image", path))
         for flag, path in commands or [(None, None)]:
-            args = [sys.executable, script, "--to", audience]
+            args = [sys.executable, script, "--to", audience, "--bg", item.get("background", "#128C7E")]
             if audience != "test":
                 args.append("--yes")
             if flag:

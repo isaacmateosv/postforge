@@ -694,7 +694,8 @@ class Operations(unittest.TestCase):
         now = datetime(2026, 11, 5, 6, tzinfo=timezone(timedelta(hours=-5)))
         plan = plan_post.plan({}, 'YouTube Shorts today at 8am, caption: Test', ['sample.mp4'], 'English', now)
         with patch.object(pmlib, 'Postiz') as api, patch.object(pmlib, 'normalize_media', return_value=('video', 'sample.mp4')), \
-             patch.object(pmlib, 'is_short', return_value=False):
+             patch.object(pmlib, 'is_short', return_value=False), \
+             patch.object(pmlib, 'ffprobe', return_value=(200, 'h264', 'aac', 1920, 1080)):
             api.return_value.integrations.return_value = [{'identifier': 'youtube'}]
             with self.assertRaisesRegex(pmlib.PMError, 'at most 3 minutes'):
                 plan_post.run({}, plan, True)

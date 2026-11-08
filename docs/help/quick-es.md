@@ -4,12 +4,41 @@ Este es el flujo actual del escritorio v2. Las instrucciones anteriores de Swift
 
 ## Escritorio en Rust y Telegram guiado
 
-El cliente Rust/Tauri separa **Redacta**, **Destinos** y **Revisa y termina**.
-Escribe el mensaje sin instrucciones de programación, elige generar un texto
-o conservar tus palabras y adjunta archivos opcionales. En la siguiente pantalla
-elige destinos, fecha y hora local. Revisa el plan horneado antes de continuar.
-La portada y la etiqueta del negocio están en una misma sección de opciones.
-Las versiones del texto conservan la programación.
+**Inicio** muestra los borradores, las publicaciones programadas, la próxima
+publicación y los indicadores de conexión. Abre Postiz para revisar lo guardado
+o elige **Nueva publicación**.
+
+1. **Redacta**: escribe una idea o selecciona conservar tus palabras. Adjunta
+   archivos si los necesitas.
+2. **Destinos**: elige redes, formatos, fecha y hora. **Pronto · +10 min** coloca
+   una hora cercana en el futuro. La etiqueta del negocio empieza vacía en una
+   instalación nueva; se conservan las etiquetas que configuraste expresamente.
+   Para un Estado de WhatsApp solo de texto puedes elegir el color de fondo.
+   Las opciones de portada y etiqueta están agrupadas debajo.
+3. **Hornea y revisa**: una batidora pequeña anima la preparación. Se muestra
+   un texto inicial. **Probar otro texto** añade otra versión; las flechas recorren
+   las anteriores. Editar modifica la versión elegida. La adaptación más corta
+   para Threads se identifica aparte. **Editar título…** modifica solo el título
+   de YouTube (hasta 100 caracteres). Revisa los destinos y segmentos antes de
+   crear borradores o confirmar expresamente la programación directa.
+
+Las historias largas de Facebook e Instagram se dividen y programan con un
+minuto entre cada segmento. Un video de 205 segundos genera **una publicación
+más cuatro borradores de historias** por red al seleccionar ambos formatos.
+YouTube Shorts prepara una copia aparte de **2:59** para videos verticales o
+cuadrados más largos; las otras redes conservan el video completo. Elige
+**Video completo** para conservar todo el video de YouTube. Un video horizontal
+no se recorta de forma automática para convertirlo en Short.
+
+**WhatsApp** en la cabecera muestra la conexión o permite escanear el QR en la
+ventana. Se conserva una sesión que ya funciona. **Eliminar publicaciones…**
+distingue entre borrar borradores y cancelar publicaciones programadas. Muestra
+las cantidades antes de confirmar. Lo que ya se publicó permanece en línea.
+
+La app encuentra automáticamente su instalación local; no necesitas elegir
+carpetas para usarla. **Ajustes → Avanzado · recuperación y migración** sirve
+solo para localizar una instalación recuperada o migrada. No se muestra la
+ruta en el inicio.
 
 Abre **Telegram** en la cabecera de la app. Cada instalación usa su propio bot
 dedicado y una cuenta privada autorizada; no hay un bot global compartido.
