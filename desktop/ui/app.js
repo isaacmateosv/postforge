@@ -42,6 +42,8 @@ function localize() {
     "Text-only announcement. Facebook posts, Threads posts and WhatsApp Status accept text. The other placements need media.",
     "Anuncio solo de texto. Las publicaciones de Facebook, Threads y los Estados de WhatsApp admiten texto. Los otros formatos requieren archivos.");
   $("final-tag").placeholder = text("#MyBusiness", "#MiNegocio");
+  $("previous").setAttribute("aria-label", text("Previous caption", "Texto anterior"));
+  $("next").setAttribute("aria-label", text("Next caption", "Texto siguiente"));
   updateModeHint();
   renderMedia();
   renderSteps();
@@ -220,10 +222,11 @@ function renderReview() {
   const destinations = document.createElement("ul");
   for (const target of plan.targets) {
     const item = document.createElement("li");
-    const network = target.network === "whatsapp" ? text("WhatsApp Status", "Estado de WhatsApp") : target.network;
+    const network = target.network === "whatsapp" ? text("WhatsApp Status", "Estado de WhatsApp")
+      : state.options.networks.find(item => item.id === target.network)?.name || target.network;
     const placement = target.placement === "story" ? text(" · Story", " · Historia")
       : target.placement === "feed" ? text(" · Post", " · Publicación") : "";
-    item.textContent = network + " · " + target.channel + placement;
+    item.textContent = network + (target.network === "whatsapp" ? "" : " · " + target.channel + placement);
     destinations.append(item);
   }
   $("plan-meta").append(when, destinations);
