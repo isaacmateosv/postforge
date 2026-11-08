@@ -1,9 +1,10 @@
 // Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 // SPDX-License-Identifier: GPL-3.0-or-later
-use tauri::{Emitter, Manager, menu::{Menu, MenuItem, PredefinedMenuItem}, tray::TrayIconBuilder};
+use tauri::{Emitter, Manager, menu::{Menu, MenuItem, PredefinedMenuItem, Submenu}, tray::TrayIconBuilder};
 
 pub struct TrayUi {
     pub status: MenuItem<tauri::Wry>,
+    pub new_window: MenuItem<tauri::Wry>,
     pub items: Vec<(String, MenuItem<tauri::Wry>)>,
 }
 const LABELS: &[(&str,&str,&str)] = &[
@@ -24,6 +25,15 @@ pub fn show(app: &tauri::AppHandle) {
 }
 
 pub fn install(app:&tauri::AppHandle) -> tauri::Result<()> {
+    // An application menu accelerator remains active after the webview is hidden.
+    let application_menu=Menu::default(app)?;
+    let new_window=MenuItem::with_id(app,"new-window","New Post…",true,Some("CmdOrCtrl+N"))?;
+    let file_menu=application_menu.items()?.into_iter().find_map(|item| {
+        item.as_submenu().filter(|submenu| submenu.text().ok().as_deref()==Some("File")).cloned()
+    });
+    if let Some(file)=file_menu {file.prepend(&new_window)?;}
+    else {application_menu.prepend(&Submenu::with_items(app,"File",true,&[&new_window])?)?;}
+    app.set_menu(application_menu)?;
     let menu=Menu::new(app)?;
     let status=MenuItem::with_id(app,"status","PostForge · local publishing",false,None::<&str>)?;
     menu.append(&status)?;menu.append(&PredefinedMenuItem::separator(app)?)?;
@@ -43,13 +53,14 @@ pub fn install(app:&tauri::AppHandle) -> tauri::Result<()> {
             show(app);let _=app.emit("postforge-tray-action",event.id.as_ref());
         }).on_tray_icon_event(|tray,_| {let _=tray.app_handle().emit("postforge-tray-refresh",());})
         .build(app)?;
-    app.manage(TrayUi{status,items});Ok(())
+    app.manage(TrayUi{status,new_window,items});Ok(())
 }
 
 #[tauri::command]
 pub fn tray_state(app:tauri::AppHandle, language:String, drafts:u64, queued:u64, busy:u32, update:bool) -> Result<(),String> {
     let es=language=="es";let ui=app.state::<TrayUi>();
     let status=if es {format!("{drafts} borradores · {queued} programadas · {busy} tareas")} else {format!("{drafts} drafts · {queued} scheduled · {busy} active")};
+    let _=ui.new_window.set_text(if es {"Nueva publicación…"} else {"New Post…"});
     ui.status.set_text(&status).map_err(|_|"Tray unavailable")?;
     for (id,item) in &ui.items {
         if let Some((_,en,spanish))=LABELS.iter().find(|(key,_,_)|key==id) {
