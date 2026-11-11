@@ -164,3 +164,16 @@ dialog > .actions:last-child { position:sticky; bottom:-26px; background:var(--p
 #network-dialog select { width:100%; }
 #network-callbacks code { overflow-wrap:anywhere; font-size:.85em; }
 #public-access-warning { width:100%; text-align:left; margin-bottom:20px; color:var(--ink); }
+
+.url-copy-row { display:flex; align-items:stretch; gap:10px; }
+.url-copy-row > input { min-width:0; flex:1; width:100%; cursor:copy; transition:border-color .15s,background-color .15s; }
+.url-copy-row > button { flex-shrink:0; min-width:112px; }
+#network-current:hover,.copyable-url:hover { border-color:var(--blue); background:#36517330; }
+#network-current.copied,.copyable-url.copied,#network-copy.copied { border-color:#63ca83; background:#2f855330; color:#91e6a9; }
+.copy-feedback { min-height:1.4em; margin:8px 0 16px; color:#91e6a9; font-size:.9em; }
+.callback-copy-row { display:grid; gap:8px; margin:18px 0; }
+.copyable-url { width:100%; text-align:left; overflow-wrap:anywhere; white-space:normal; font-family:ui-monospace,monospace; font-size:.85em; line-height:1.5; cursor:copy; transition:border-color .15s,background-color .15s; }
+@media(max-width:480px) { .url-copy-row { flex-wrap:wrap; }.url-copy-row > input { flex-basis:100%; } }
+
+.copy-feedback.copy-error { color:#ffb4a8; }
+#network-dialog .settings-field > .url-copy-row { display:flex; margin-bottom:0; font-weight:normal; }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.27]
+
+- Copy the public URL by clicking its field or using Copy link; show a brief green confirmation and accessible status message.
+- Make OAuth callback URLs copyable with the same feedback and keyboard support in English and Ecuadorian Spanish.
+- Use native clipboard writes on macOS, Windows and Linux without clipboard-read access.
+
+
 ## [2.0.0-rc.26]
 
 - Add selectable TryCloudflare, named Cloudflare/custom-domain and saved ngrok profiles with URL synchronization and deliberate temporary URL rotation in the app and native tray.

@@ -157,7 +157,8 @@
 <h2 id="network-title" data-en="Public URL & tunnel" data-es="URL pública y túnel"></h2>
 <p data-en="The gateway login remains enabled for every provider. Switching the URL signs you out of the gateway and requires updating OAuth callbacks in your developer apps." data-es="El acceso del gateway se mantiene con cualquier proveedor. Cambiar la URL cierra la sesión del gateway y requiere actualizar las URL de redirección OAuth en tus apps de desarrollador."></p>
 <div id="network-result" class="callout" role="status"></div>
-<label class="settings-field"><span data-en="Current public URL" data-es="URL pública actual"></span><input id="network-current" readonly></label>
+<div class="settings-field"><label for="network-current" data-en="Current public URL" data-es="URL pública actual"></label><span class="url-copy-row"><input id="network-current" readonly><button id="network-copy" type="button" data-en="Copy link" data-es="Copiar enlace"></button></span></div>
+<p id="network-copy-feedback" class="copy-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
 <label class="settings-field"><span data-en="Provider" data-es="Proveedor"></span><select id="network-provider"><option value="trycloudflare" data-en="TryCloudflare · temporary URL" data-es="TryCloudflare · URL temporal"></option><option value="cloudflare" data-en="Cloudflare · my own domain" data-es="Cloudflare · mi propio dominio"></option><option value="ngrok">ngrok</option></select></label>
 <p id="network-hint" class="hint"></p>
 <div id="network-custom-fields" hidden>
