@@ -45,6 +45,12 @@ manage_posts = module("manage_posts", "manage_posts.py")
 
 
 class Operations(unittest.TestCase):
+    def setUp(self):
+        # Synthetic planner fixtures have no real video to probe. Real-file
+        # orientation is exercised separately by test_media_preview.py.
+        orientation=patch.object(pmlib,'display_dimensions',side_effect=lambda path,width,height:(width,height))
+        orientation.start();self.addCleanup(orientation.stop)
+
     def test_quoted_idea_is_exact_and_schedule_ignores_caption_dates(self):
         words = 'WhatsApp today at 8:36 pm; idea: "Open on Saturday at 9am. See you! 🎉"'
         command, exact, idea = plan_post.split_instruction(words)
