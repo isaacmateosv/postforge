@@ -44,6 +44,8 @@ jobs:
         run: python -m unittest discover -s scripts -p test_composer.py
       - name: Dashboard, pairing and YouTube variant tests
         run: python -m unittest discover -s scripts -p test_desktop_status.py
+      - name: Tunnel provider and rollback tests
+        run: python -m unittest discover -s scripts -p test_network_settings.py
       - name: Audience and stopped-post repair regression tests
         run: python -m unittest discover -s scripts -p test_whatsapp_audience.py && python -m unittest discover -s scripts -p test_repair_media_links.py
       - name: Telegram settings and migration tests

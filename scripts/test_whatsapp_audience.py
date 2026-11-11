@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import os
 import tempfile
 from pathlib import Path
 import unittest
@@ -17,7 +18,8 @@ class AudienceTests(unittest.TestCase):
             self.assertEqual(result['recipients'],'593991234568')
             self.assertEqual(write.call_args.args[0][0]['audience'],'all')
             self.assertEqual(write.call_args.args[0][1]['recipients'],'593991234567')
-            self.assertIn('OTHER=keep',envfile.read_text());self.assertEqual(envfile.stat().st_mode&0o777,0o600)
+            self.assertIn('OTHER=keep',envfile.read_text())
+            if os.name != 'nt':self.assertEqual(envfile.stat().st_mode&0o777,0o600)
     def test_sending_blocks_default_change(self):
         with tempfile.TemporaryDirectory() as folder,patch.object(pmlib,'RUN_DIR',folder),patch.object(pmlib,'load_env',return_value={}),patch.object(whatsapp_pending,'_read',return_value=[{'status':'sending'}]),patch.object(whatsapp_pending,'_write') as write:
             with self.assertRaisesRegex(pmlib.PMError,'being sent'):audience.save({'audience':'all','recipients':''})

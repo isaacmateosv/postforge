@@ -67,6 +67,13 @@ class ComposerTests(unittest.TestCase):
                 composer.submit(self.env, preview["review_id"], "schedule")
         run.assert_called_once()
 
+    def test_changed_public_origin_requires_new_review(self):
+        preview=self.preview()
+        with patch.object(composer.plan_post,'run') as run:
+            with self.assertRaisesRegex(pmlib.PMError,'public URL changed'):
+                composer.submit(dict(self.env,FRONTEND_URL='https://new.example.org'),preview['review_id'],'draft')
+        run.assert_not_called()
+
     def test_changed_media_requires_new_review(self):
         media = self.root / "synthetic.mp4"
         media.write_bytes(b"one")

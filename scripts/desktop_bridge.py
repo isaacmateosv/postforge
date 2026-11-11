@@ -32,6 +32,9 @@ def dispatch(operation, payload):
     if operation in ("whatsapp_audience", "whatsapp_audience_save"):
         import whatsapp_audience
         return whatsapp_audience.status() if operation=="whatsapp_audience" else whatsapp_audience.save(payload)
+    if operation in ("network_status", "network_apply"):
+        import network_settings
+        return network_settings.status(check=True,force=payload.get("force") is True) if operation=="network_status" else network_settings.apply(payload)
     env = pmlib.load_env()
     if operation == "connections":
         import desktop_status

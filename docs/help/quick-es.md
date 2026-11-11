@@ -194,3 +194,8 @@ Usa el reproductor de Redacta para revisar los archivos. Se pausa al salir del p
 En **WhatsApp → Audiencia**, elige todos los contactos o números seleccionados con código de país y guarda. Los planes nuevos usan esa audiencia; los que ya están en cola conservan la anterior. No se puede cambiar mientras se envía un Estado. Una audiencia grande puede requerir varios minutos por segmento: revisa el progreso antes de reenviar. Puedes mostrar u ocultar los recibos, filtrarlos por fecha o tipo y recorrerlos de cinco en cinco.
 
 La descripción de YouTube termina con la etiqueta del negocio; si está vacía, se usa `#shorts`. No se añade una etiqueta automática al título. La descripción es independiente del límite de 100 caracteres del título.
+
+
+## URL pública y túnel
+
+Abre **Ajustes → Acceso público** o **URL pública y túnel** en la barra de menús. Elige TryCloudflare temporal, tu dominio con un túnel de Cloudflare con nombre o ngrok guardado. Comprueba el acceso antes de publicar. Rotar o reiniciar un conector temporal cambia el dominio: aplica la URL detectada y actualiza las redirecciones OAuth antes de reconectar los canales. El dominio y el token se conservan al volver al modo temporal. Los ajustes viajan en Respaldo y migración de forma cifrada; verifica la URL del destino antes de reanudar las publicaciones. Consulta la Ayuda técnica para ver el procedimiento completo.

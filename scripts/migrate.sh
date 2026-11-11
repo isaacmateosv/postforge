@@ -171,12 +171,18 @@ import_bundle() (
     PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$target/scripts" python3 - "$target/.env" <<'PYTHON'
 import sys
 from pathlib import Path
-from tunnel_url import check_gateway_config, read_setting
+from tunnel_url import check_gateway_config, read_setting, private_write
+from network_settings import restore_provider
 
 env = Path(sys.argv[1])
+override = env.parent / "docker-compose.override.yml"
+previous = override.read_bytes() if override.exists() else None
 try:
+    restore_provider(env)
     check_gateway_config(env, read_setting(env.read_text(), "NGROK_DOMAIN"))
 except (OSError, ValueError, KeyError, RuntimeError) as error:
+    if previous is not None: private_write(override, previous, env.parent / "run")
+    else: override.unlink(missing_ok=True)
     sys.exit(f"Error: Gateway route could not be verified. {error}")
 PYTHON
   fi

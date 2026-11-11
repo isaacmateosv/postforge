@@ -138,6 +138,7 @@ def preview(env, value):
     expected = signature(data)
     with pmlib.Job("compose-preview", "Prepare a plan"):
         result = plan_post.run(env, p, True)
+        result["public_origin"] = env.get("FRONTEND_URL", "")
     if signature(data) != expected:
         raise pmlib.PMError("An attached file changed while preparing the preview. Prepare a fresh plan.")
     family = secrets.token_hex(16)
@@ -180,7 +181,7 @@ def submit(env, identifier, mode):
         raise pmlib.PMError("Choose drafts or direct scheduling.")
     ticket = load_ticket(identifier)
     family_path = path_for(ticket["family"])
-    with file_lock.exclusive(str(family_path) + ".lock"):
+    with file_lock.exclusive(str(Path(pmlib.RUN_DIR) / "tunnel-url.lock")), file_lock.exclusive(str(family_path) + ".lock"):
         state = json.loads(family_path.read_text())
         if state["state"] == "completed":
             return dict(state["receipt"], already_submitted=True)
@@ -188,6 +189,8 @@ def submit(env, identifier, mode):
             raise pmlib.PMError("Submission needs review. Check Postiz before preparing another batch.")
         if ticket.get("pipeline_revision") != PIPELINE_REVISION:
             raise pmlib.PMError("The planner changed. Check saved posts, then prepare a fresh plan. / El planificador cambió. Revisa las publicaciones guardadas y prepara otro plan.")
+        if ticket["plan"].get("public_origin", "") != env.get("FRONTEND_URL", ""):
+            raise pmlib.PMError("The public URL changed. Prepare a fresh plan. / La URL pública cambió. Prepara un plan nuevo.")
         data = fields(ticket["fields"])
         if signature(data) != ticket["signature"]:
             raise pmlib.PMError("An attached file changed. Prepare a fresh plan.")

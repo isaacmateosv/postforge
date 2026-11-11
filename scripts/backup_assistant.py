@@ -154,6 +154,8 @@ def inspect_bundle(path,password,progress,restore=False,replace=False,expected=N
         if ids:subprocess.run(['docker','stop',*ids],check=True,capture_output=True,timeout=120)
         previous_env=(ROOT/'.env').read_bytes() if (ROOT/'.env').exists() else None
         previous_gateway=work/'previous-gateway';live_gateway=ROOT/'data/gateway';override=None;installed_gateway=False
+        provider_override=ROOT/'docker-compose.override.yml'
+        provider_previous=provider_override.read_bytes() if provider_override.exists() else None
         try:
             telegram_settings.atomic_write(ROOT/'.env',stage.read_text())
             if gateway.is_dir():
@@ -163,6 +165,8 @@ def inspect_bundle(path,password,progress,restore=False,replace=False,expected=N
                 overrides=[ROOT/name for name in ('compose.override.yaml','compose.override.yml','docker-compose.override.yml','docker-compose.override.yaml')]
                 if not any(file.exists() for file in overrides):
                     override=ROOT/'docker-compose.override.yml';shutil.copyfile(ROOT/'v2/compose.gateway.yml',override)
+                from network_settings import restore_provider
+                restore_provider(ROOT/".env")
                 from tunnel_url import check_gateway_config,read_setting
                 check_gateway_config(ROOT/'.env',read_setting(stage.read_text(),'NGROK_DOMAIN'))
             progress('Verifying and restoring posts and media / Verificando y restaurando datos',70)
@@ -173,6 +177,10 @@ def inspect_bundle(path,password,progress,restore=False,replace=False,expected=N
             if installed_gateway and live_gateway.exists():shutil.rmtree(live_gateway)
             if previous_gateway.exists():shutil.move(str(previous_gateway),str(live_gateway))
             if override:override.unlink(missing_ok=True)
+            if provider_previous is not None:
+                from tunnel_url import private_write
+                private_write(provider_override,provider_previous,work)
+            else:provider_override.unlink(missing_ok=True)
             raise
         info.update(restored=True,rollback=rollback['file'] if rollback else None,services_stopped=True,telegram_paused=True)
         return info

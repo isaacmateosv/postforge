@@ -1,6 +1,6 @@
 [package]
 name = "postforge-desktop"
-version = "2.0.0-rc.25"
+version = "2.0.0-rc.26"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "PostForge cross-platform desktop composer"

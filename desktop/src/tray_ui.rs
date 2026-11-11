@@ -15,6 +15,7 @@ const LABELS: &[(&str,&str,&str)] = &[
  ("telegram","Telegram Settings","Ajustes de Telegram"),
  ("backup","Backup & Move","Respaldo y traslado"),
  ("updates","Check for Updates","Buscar actualizaciones"),
+ ("network","Public URL & Tunnel","URL pública y túnel"),
  ("settings","Settings & Recovery","Ajustes y recuperación"),
  ("help","Help","Ayuda"),("about","About PostForge","Acerca de PostForge"),
  ("quit","Quit PostForge (services keep running)","Salir de PostForge (los servicios siguen activos)")

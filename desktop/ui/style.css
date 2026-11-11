@@ -158,3 +158,9 @@ dialog > .actions:last-child { position:sticky; bottom:-26px; background:var(--p
 .receipt-row { padding:14px 0; border-top:1px solid var(--border); }.receipt-row strong { font-size:12px; font-weight:500; }.receipt-row p { font-size:13px; margin:6px 0; }.history-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:18px 0; font-size:12px; }
 .audience-settings { margin:22px 0; }.audience-settings > p { margin-top:14px; }.audience-settings > label,.audience-settings > select { display:block; margin:12px 0; }.audience-settings textarea { min-height:70px; }
 .connection-row { padding:16px 0; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }.connection-row strong { font-size:13px; font-weight:500; }.connection-row small { display:block; width:100%; }.connection-ok { color:#9bceb0; font-size:12px; }.connection-attention { color:#e4c48d; font-size:12px; }#connection-checked { margin-top:18px; }
+
+#network-dialog .settings-field { display:block; }
+#network-dialog .settings-field > span { display:block; margin-bottom:9px; font-weight:500; }
+#network-dialog select { width:100%; }
+#network-callbacks code { overflow-wrap:anywhere; font-size:.85em; }
+#public-access-warning { width:100%; text-align:left; margin-bottom:20px; color:var(--ink); }

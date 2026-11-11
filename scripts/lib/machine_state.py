@@ -204,6 +204,14 @@ def scheduler_alive():
 def services(env, running):
     out = {"postiz": False, "evolution": False, "whatsapp": None, "scheduler": False,
            "tunnel": running.get("pm-tunnel") == "running"}
+    if out['tunnel'] and env.get('FRONTEND_URL','').startswith('https://'):
+        try:
+            sys.path.insert(0, os.path.join(pmlib.ROOT,'scripts'))
+            import network_settings
+            public=network_settings.status(check=True)
+            out['tunnel']=bool(public.get('reachable') and not public.get('needs_sync'))
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            out['tunnel']=False
     if running.get("pm-postiz") == "running":
         status, _ = http_up(env.get("POSTIZ_LOCAL_URL", "http://localhost:4200") + "/api/")
         out["postiz"] = bool(status) and status < 500

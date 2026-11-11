@@ -70,7 +70,7 @@ def start():
         flags = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS} if os.name == "nt" else {"start_new_session": True}
         subprocess.Popen([sys.executable, "-B", str(Path(__file__).resolve()), "run"],
                          cwd=ROOT, stdin=subprocess.DEVNULL, stdout=output, stderr=output,
-                         env=dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1"), **flags)
+                         env=dict({key:value for key,value in os.environ.items() if key not in ("NGROK_DOMAIN","FRONTEND_URL","NEXT_PUBLIC_BACKEND_URL","MAIN_URL","POSTFORGE_GATEWAY_HOST")}, PYTHONIOENCODING="utf-8", PYTHONUTF8="1"), **flags)
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         if running():
