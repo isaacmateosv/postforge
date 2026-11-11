@@ -1081,10 +1081,38 @@ function networkFields(){
   $("network-rotate").hidden=provider!=="trycloudflare";
   $("network-hint").textContent=provider==="trycloudflare"?text("Temporary testing endpoint: its hostname changes when the connector restarts. Use Apply to synchronize a changed URL, or Rotate to request another one. No uptime guarantee.","Dirección temporal de pruebas: cambia al reiniciar el conector. Usa Aplicar para sincronizar una URL que cambió o Rotar para pedir otra. No tiene garantía de disponibilidad."):provider==="cloudflare"?text("A named tunnel keeps your domain stable. You can return to TryCloudflare without erasing these settings.","Un túnel con nombre mantiene tu dominio estable. Puedes volver a TryCloudflare sin borrar estos ajustes."):text("Uses your saved ngrok domain and credentials. The account must have bandwidth available.","Usa el dominio y las credenciales guardados de ngrok. La cuenta debe tener ancho de banda disponible.");
 }
+const copyFeedbackTimers=new WeakMap();
+let copyNoticeTimer;
+async function copyPublicLink(url,target,label){
+  if(!url)return;
+  try{
+    await invoke("copy_public_url",{url});
+    clearTimeout(copyFeedbackTimers.get(target));clearTimeout(copyNoticeTimer);
+    target.classList.add("copied");
+    if(label)target.textContent=text("✓ Copied","✓ Copiado");
+    $("network-copy-feedback").classList.remove("copy-error");
+    $("network-copy-feedback").textContent=text("✓ Link copied","✓ Enlace copiado");
+    copyFeedbackTimers.set(target,setTimeout(()=>{target.classList.remove("copied");if(label)target.textContent=text("Copy link","Copiar enlace");},2000));
+    copyNoticeTimer=setTimeout(()=>{$("network-copy-feedback").textContent="";},2500);
+  }catch(error){target.classList.remove("copied");$("network-copy-feedback").classList.add("copy-error");$("network-copy-feedback").textContent=friendlyError(error);}
+}
 function networkCallbacks(url){
   $("network-callbacks").replaceChildren();
-  for(const name of ["youtube","facebook","instagram","threads","tiktok"]){const row=document.createElement("p");const label=document.createElement("strong");label.textContent=name+": ";const value=document.createElement("code");value.textContent=url+"/integrations/social/"+name;row.append(label,value);$("network-callbacks").append(row);}
+  const names={youtube:"YouTube",facebook:"Facebook",instagram:"Instagram",threads:"Threads",tiktok:"TikTok"};
+  for(const name of Object.keys(names)){
+    const row=document.createElement("div");row.className="callback-copy-row";
+    const label=document.createElement("strong");label.textContent=names[name];
+    const value=document.createElement("button");value.type="button";value.className="copyable-url";
+    const link=url+"/integrations/social/"+name;value.textContent=link;
+    value.title=text("Click to copy","Haz clic para copiar");
+    value.setAttribute("aria-label",text("Copy ","Copiar ")+names[name]+text(" callback URL"," URL de redirección"));
+    value.onclick=()=>copyPublicLink(link,value,false);row.append(label,value);$("network-callbacks").append(row);
+  }
 }
+bind("network-copy",()=>copyPublicLink($("network-current").value,$("network-copy"),true));
+$("network-current").onclick=()=>copyPublicLink($("network-current").value,$("network-current"),false);
+$("network-current").onkeydown=event=>{if(event.key==="Enter" || event.key===" "){event.preventDefault();copyPublicLink(event.currentTarget.value,event.currentTarget,false);}};
+
 async function networkCheck(fill=false){
   $("network-result").textContent=text("Checking public access","Comprobando el acceso público");
   try{const result=await engine("network_status",{force:true});state.network=result;$("network-current").value=result.url;
@@ -1093,16 +1121,16 @@ async function networkCheck(fill=false){
     networkCallbacks(result.url);
   }catch(error){$("network-result").textContent=friendlyError(error);}
 }
-async function networkOpen(){openDialog("network-dialog");await networkCheck(true);}
+async function networkOpen(){$("network-copy-feedback").textContent="";$("network-current").title=text("Click to copy link","Haz clic para copiar el enlace");openDialog("network-dialog");await networkCheck(true);}
 async function networkApply(rotate=false){
   if(state.networkBusy)return;
   const confirmed=await modal(rotate?text("Rotate the temporary URL?","¿Rotar la URL temporal?"):text("Change public access?","¿Cambiar el acceso público?"),text("Finish or cancel queued posts first. This restarts Postiz and the gateway. Existing media origins are updated; published posts are not reposted. Developer OAuth callbacks must be updated manually.","Primero completa o cancela las publicaciones en cola. Se reiniciarán Postiz y el gateway. Se actualizarán los enlaces de los archivos; lo ya publicado no se reenviará. Debes actualizar manualmente las redirecciones OAuth."),text("Continue","Continuar"));
   if(!confirmed)return;
-  state.networkBusy=true;for(const id of ["network-apply","network-rotate","network-check","network-close","network-provider"])$(id).disabled=true;
+  state.networkBusy=true;document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=true);
   $("network-result").textContent=text("Applying configuration and verifying the gateway. This can take a few minutes. Keep this window open.","Aplicando la configuración y verificando el gateway. Puede tardar unos minutos. Mantén esta ventana abierta.");
   try{const result=await engine("network_apply",{provider:$("network-provider").value,custom_domain:$("network-domain").value,ngrok_domain:$("network-ngrok-domain").value,token:$("network-token").value,rotate,confirm:true});$("network-token").value="";invalidate();state.options=await engine("options");await networkCheck(true);$("network-result").textContent=text("✓ Public access verified. Sign in at the new address and update the callbacks below before reconnecting channels.","✓ Acceso público verificado. Inicia sesión en la nueva dirección y actualiza las redirecciones de abajo antes de reconectar los canales.");networkCallbacks(result.url);}
   catch(error){$("network-result").textContent=friendlyError(error);}
-  finally{state.networkBusy=false;for(const id of ["network-apply","network-rotate","network-check","network-close","network-provider"])$(id).disabled=false;}
+  finally{state.networkBusy=false;document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=false);}
 }
 bind("network-open",()=>fromSettings(networkOpen));bind("network-check",()=>networkCheck());bind("network-apply",()=>networkApply());bind("network-rotate",()=>networkApply(true));bind("network-close",()=>$("network-dialog").close());$("network-provider").onchange=networkFields;
 $("network-dialog").addEventListener("cancel",event=>{if(state.networkBusy)event.preventDefault();else $("network-token").value="";});

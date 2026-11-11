@@ -11,6 +11,7 @@ use tauri::{Manager, Emitter};
 mod tray_ui;
 mod media_ui;
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 struct Workspace(Mutex<PathBuf>);
 
@@ -61,6 +62,17 @@ fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Val
     } else {
         Err(result["error"].as_str().unwrap_or("The request failed.").to_string())
     }
+}
+
+#[tauri::command]
+fn copy_public_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    let parsed=tauri::Url::parse(&url).map_err(|_|"Invalid link. / Enlace inválido.")?;
+    if url.len()>2048 || url.chars().any(|c|c.is_control() || c.is_whitespace()) || parsed.scheme()!="https" || parsed.host_str().is_none()
+        || !parsed.username().is_empty() || parsed.password().is_some()
+        || parsed.query().is_some() || parsed.fragment().is_some() {
+        return Err("Choose a public HTTPS link. / Elige un enlace HTTPS público.".into());
+    }
+    app.clipboard().write_text(url).map_err(|_|"The link could not be copied. Try again. / No se pudo copiar el enlace. Vuelve a intentar.".into())
 }
 
 #[tauri::command]
@@ -241,6 +253,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app,_,_| {tray_ui::show(app);} ))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let fallback = std::env::var("POSTFORGE_PROJECT_DIR").map(PathBuf::from).unwrap_or_else(|_| {
@@ -270,7 +283,7 @@ fn main() {
 
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
-        .invoke_handler(tauri::generate_handler![engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
+        .invoke_handler(tauri::generate_handler![copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
         .build(tauri::generate_context!())
         .expect("PostForge desktop could not start")
         .run(|app,event| {

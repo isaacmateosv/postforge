@@ -199,3 +199,6 @@ La descripción de YouTube termina con la etiqueta del negocio; si está vacía,
 ## URL pública y túnel
 
 Abre **Ajustes → Acceso público** o **URL pública y túnel** en la barra de menús. Elige TryCloudflare temporal, tu dominio con un túnel de Cloudflare con nombre o ngrok guardado. Comprueba el acceso antes de publicar. Rotar o reiniciar un conector temporal cambia el dominio: aplica la URL detectada y actualiza las redirecciones OAuth antes de reconectar los canales. El dominio y el token se conservan al volver al modo temporal. Los ajustes viajan en Respaldo y migración de forma cifrada; verifica la URL del destino antes de reanudar las publicaciones. Consulta la Ayuda técnica para ver el procedimiento completo.
+
+
+Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El control cambia brevemente a verde y confirma **Enlace copiado**. Las URL de redirección OAuth también se copian al hacer clic; con el teclado, usa Tab y Enter o Espacio.

@@ -187,3 +187,6 @@ YouTube descriptions end with your business hashtag, or `#shorts` if it is empty
 ## Public URL and tunnel
 
 Open **Settings → Public access** or **Public URL & Tunnel** in the menu bar. Choose temporary TryCloudflare, your own domain through a named Cloudflare tunnel, or saved ngrok. Check access before posting. Rotating or restarting a temporary connector changes its hostname: apply the detected URL and update provider OAuth callbacks before reconnecting channels. Domain and token settings remain saved when returning to temporary mode. All provider settings travel in encrypted Backup & Move; verify the destination URL before restarting publishing. See Technical Help for the complete procedure.
+
+
+Click the current public URL or **Copy link** to copy it. The control briefly turns green and confirms **Link copied**. OAuth callback URLs are clickable copy controls too; use Tab and Enter/Space with the keyboard.
