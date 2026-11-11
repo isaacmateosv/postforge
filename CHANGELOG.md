@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.0-rc.25]
+
+- Show per-channel connection status from Postiz, token validity and renewal/reconnection states; a fresh login supersedes previous authentication failures.
+- Preserve file-scoped signed media URLs during Postiz normalization without weakening the gateway login.
+- Preview selected media and covers locally with access restricted to files explicitly selected in the window.
+- Route portrait/square YouTube videos to Shorts and landscape videos to regular uploads in Automatic mode; keep titles separate from descriptions and end descriptions with the business hashtag, or #shorts when unset.
+- Configure WhatsApp Status audiences in the window, preserve queued audiences and show segment delivery progress. Add collapsible, filtered, paginated receipt history.
+- Expand English and Ecuadorian Spanish help and Google OAuth setup instructions.
+
+
 ## [2.0.0-rc.24]
 
 - Keep only the open dialog modal to assistive technology; explicitly hide closed dialogs and preserve access when moving from Settings to Backup & Move or cleanup.

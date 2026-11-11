@@ -101,7 +101,7 @@ def import_credentials(path, output=None, gateway_stage=None, password=None):
     except Exception as exc:
         if os.path.exists(temporary):
             os.remove(temporary)
-        if "bad decrypt" in str(exc) or "bad magic" in str(exc):
+        if isinstance(exc, UnicodeDecodeError) or "bad decrypt" in str(exc) or "bad magic" in str(exc):
             raise RuntimeError("Wrong passphrase, or the file is damaged") from exc
         raise
     print("Decrypted .env restored with permissions 600")

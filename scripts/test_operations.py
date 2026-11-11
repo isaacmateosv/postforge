@@ -270,7 +270,7 @@ class Operations(unittest.TestCase):
         for short in (False, True):
             title = pmlib.youtube_title(caption, short)
             self.assertLessEqual(len(title.encode("utf-16-le")) // 2, 100)
-            self.assertEqual(title.endswith(" #Shorts"), short)
+            self.assertFalse(title.endswith(" #Shorts"))
             self.assertEqual(pmlib.draft_settings("youtube", caption, short=short)["title"], title)
             self.assertNotIn("The full description", title)
         self.assertEqual(pmlib.youtube_title("A <good> title"), "A good title")
@@ -283,10 +283,10 @@ class Operations(unittest.TestCase):
         })) as generate:
             title = plan_post.reviewed_youtube_title({}, caption, "Torta para hinchas de Liga", "Spanish", True)
         generate.assert_called_once()
-        self.assertEqual(title, "Torta de frutillas con chantilly para la hinchada de Liga #Shorts")
+        self.assertEqual(title, "Torta de frutillas con chantilly para la hinchada de Liga")
         with patch.object(pmlib, "http", side_effect=pmlib.PMError("offline")):
             fallback = plan_post.reviewed_youtube_title({}, caption, None, "Spanish", True)
-        prefix = fallback.removesuffix("… #Shorts")
+        prefix = fallback.removesuffix("…")
         self.assertTrue(caption.startswith(prefix + " "))
         self.assertLessEqual(len(fallback), 100)
 

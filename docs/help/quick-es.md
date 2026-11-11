@@ -26,8 +26,7 @@ Las historias largas de Facebook e Instagram se dividen y programan con un
 minuto entre cada segmento. Un video de 205 segundos genera **una publicación
 más cuatro borradores de historias** por red al seleccionar ambos formatos.
 YouTube Shorts prepara una copia aparte de **2:59** para videos verticales o
-cuadrados más largos; las otras redes conservan el video completo. Elige
-**Video completo** para conservar todo el video de YouTube. Un video horizontal
+cuadrados más largos; las otras redes conservan el video completo. En **Automático**, los videos horizontales conservan su duración como videos normales; los verticales y cuadrados van a Shorts. Elegir Video normal no cambia la clasificación de YouTube para un video vertical corto que cumple los requisitos. Un video horizontal
 no se recorta de forma automática para convertirlo en Short.
 
 **WhatsApp** en la cabecera muestra la conexión o permite escanear el QR en la
@@ -184,3 +183,14 @@ La bandeja incluye Inicio, Nueva publicación, planes y aprobaciones de WhatsApp
 ### Dónde encontrar las acciones en la app
 
 Redacta → Destinos → Revisa y termina permanece en la parte superior. Elige **Generar un texto** si tienes una idea o **Usar mi texto** para conservar tu redacción. Las opciones muestran por separado la selección y el foco del teclado. El pie contiene información de privacidad y, mientras redactas, **Limpiar formulario**. El mantenimiento está en **Ajustes → App y datos**: actualizaciones, **Respaldo y traslado**, y eliminación de borradores o publicaciones en cola. El idioma también está en Ajustes. Puedes actualizar el inicio junto a **Abrir Postiz**. Estas acciones siguen disponibles en la bandeja. La limpieza muestra una vista previa y pide confirmación antes de eliminar algo. El batidor solo se anima mientras se prepara el plan y respeta la preferencia del sistema para reducir movimiento.
+
+
+## Vistas previas, conexiones y entregas de WhatsApp
+
+Usa el reproductor de Redacta para revisar los archivos. Se pausa al salir del paso o cambiar de ventana. En Destinos puedes ver la portada subida o elegir un segundo del video. **Usar fotograma actual** toma la posición del reproductor. La compatibilidad de portadas depende del destino.
+
+**Conexiones** muestra el estado de cada sesión en Postiz y la vigencia real del token: conectado, renovación pendiente, en pausa o reconexión necesaria. No garantiza una publicación exitosa.
+
+En **WhatsApp → Audiencia**, elige todos los contactos o números seleccionados con código de país y guarda. Los planes nuevos usan esa audiencia; los que ya están en cola conservan la anterior. No se puede cambiar mientras se envía un Estado. Una audiencia grande puede requerir varios minutos por segmento: revisa el progreso antes de reenviar. Puedes mostrar u ocultar los recibos, filtrarlos por fecha o tipo y recorrerlos de cinco en cinco.
+
+La descripción de YouTube termina con la etiqueta del negocio; si está vacía, se usa `#shorts`. No se añade una etiqueta automática al título. La descripción es independiente del límite de 100 caracteres del título.

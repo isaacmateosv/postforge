@@ -22,9 +22,7 @@ indicators. Open Postiz to review saved work, or choose **New post**.
 Long Facebook/Instagram stories create multiple segments, scheduled one minute
 apart. A 205-second video means **one feed post + four Story drafts** per network
 when both formats are selected. YouTube Shorts uses a separate **2:59** copy for
-longer portrait/square videos; the other networks keep the full video. Choose
-**Full video** to retain the entire YouTube upload instead. Landscape sources
-are not silently cropped to Shorts.
+longer portrait/square videos; the other networks keep the full video. In **Automatic** mode, landscape videos retain their full duration as regular uploads. Vertical/square videos use Shorts. The explicit Regular video option cannot override YouTube’s classification for eligible short portrait videos. Landscape sources are not silently cropped to Shorts.
 
 Use **WhatsApp** in the header to see connection status or scan its QR directly
 in the window. A working connection stays paired. **Remove posts…** first asks
@@ -173,3 +171,14 @@ The tray provides Dashboard, New Post, WhatsApp plans and approvals, connections
 ### Finding actions in the desktop app
 
 Compose → Delivery → Review stays at the top of the window. Choose **Generate a caption** for an idea or **Use my caption** to keep your wording. Radio choices have separate focus and selection indicators. The footer contains privacy information and, while composing, **Clear composer**. Maintenance lives in **Settings → App & data**: update checks, **Backup & Move**, and removal of unpublished drafts or queued posts. Language is also in Settings. Dashboard refresh is next to **Open Postiz**. These actions remain available in the tray. Selecting a cleanup scope still shows a preview and asks for confirmation before removing anything. The mixer only animates while preparing a plan and respects the system reduced-motion preference.
+
+
+## Previews, connection health and WhatsApp delivery
+
+Use the Compose player to preview selected media; playback pauses when leaving the window or step. In Delivery, preview an uploaded cover or enter its video timestamp. **Use current frame** selects the paused player position. Cover support depends on the destination.
+
+**Connections** reports each channel’s Postiz session state and actual token validity. It distinguishes connected, renewal pending, paused and reconnect required; it does not guarantee publication success.
+
+In **WhatsApp → Audience**, select all contacts or selected international phone numbers and save. New plans use this audience; already queued plans retain their previous audience. Changes are blocked while a Status is sending. Large audiences may take several minutes per segment; follow the visible segment progress instead of resending. Delivery receipts can be expanded or hidden, filtered by date/type, and browsed five per page.
+
+YouTube descriptions end with your business hashtag, or `#shorts` if it is empty. Titles do not receive an automatic hashtag. The description remains independent of the 100-character title.

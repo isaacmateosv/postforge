@@ -73,6 +73,8 @@ for pair in $PM_META_SCOPE_FIX; do
   echo "[pm-patch] meta scopes: $action ($hits files)"
 done
 
+node /pm-patches/preserve-media.js || exit 1
+
 nginx || exit 1
 
 # Same schema sync as the stock boot (`pnpm dlx prisma@6.5.0 db push`), without pnpm.

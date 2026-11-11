@@ -62,6 +62,29 @@ class DesktopStatusTests(unittest.TestCase):
             self.assertEqual(calls['youtube'],'/uploads/trimmed.mp4')
             self.assertEqual(calls['facebook'],'/uploads/original.mp4')
 
+    def test_automatic_horizontal_youtube_keeps_full_original(self):
+        plan=plan_post.plan({},'YouTube tomorrow at 9am; caption: Exact test',['sample.mp4'],'English',datetime.now(timezone.utc))
+        plan.update(youtube_mode='auto',youtube_trim=True)
+        with patch.object(pmlib,'Postiz') as api, patch.object(pmlib,'normalize_media',return_value=('video','original.mp4')), \
+             patch.object(pmlib,'is_short',return_value=False),patch.object(pmlib,'ffprobe',return_value=(205,'h264','aac',1920,1080)), \
+             patch.object(pmlib,'display_dimensions',return_value=(1920,1080)),patch.object(pmlib,'to_mp4') as trim:
+            api.return_value.integrations.return_value=[{'id':'youtube','identifier':'youtube','name':'YouTube'}]
+            api.return_value.upload.return_value={'id':'original','path':'/uploads/original.mp4'}
+            api.return_value.create_draft.return_value=[{'postId':'synthetic'}]
+            result=plan_post.run({},plan,False)
+            self.assertFalse(result['short']);self.assertIsNone(result['youtube_trim_seconds']);trim.assert_not_called()
+            self.assertEqual(api.return_value.create_draft.call_args.args[2][0]['path'],'/uploads/original.mp4')
+
+    def test_regular_mode_does_not_promise_to_override_youtube_short_classification(self):
+        plan=plan_post.plan({},'YouTube tomorrow at 9am; caption: Exact test',['sample.mp4'],'English',datetime.now(timezone.utc))
+        plan.update(youtube_mode='regular',youtube_trim=False)
+        with patch.object(pmlib,'Postiz') as api,patch.object(pmlib,'normalize_media',return_value=('video','sample.mp4')), \
+             patch.object(pmlib,'is_short',return_value=True):
+            api.return_value.integrations.return_value=[{'id':'youtube','identifier':'youtube','name':'YouTube'}]
+            with self.assertRaisesRegex(pmlib.PMError,'classify'):
+                plan_post.run({},plan,True)
+            api.return_value.upload.assert_not_called()
+
     def test_text_status_color_survives_queue_and_is_used_at_delivery(self):
         import tempfile
         import whatsapp_pending
@@ -86,5 +109,39 @@ class DesktopStatusTests(unittest.TestCase):
              self.assertRaisesRegex(pmlib.PMError, "Connect WhatsApp"):
             desktop_bridge.dispatch("approve_status", {"id":"synthetic"})
         approve.assert_not_called()
+
+class ConnectionHealthTests(unittest.TestCase):
+    def health(self, **changes):
+        import json
+        item=dict(name='Synthetic channel',network='youtube',disabled=False,refresh_needed=False,
+                  has_token=True,can_renew=True,expires='2099-11-01T20:02:17.53',
+                  updated='2026-11-11T01:25:57.1',auth_error='2026-11-11T01:16:00.12')
+        item.update(changes)
+        with patch.object(pmlib,'Postiz') as client,patch.object(pmlib,'psql',return_value=[[json.dumps(item)]]):
+            client.return_value.org_id='synthetic'
+            return desktop_status.connections({})['items'][0]
+
+    def test_reconnection_supersedes_old_auth_failure(self):
+        self.assertEqual(self.health()['state'],'connected')
+
+    def test_expired_token_with_refresh_is_pending_not_healthy(self):
+        self.assertEqual(self.health(expires='2000-01-01T00:00:00')['state'],'renewal')
+        self.assertEqual(self.health(expires='2000-01-01T00:00:00',can_renew=False)['state'],'reconnect')
+
+    def test_missing_token_and_new_auth_failure_require_reconnection(self):
+        self.assertEqual(self.health(has_token=False)['state'],'reconnect')
+        self.assertEqual(self.health(auth_error='2026-11-11T02:00:00')['state'],'reconnect')
+        self.assertEqual(self.health(refresh_needed=True)['state'],'reconnect')
+        self.assertEqual(self.health(disabled=True)['state'],'paused')
+        self.assertEqual(self.health(network='facebook',expires='2000-01-01T00:00:00')['state'],'reconnect')
+
+    def test_receipts_validate_filters_and_limit_database_rows(self):
+        import json
+        with patch.object(pmlib,'psql',return_value=[[json.dumps({'at':2000000000})]]*6) as query:
+            result=desktop_status.receipts({},dict(page=2,period='7',kind='video'))
+        self.assertEqual(len(result['items']),5);self.assertTrue(result['has_more'])
+        self.assertIn('LIMIT 6 OFFSET 10',query.call_args.args[0])
+        self.assertIn("='videoMessage'",query.call_args.args[0])
+        with self.assertRaises(pmlib.PMError):desktop_status.receipts({},dict(period="7; DROP TABLE"))
 
 if __name__ == '__main__':unittest.main()

@@ -1,6 +1,6 @@
 [package]
 name = "postforge-desktop"
-version = "2.0.0-rc.24"
+version = "2.0.0-rc.25"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "PostForge cross-platform desktop composer"
@@ -13,7 +13,7 @@ custom-protocol = ["tauri/custom-protocol"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["image-png", "tray-icon"] }
+tauri = { version = "2", features = ["image-png", "tray-icon", "protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"

@@ -354,14 +354,14 @@ def youtube_title_line(content):
 
 
 def youtube_title_fits(title, short=False):
-    budget = YOUTUBE_TITLE_LIMIT - (len(" #Shorts") if short else 0)
+    budget = YOUTUBE_TITLE_LIMIT
     return len(title) >= 2 and len(title.encode("utf-16-le")) // 2 <= budget
 
 
 def youtube_title(content, short=False):
     """Format the title and fall back to a whole-word cut if it is too long."""
     title = youtube_title_line(content)
-    suffix = " #Shorts" if short else ""
+    suffix = ""
     if len(title) < 2:
         return "Untitled video" + suffix
     if not youtube_title_fits(title, short):
@@ -370,6 +370,14 @@ def youtube_title(content, short=False):
         whole = truncated.rsplit(" ", 1)[0] if " " in truncated else truncated
         title = whole.rstrip(" ,;:–-") + "…"
     return title + suffix
+
+
+def youtube_description(caption, tag=""):
+    """Keep topic hashtags; reserve the final position for the business or fallback tag."""
+    tag=final_tag(tag)
+    body=remove_final_tag(caption,tag) if tag else caption
+    body=re.sub(r"(?:\s*#shorts)+\s*$","",body,flags=re.IGNORECASE).rstrip()
+    return apply_final_tag(body,tag or "#shorts")
 
 
 def draft_settings(identifier, content, env=None, short=False):
@@ -487,13 +495,19 @@ def normalize_media(src, tmp):
     raise PMError("Unsupported media type '%s' (images: JPG/PNG/HEIC/WEBP, videos: MP4/MOV/WEBM)." % ext)
 
 
-def is_short(path):
-    """True for a YouTube Short: vertical or square, at most 3 minutes (rotation tags respected)."""
-    duration, _, _, width, height = ffprobe(path)
+def display_dimensions(path, width, height):
+    """Use display orientation, including phones that store rotation metadata."""
     rotation = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                    "stream_tags=rotate:stream_side_data=rotation", "-of", "default=nw=1:nk=1", path])
+                    "stream_tags=rotate:stream_side_data=rotation", "-of", "default=nw=1:nk=1", path], check=False)
     if any(r.strip().lstrip("-") in ("90", "270") for r in (rotation or "").splitlines()):
-        width, height = height, width
+        return height, width
+    return width, height
+
+
+def is_short(path):
+    """True for a YouTube Short: vertical or square, at most 3 minutes."""
+    duration, _, _, width, height = ffprobe(path)
+    width, height = display_dimensions(path, width, height)
     return 0 < duration <= 180 and height >= width
 
 
@@ -504,7 +518,7 @@ def youtube_short(identifier, kind, path):
     if kind != "video":
         raise PMError("YouTube posts must be a video (.mp4); photos can't be posted there.")
     short = is_short(path)
-    info("      YouTube: " + ("a Short (vertical or square, up to 3 min); '#Shorts' goes in the title." if short
+    info("      YouTube: " + ("a Short (vertical or square, up to 3 min)." if short
                              else "not a Short (Shorts are vertical or square, up to 3 min); a regular video."))
     return short
 

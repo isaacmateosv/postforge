@@ -8,6 +8,7 @@
   <title>PostForge Desktop</title>
   <link rel="stylesheet" href="style.css">
   <script src="dialogs.js" defer></script>
+  <script src="media-preview.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -15,7 +16,7 @@
   <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
   <div class="tools">
 
-    <button id="go-home" data-en="Dashboard" data-es="Inicio"></button><button id="whatsapp-open">WhatsApp</button><button id="telegram-open">Telegram</button><button id="settings-open" data-en="Settings" data-es="Ajustes"></button><button id="help"></button>
+    <button id="go-home" data-en="Dashboard" data-es="Inicio"></button><button id="whatsapp-open">WhatsApp</button><button id="telegram-open">Telegram</button><button id="connections-open" data-en="Connections" data-es="Conexiones"></button><button id="settings-open" data-en="Settings" data-es="Ajustes"></button><button id="help"></button>
   </div>
 </header>
 <nav id="steps" aria-label="Workflow"></nav>
@@ -38,7 +39,11 @@
     <button id="show-queue" class="stat"><span data-en="Scheduled" data-es="Programadas"></span><strong id="dash-queue">—</strong><small data-en="Awaiting their moment" data-es="Esperando su momento"></small></button>
     <div class="stat"><span data-en="Next publication" data-es="Próxima publicación"></span><strong id="dash-next" class="next-date">—</strong><small id="dash-updated"></small></div>
   </div>
-  <details id="status-card" class="card" hidden><summary><span data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></span> <span id="status-count"></span></summary><div id="dashboard-status"></div><button id="wa-receipts" data-en="View delivery receipts" data-es="Ver recibos de entrega"></button><div id="wa-receipt-history"></div></details>
+  <details id="status-card" class="card" hidden><summary><span data-en="WhatsApp Status · review & approval" data-es="Estados de WhatsApp · revisión y aprobación"></span> <span id="status-count"></span></summary><div id="dashboard-status"></div><button id="wa-receipts" aria-expanded="false" aria-controls="wa-receipt-history" data-en="View delivery receipts" data-es="Ver recibos de entrega"></button><section id="wa-receipt-history" hidden>
+<div class="history-filters"><label><span data-en="Period" data-es="Período"></span><select id="receipt-period"><option value="30" data-en="Last 30 days" data-es="Últimos 30 días"></option><option value="7" data-en="Last 7 days" data-es="Últimos 7 días"></option><option value="all" data-en="All saved history" data-es="Todo el historial guardado"></option></select></label>
+<label><span data-en="Type" data-es="Tipo"></span><select id="receipt-kind"><option value="all" data-en="All types" data-es="Todos los tipos"></option><option value="video">Video</option><option value="image" data-en="Image" data-es="Imagen"></option><option value="text" data-en="Text" data-es="Texto"></option></select></label></div>
+<div id="receipt-rows" aria-live="polite"></div><div class="history-pagination"><button id="receipt-prev" data-en="Previous" data-es="Anterior"></button><span id="receipt-page"></span><button id="receipt-next" data-en="Next" data-es="Siguiente"></button></div>
+<p class="hint" data-en="Views depend on read receipts being enabled on both phones." data-es="Las vistas dependen de que ambos teléfonos tengan activadas las confirmaciones de lectura."></p></section></details>
   <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><div class="dashboard-actions"><button id="reconnect"></button><button id="home-calendar" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div></div><div id="dashboard-posts" class="post-list"></div></article>
 </section>
 
@@ -62,7 +67,12 @@
         <div><button id="add-media"></button><button id="clear-media"></button></div>
       </div>
       <div id="drop-zone" tabindex="0"><p id="drop-label"></p><ul id="media-list"></ul></div>
-      <div class="actions end"><button id="to-delivery" class="primary"></button></div>
+      <div id="media-preview-pane" class="media-preview" hidden>
+<div class="media-preview-heading"><strong data-en="Media preview" data-es="Vista previa"></strong><select id="preview-file" aria-label="Preview file" hidden></select></div>
+<video id="video-preview" controls playsinline preload="metadata" hidden></video><img id="image-preview" alt="Selected media" hidden>
+<div class="media-preview-caption"><span id="media-preview-info"></span><button id="use-current-frame" data-en="Use current frame as cover" data-es="Usar este fotograma como portada" hidden></button></div>
+</div>
+<div class="actions end"><button id="to-delivery" class="primary"></button></div>
     </article>
     <aside class="card quiet">
       <h2 data-en="A review comes first" data-es="Primero revisas"></h2>
@@ -94,7 +104,7 @@
       </label>
     </div>
     <div class="form-grid" id="network-options">
-      <label id="youtube-options"><span data-en="YouTube format" data-es="Formato de YouTube"></span><select id="youtube-mode"><option value="shorts" data-en="Shorts · trim to 2:59 if longer" data-es="Shorts · recorta a 2:59 si dura más"></option><option value="regular" data-en="Full video · no trim" data-es="Video completo · sin recortar"></option></select></label>
+      <label id="youtube-options"><span data-en="YouTube format" data-es="Formato de YouTube"></span><select id="youtube-mode"><option value="auto" data-en="Automatic · vertical Shorts / horizontal video" data-es="Automático · vertical Short / horizontal video"></option><option value="shorts" data-en="Shorts · trim to 2:59 if longer" data-es="Shorts · recorta a 2:59 si dura más"></option><option value="regular" data-en="Regular video · no trim" data-es="Video normal · sin recortar"></option></select><small id="youtube-route-hint"></small></label>
       <label id="wa-text-options"><span data-en="WhatsApp text Status background" data-es="Fondo del Estado de texto de WhatsApp"></span><input id="wa-background" type="color" value="#128C7E"><small data-en="Applies to text-only Status, after approval." data-es="Se aplica a los Estados solo de texto, después de aprobarlos."></small></label>
     </div>
     <details>
@@ -106,6 +116,7 @@
           <input id="cover-second" type="number" min="0" step=".1" placeholder="12.5">
           <div class="actions"><button id="cover-image"></button><button id="cover-clear"></button></div>
           <small id="cover-name"></small>
+<div id="cover-preview-box" class="cover-preview"><img id="cover-preview" alt="Selected cover" hidden><p id="cover-preview-status" role="status"></p></div>
         </div>
       </div>
     </details>
@@ -157,6 +168,11 @@
 <div id="wa-state" class="callout" role="status"></div>
 <p data-en="On your phone: WhatsApp → Settings → Linked devices → Link a device. Scan the QR here. An existing working session is kept." data-es="En tu teléfono: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo. Escanea el QR aquí. Se conserva una sesión que ya funciona."></p>
 <img id="wa-qr" alt="WhatsApp pairing QR" hidden><div id="wa-feedback" role="status"></div>
+<details class="audience-settings"><summary data-en="Status audience" data-es="Audiencia de los Estados"></summary>
+<p class="hint" data-en="The default applies to new plans. Already queued plans keep their audience. Sending to all contacts can take several minutes per video segment." data-es="El valor predeterminado se aplica a los planes nuevos. Los que ya están en cola conservan su audiencia. El envío a todos los contactos puede tardar varios minutos por cada parte del video."></p>
+<label for="wa-audience" data-en="Default audience" data-es="Audiencia predeterminada"></label><select id="wa-audience"><option value="all" data-en="All contacts" data-es="Todos los contactos"></option><option value="test" data-en="Selected contacts" data-es="Contactos seleccionados"></option></select>
+<label id="wa-recipient-field"><span data-en="Phone numbers with country code · separated by commas" data-es="Números con código de país · separados por comas"></span><textarea id="wa-recipients" rows="2" placeholder="+593…"></textarea></label>
+<button id="wa-audience-save" data-en="Save audience" data-es="Guardar audiencia"></button><p id="wa-audience-result" role="status"></p></details>
 <div class="actions between"><button id="wa-refresh" data-en="Get / refresh QR" data-es="Obtener / renovar QR"></button><button id="wa-close" data-en="Done" data-es="Listo"></button></div>
 </dialog>
 
@@ -205,5 +221,6 @@
 <label id="backup-old-host-row" hidden><input id="backup-old-host" type="checkbox"><span data-en="The previous publishing host is stopped." data-es="El equipo que publicaba anteriormente está detenido."></span></label>
 <div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="primary" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></div>
 </dialog>
+<dialog hidden role="dialog" id="connections-dialog" aria-labelledby="connections-title"><h2 id="connections-title" data-en="Channel connections" data-es="Conexiones de los canales"></h2><p class="hint" data-en="Connection status and token validity reported by Postiz. Publishing results appear in the history." data-es="Estado de conexión y vigencia de los tokens que registra Postiz. Los resultados de publicación aparecen en el historial."></p><div id="connection-rows"></div><p id="connection-checked" class="hint"></p><div class="actions between"><button id="connections-refresh" data-en="Check again" data-es="Revisar otra vez"></button><button id="connections-close" data-en="Done" data-es="Listo"></button></div></dialog>
 </body>
 </html>

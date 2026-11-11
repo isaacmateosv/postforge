@@ -142,3 +142,6 @@ The current gateway protects `/uploads/`. If Postiz gives the provider a
 URL there, the provider cannot fetch it. Verify URL-based publishing
 separately from OAuth and draft creation before relying on those formats.
 Keep the dashboard, API, and general upload directory gated.
+
+
+[Full Google Console, format and recovery guide](youtube.md)

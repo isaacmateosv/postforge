@@ -130,3 +130,6 @@ proveedor una URL en esa ruta, el proveedor no puede descargar el archivo.
 Verifica la publicación por URL por separado del inicio de sesión OAuth y
 de la creación de borradores. Mantén protegidos el panel, la API y la carpeta
 general de archivos subidos.
+
+
+[Guía completa de Google Console, formatos y recuperación](youtube-es.md)

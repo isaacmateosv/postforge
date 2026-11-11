@@ -333,7 +333,7 @@ def reviewed_youtube_title(env, caption, idea, lang, short):
     original = pmlib.youtube_title_line(caption)
     if not original or pmlib.youtube_title_fits(original, short):
         return pmlib.youtube_title(caption, short)
-    limit = pmlib.YOUTUBE_TITLE_LIMIT - (len(" #Shorts") if short else 0)
+    limit = pmlib.YOUTUBE_TITLE_LIMIT
     prompt = (
         f"Write one complete YouTube title in {lang}, at most {limit} characters. "
         "Keep the subject and distinctive details. Use a short phrase that makes sense on its own. "
@@ -387,7 +387,8 @@ def revise_copy(env, snapshot, instruction, edited=None):
              reviewed_youtube_title(env, caption, idea, lang, snapshot.get("short", False))
              if "youtube" in networks else None)
     return dict(snapshot, caption=caption, caption_source=source,
-                threads_caption=threads if threads != caption else None, youtube_title=title)
+                threads_caption=threads if threads != caption else None, youtube_title=title,
+                youtube_caption=pmlib.youtube_description(caption,tag) if "youtube" in networks else None)
 
 
 def plan(env, text, media_paths, lang_arg, now, *, placement_override=None, cover_image=None,
@@ -506,6 +507,7 @@ def run(env, p, dry_run, schedule=False):
         youtube_trim = False
         if kinds == ["video"] and any(n == "youtube" for n, _, _ in targets) and p.get("youtube_trim", True):
             duration, _, _, width, height = pmlib.ffprobe(ready[0][1])
+            width, height = pmlib.display_dimensions(ready[0][1], width, height)
             youtube_trim = duration > 179 and height >= width
             short = height >= width
             if youtube_trim:
@@ -532,7 +534,7 @@ def run(env, p, dry_run, schedule=False):
             elif second >= pmlib.ffprobe(ready[0][1])[0]:
                 raise PMError("El segundo de la portada debe estar dentro del video." if es else
                               "The cover timestamp must be within the video.")
-        shorts_requested = p.get("youtube_trim", False) or re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
+        shorts_requested = (p.get("youtube_mode") == "shorts" or ("youtube_mode" not in p and p.get("youtube_trim", False))) or re.search(r"\byou\s*tube\s+shorts?\b", p["command"], re.IGNORECASE)
         usable = []
         for network, channel, _ in targets:
             places = draft_placements(network, requested, bool(kinds))
@@ -552,6 +554,9 @@ def run(env, p, dry_run, schedule=False):
                                    f"{NAMES[network]} needs a photo or video")
             else:
                 problem = media_problem(network, kinds, es)
+                if not problem and network == "youtube" and p.get("youtube_mode") == "regular" and short:
+                    problem = ("YouTube will classify this vertical or square video as a Short; use Automatic or choose a horizontal version"
+                               if not es else "YouTube clasificará este video vertical o cuadrado como Short; usa Automático o elige una versión horizontal")
                 if not problem and network == "youtube" and shorts_requested and not short:
                     problem = ("YouTube Shorts require a vertical or square video of at most 3 minutes"
                                if not es else
@@ -656,7 +661,7 @@ def run(env, p, dry_run, schedule=False):
                        "can_rewrite": bool(p["idea"] or p["exact"]),
                        "direct_schedule_available": has_social_posts and not media_blocked,
                        "direct_schedule_blocked_by_gateway": has_social_posts and media_blocked,
-                       "youtube_title": youtube_title, "youtube_trim_seconds": 179 if youtube_trim else None,
+                       "youtube_title": youtube_title, "youtube_caption": pmlib.youtube_description(caption,tag) if youtube_title else None, "youtube_trim_seconds": 179 if youtube_trim else None,
                        "whatsapp_background": p.get("whatsapp_background", "#128C7E"),
                        "video_cover_available": cover_available,
                        "video_without_cover": cover_available and not cover_requested,
@@ -726,7 +731,7 @@ def run(env, p, dry_run, schedule=False):
                 result["drafts"].append({"network": network, "channel": "WhatsApp Status", "post_id": None,
                                          "placement": "status", "pending": True})
                 continue
-            target_caption = thread_caption if network == "threads" else caption
+            target_caption = thread_caption if network == "threads" else pmlib.youtube_description(caption,tag) if network=="youtube" else caption
             settings = {"post_type": "story"} if item_placement == "story" else {}
             if network == "youtube":
                 settings["title"] = youtube_title
