@@ -398,6 +398,7 @@ case "${1:-}" in
     # 4. Spin up Docker containers. Both apps patch themselves as they boot: Postiz its cookie
     #    domain (patches/postiz/run.sh), Evolution its status receipts (patches/evolution/).
     echo "[4/6] Starting container stack (hard memory limits active)..."
+    if [ -f "$DIR/data/gateway/configuration.yml" ]; then python3 "$DIR/scripts/network_settings.py" --prepare; fi
     docker compose up -d --remove-orphans
 
     # 5. Wait for the services to answer
@@ -515,6 +516,7 @@ case "${1:-}" in
       echo "PostForge services are stopped. They will load the new files on the next start."
       exit 0
     fi
+    if [ -f "$DIR/data/gateway/configuration.yml" ]; then python3 "$DIR/scripts/network_settings.py" --prepare; fi
     docker compose config --quiet
     docker compose pull --policy missing
     mark_lifecycle stopping

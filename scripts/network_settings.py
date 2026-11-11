@@ -206,5 +206,8 @@ def callbacks(url):
 
 if __name__=='__main__':
     import argparse
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('provider',choices=PROVIDERS);parser.add_argument('--rotate',action='store_true');args=parser.parse_args()
-    print(json.dumps(apply({'provider':args.provider,'rotate':args.rotate,'confirm':True}),indent=2))
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('provider',choices=PROVIDERS,nargs='?');parser.add_argument('--rotate',action='store_true');parser.add_argument('--prepare',action='store_true');args=parser.parse_args()
+    if args.prepare:
+        restore_provider(ROOT/'.env');print('Tunnel provider configuration prepared.')
+    elif args.provider:print(json.dumps(apply({'provider':args.provider,'rotate':args.rotate,'confirm':True}),indent=2))
+    else:parser.error('Choose a provider or --prepare')
