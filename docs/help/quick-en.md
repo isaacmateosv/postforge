@@ -190,3 +190,6 @@ Open **Settings → Public access** or **Public URL & Tunnel** in the menu bar. 
 
 
 Click the current public URL or **Copy link** to copy it. The control briefly turns green and confirms **Link copied**. OAuth callback URLs are clickable copy controls too; use Tab and Enter/Space with the keyboard.
+
+
+The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Synchronize current URL** before copying or opening Postiz.

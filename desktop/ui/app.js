@@ -1084,9 +1084,15 @@ function networkFields(){
 const copyFeedbackTimers=new WeakMap();
 let copyNoticeTimer;
 async function copyPublicLink(url,target,label){
-  if(!url)return;
+  if(!url || state.networkBusy || state.copyPending)return;
+  state.copyPending=true;
+  $("network-copy-feedback").textContent=text("Checking current link","Comprobando el enlace actual");
   try{
+    const current=await engine("network_status",{force:true});
+    renderNetworkStatus(current);
+    url=networkLinkView.resolve(url);
     await invoke("copy_public_url",{url});
+    if(!target.isConnected)target=$("network-current");
     clearTimeout(copyFeedbackTimers.get(target));clearTimeout(copyNoticeTimer);
     target.classList.add("copied");
     if(label)target.textContent=text("✓ Copied","✓ Copiado");
@@ -1095,9 +1101,11 @@ async function copyPublicLink(url,target,label){
     copyFeedbackTimers.set(target,setTimeout(()=>{target.classList.remove("copied");if(label)target.textContent=text("Copy link","Copiar enlace");},2000));
     copyNoticeTimer=setTimeout(()=>{$("network-copy-feedback").textContent="";},2500);
   }catch(error){target.classList.remove("copied");$("network-copy-feedback").classList.add("copy-error");$("network-copy-feedback").textContent=friendlyError(error);}
+  finally{state.copyPending=false;}
 }
 function networkCallbacks(url){
   $("network-callbacks").replaceChildren();
+  if(!url)return;
   const names={youtube:"YouTube",facebook:"Facebook",instagram:"Instagram",threads:"Threads",tiktok:"TikTok"};
   for(const name of Object.keys(names)){
     const row=document.createElement("div");row.className="callback-copy-row";
@@ -1105,7 +1113,7 @@ function networkCallbacks(url){
     const value=document.createElement("button");value.type="button";value.className="copyable-url";
     const link=url+"/integrations/social/"+name;value.textContent=link;
     value.title=text("Click to copy","Haz clic para copiar");
-    value.setAttribute("aria-label",text("Copy ","Copiar ")+names[name]+text(" callback URL"," URL de redirección"));
+    value.setAttribute("aria-label",text("Copy "+names[name]+" callback URL","Copiar URL de redirección de "+names[name]));
     value.onclick=()=>copyPublicLink(link,value,false);row.append(label,value);$("network-callbacks").append(row);
   }
 }
@@ -1113,12 +1121,21 @@ bind("network-copy",()=>copyPublicLink($("network-current").value,$("network-cop
 $("network-current").onclick=()=>copyPublicLink($("network-current").value,$("network-current"),false);
 $("network-current").onkeydown=event=>{if(event.key==="Enter" || event.key===" "){event.preventDefault();copyPublicLink(event.currentTarget.value,event.currentTarget,false);}};
 
+const networkLinkView=window.PostForgeNetworkLinks.create({field:$("network-current"),copy:$("network-copy"),onURL:networkCallbacks});
+function renderNetworkStatus(result){
+  if(!networkLinkView.update(result,{busy:!!state.networkBusy,lang:state.language,placeholder:text("Synchronize the detected URL first","Primero sincroniza la URL detectada")}))return false;
+  state.network=result;
+  $("network-detected").hidden=!result.needs_sync;
+  $("network-detected").textContent=result.needs_sync?text("Detected address: ","Dirección detectada: ")+result.discovered_url:"";
+  $("network-result").textContent=result.needs_sync?text("The connector changed its temporary URL. Synchronize it before opening Postiz or copying links.","El conector cambió su URL temporal. Sincronízala antes de abrir Postiz o copiar enlaces."):result.reachable?text("✓ Public gateway is reachable. Channel sign-ins are checked separately under Connections.","✓ El gateway público está disponible. Revisa las sesiones de los canales en Conexiones."):text("Public access is unavailable. Do not retry publishing until this check succeeds.","El acceso público no está disponible. No vuelvas a publicar hasta que esta comprobación sea exitosa.");
+  $("network-apply").textContent=result.needs_sync && $("network-provider").value===result.provider?text("Synchronize current URL","Sincronizar URL actual"):text("Apply configuration","Aplicar configuración");
+  return true;
+}
 async function networkCheck(fill=false){
   $("network-result").textContent=text("Checking public access","Comprobando el acceso público");
-  try{const result=await engine("network_status",{force:true});state.network=result;$("network-current").value=result.url;
+  try{const result=await engine("network_status",{force:true});
     if(fill){$("network-provider").value=result.provider;$("network-domain").value=result.custom_domain;$("network-ngrok-domain").value=result.ngrok_domain;$("network-token").value="";networkFields();}
-    $("network-result").textContent=result.needs_sync?text("The temporary URL changed. Apply configuration to synchronize Postiz and the gateway before posting.","La URL temporal cambió. Aplica la configuración para sincronizar Postiz y el gateway antes de publicar."):result.reachable?text("✓ Public gateway is reachable. Channel sign-ins are checked separately under Connections.","✓ El gateway público está disponible. Revisa las sesiones de los canales en Conexiones."):text("Public access is unavailable. Do not retry publishing until this check succeeds.","El acceso público no está disponible. No vuelvas a publicar hasta que esta comprobación sea exitosa.");
-    networkCallbacks(result.url);
+    renderNetworkStatus(result);
   }catch(error){$("network-result").textContent=friendlyError(error);}
 }
 async function networkOpen(){$("network-copy-feedback").textContent="";$("network-current").title=text("Click to copy link","Haz clic para copiar el enlace");openDialog("network-dialog");await networkCheck(true);}
@@ -1138,8 +1155,11 @@ $("network-dialog").addEventListener("cancel",event=>{if(state.networkBusy)event
 async function checkPublicAccess(){
   if(state.networkBusy || state.publicCheckPending)return;
   state.publicCheckPending=true;
-  try{const result=await engine("network_status");state.network=result;const warning=$("public-access-warning");warning.hidden=result.reachable && !result.needs_sync;warning.textContent=result.needs_sync?text("Public URL changed · open network settings to synchronize","La URL pública cambió · abre los ajustes de red para sincronizar"):text("Public access unavailable · check network settings before publishing","Acceso público no disponible · revisa los ajustes de red antes de publicar");}
+  try{const result=await engine("network_status");if(!renderNetworkStatus(result))return;const warning=$("public-access-warning");warning.hidden=result.reachable && !result.needs_sync;warning.textContent=result.needs_sync?text("Public URL changed · open network settings to synchronize","La URL pública cambió · abre los ajustes de red para sincronizar"):text("Public access unavailable · check network settings before publishing","Acceso público no disponible · revisa los ajustes de red antes de publicar");}
   catch(error){$("public-access-warning").hidden=false;$("public-access-warning").textContent=text("Public access could not be checked · open network settings","No se pudo comprobar el acceso público · abre los ajustes de red");}
   finally{state.publicCheckPending=false;}
 }
 bind("public-access-warning",networkOpen);
+
+window.addEventListener("focus",()=>{if($("network-dialog").open && !state.networkBusy)networkCheck();});
+setInterval(()=>{if($("network-dialog").open && document.visibilityState==="visible" && document.hasFocus() && !state.networkBusy && !state.copyPending)networkCheck();},15000);

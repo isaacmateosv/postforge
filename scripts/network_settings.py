@@ -75,6 +75,7 @@ def quick_url():
 
 
 def status(check=False,force=False):
+    started=time.time()
     config=values();provider=config['PM_TUNNEL_PROVIDER'] or 'ngrok'
     result={'provider':provider,'url':config['FRONTEND_URL'],'custom_domain':config['PM_CUSTOM_DOMAIN'],
             'ngrok_domain':config['PM_NGROK_DOMAIN'] or config['NGROK_DOMAIN'],
@@ -91,7 +92,7 @@ def status(check=False,force=False):
         try:result['discovered_url']=quick_url() if provider=='trycloudflare' else None
         except (OSError,subprocess.SubprocessError):result['discovered_url']=None
         result['needs_sync']=bool(result['discovered_url'] and result['discovered_url']!=result['url'])
-        result['checked_at']=time.time()
+        result['checked_at']=started
         atomic_write(cache,json.dumps(result))
     return result
 
