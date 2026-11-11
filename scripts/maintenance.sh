@@ -74,6 +74,7 @@ update() {
     exit 2
   }
   docker info >/dev/null
+  if [ -f "$DIR/data/gateway/configuration.yml" ]; then python3 "$DIR/scripts/network_settings.py" --prepare; fi
   docker compose config --quiet
   if ! "$yes"; then
     printf 'Create a rollback snapshot and update the declared Docker stack? [y/N] '
