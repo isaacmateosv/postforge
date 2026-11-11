@@ -52,8 +52,14 @@ jobs:
             ~/.cargo/git
             desktop/target
           key: desktop-${{ runner.os }}-${{ hashFiles('desktop/Cargo.lock') }}
+          restore-keys: desktop-${{ runner.os }}-
       - name: Timezone database for Python on Windows
         run: python -m pip install tzdata
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Dialog accessibility and confirmation regression tests
+        run: node --test desktop/test/dialogs.test.cjs
       - name: Compile native client
         run: cargo build --release --locked --manifest-path desktop/Cargo.toml
       - name: Package native artifact and notices
