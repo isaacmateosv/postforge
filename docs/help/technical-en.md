@@ -274,3 +274,8 @@ The tray provides Dashboard, New Post, WhatsApp plans and approvals, connections
 ### Finding actions in the desktop app
 
 Compose → Delivery → Review stays at the top of the window. Choose **Generate a caption** for an idea or **Use my caption** to keep your wording. Radio choices have separate focus and selection indicators. The footer contains privacy information and, while composing, **Clear composer**. Maintenance lives in **Settings → App & data**: update checks, **Backup & Move**, and removal of unpublished drafts or queued posts. Language is also in Settings. Dashboard refresh is next to **Open Postiz**. These actions remain available in the tray. Selecting a cleanup scope still shows a preview and asks for confirmation before removing anything. The mixer only animates while preparing a plan and respects the system reduced-motion preference.
+
+
+### Desktop dialog and release checks
+
+The frontend dialog controller keeps closed dialogs hidden, marks only the active dialog as modal, and restores the parent modal after a nested confirmation. Run `node --test desktop/test/dialogs.test.cjs` for dialog state regression checks. Native checks still verify actual WebKit accessibility and keyboard reopening on macOS. Release workflows publish Rust ZIPs for v2; legacy Swift installer publication is restricted to v1 tags.

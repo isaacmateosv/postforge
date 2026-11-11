@@ -91,6 +91,8 @@ function showPage(page) {
   $("new").hidden = !["compose","delivery","review"].includes(page);
 }
 
+const openDialog = id => window.PostForgeDialogs.open(id);
+
 function notice(message = "", busy = false) {
   $("notice").textContent = message;
   $("notice").hidden = !message;
@@ -317,7 +319,7 @@ function modal(title, content, confirmLabel = text("Continue", "Continuar")) {
     $("modal-confirm").onclick = () => { $("modal").close(); resolve(true); };
     $("modal-cancel").onclick = () => { $("modal").close(); resolve(false); };
     $("modal").oncancel = () => resolve(false);
-    $("modal").showModal();
+    openDialog("modal");
   });
 }
 
@@ -565,7 +567,7 @@ async function whatsappSettings() {
   $("wa-feedback").textContent = "";
   $("wa-state").textContent = text("Checking connection", "Comprobando conexión");
   $("wa-refresh").hidden = false;
-  $("whatsapp-settings").showModal();
+  openDialog("whatsapp-settings");
   await waState();
   if ($("whatsapp-settings").open && !$("wa-refresh").hidden) waTimer = setInterval(waState, 4000);
 }
@@ -607,7 +609,7 @@ async function telegramSettings() {
   $("telegram-token").value = "";
   $("telegram-feedback").textContent = "";
   renderTelegramStatus(await engine("telegram_status"));
-  $("telegram-settings").showModal();
+  openDialog("telegram-settings");
   $("telegram-settings").querySelector(".telegram-body").scrollTop = 0;
 }
 
@@ -734,7 +736,7 @@ bind("home-calendar", () => invoke("open_calendar"));
 bind("show-drafts", () => { state.dashFilter = state.dashFilter === "DRAFT" ? null : "DRAFT"; renderDashboard(); });
 bind("show-queue", () => { state.dashFilter = state.dashFilter === "QUEUE" ? null : "QUEUE"; renderDashboard(); });
 bind("asap", soon);
-bind("settings-open", () => $("app-settings").showModal());
+bind("settings-open", () => openDialog("app-settings"));
 bind("settings-close", () => $("app-settings").close());
 bind("whatsapp-open", whatsappSettings);
 bind("wa-close", () => { waClose(); $("whatsapp-settings").close(); });
@@ -764,7 +766,7 @@ bind("calendar", () => invoke("open_calendar"));
 bind("approve-status", approveStatus);
 bind("new-plan", reset);
 bind("new", reset);
-bind("cleanup", () => { $("app-settings").close(); return cleanup(); });
+bind("cleanup", () => fromSettings(cleanup));
 bind("help", help);
 
 bind("telegram-open", telegramSettings);
@@ -882,7 +884,16 @@ async function checkUpdates(manual=false) {
   } catch (error) { if (manual) notice(friendlyError(error)); }
   finally {state.updateChecking=false;updateTray();}
 }
-function backupOpen() { $("backup-dialog").showModal(); }
+// Let WebKit finish removing the old modal from the top layer before opening
+// another. Otherwise the new dialog can remain absent from the accessibility tree.
+async function fromSettings(action) {
+  if ($("app-settings").open) {
+    $("app-settings").close();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+  return action();
+}
+function backupOpen() { openDialog("backup-dialog"); }
 function backupClearInspection() {
   state.backupInspection=null;
   ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=true);
@@ -931,8 +942,8 @@ async function backupRun(action) {
   } catch(error) {$("backup-stage").textContent=friendlyError(error);}
   finally {state.backupBusy=false;updateTray();document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore").forEach(node=>node.disabled=false);}
 }
-bind("backup-open",()=>{$("app-settings").close();backupOpen();});
-bind("updates-open",()=>{$("app-settings").close();return checkUpdates(true);});
+bind("backup-open",()=>fromSettings(backupOpen));
+bind("updates-open",()=>fromSettings(()=>checkUpdates(true)));
 bind("backup-close",backupClose);
 $("backup-dialog").addEventListener("cancel",()=>{$("backup-password").value="";$("backup-confirm").value="";backupClearInspection();});
 $("backup-mode").onchange=()=>{backupClearInspection();state.backupPath=null;$("backup-path").textContent="";$("backup-confirm-row").hidden=$("backup-mode").value!=="export";$("backup-start").textContent=$("backup-mode").value==="export" ? text("Create backup","Crear respaldo") : text("Inspect backup","Revisar respaldo");};
@@ -952,7 +963,7 @@ if (window.__TAURI__?.event) {
       else if(action==="telegram") await telegramSettings();
       else if(action==="backup") backupOpen();
       else if(action==="updates") await checkUpdates(true);
-      else if(action==="settings") $("app-settings").showModal();
+      else if(action==="settings") openDialog("app-settings");
       else if(action==="help") await help();
       else if(action==="about") await modal("PostForge · "+(state.options?.version || ""),text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
     } catch(error) {notice(friendlyError(error));}

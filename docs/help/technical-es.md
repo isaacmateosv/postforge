@@ -289,3 +289,8 @@ La bandeja incluye Inicio, Nueva publicación, planes y aprobaciones de WhatsApp
 ### Dónde encontrar las acciones en la app
 
 Redacta → Destinos → Revisa y termina permanece en la parte superior. Elige **Generar un texto** si tienes una idea o **Usar mi texto** para conservar tu redacción. Las opciones muestran por separado la selección y el foco del teclado. El pie contiene información de privacidad y, mientras redactas, **Limpiar formulario**. El mantenimiento está en **Ajustes → App y datos**: actualizaciones, **Respaldo y traslado**, y eliminación de borradores o publicaciones en cola. El idioma también está en Ajustes. Puedes actualizar el inicio junto a **Abrir Postiz**. Estas acciones siguen disponibles en la bandeja. La limpieza muestra una vista previa y pide confirmación antes de eliminar algo. El batidor solo se anima mientras se prepara el plan y respeta la preferencia del sistema para reducir movimiento.
+
+
+### Validación de diálogos y publicaciones de escritorio
+
+El controlador de diálogos oculta los que ya se cerraron, marca como modal solo el diálogo activo y restablece el diálogo anterior al cerrar una confirmación anidada. Ejecuta `node --test desktop/test/dialogs.test.cjs` para comprobar estos estados. La revisión nativa verifica además la accesibilidad real de WebKit y la reapertura con el teclado en macOS. Los flujos publican archivos ZIP Rust para v2; los instaladores Swift anteriores solo se publican con etiquetas v1.

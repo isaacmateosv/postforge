@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0-rc.24]
+
+- Keep only the open dialog modal to assistive technology; explicitly hide closed dialogs and preserve access when moving from Settings to Backup & Move or cleanup.
+- Protect consecutive and nested confirmation dialogs with frontend regression tests.
+- Restrict legacy Swift installer publication to v1 tags; v2 releases publish Rust desktop packages only.
+
+## [2.0.0-rc.23]
+
+- Publish macOS, Windows and Linux desktop packages with SHA-256 checksums through the release workflow.
+- Keep stable and test update channels separate; offer the newest compatible release for the installed channel.
+- Carry forward the simplified desktop layout, grouped settings, accessible dialog labels, native reopening shortcut and compact baking animation.
+
 ## [2.0.0-rc.22]
 
 - Simplify desktop surfaces and typography, give radio labels clear spacing, group maintenance under Settings, and replace the baking graphic with a compact animated vector whisk. Remove trailing ellipses from action labels in both languages.
