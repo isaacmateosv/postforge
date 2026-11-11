@@ -137,3 +137,8 @@ state persistence, replay guards, retention and deployment limitations.
    accepts the same password and authenticator and verify pending Postiz work.
 4. From the Telegram owner's private chat, run `/status`, use **Refresh
    status**, and verify a heartbeat arrives if one was configured.
+
+
+### Current desktop tunnel controls
+
+Use **Settings → Public access** or the native tray **Public URL & Tunnel** for provider selection, temporary URL synchronization/rotation and saved domain settings. TryCloudflare is temporary and changes hostname on process restart. Prefer the app assistant over the older `tunnel-url` CLI for provider changes. [Full procedure](../docs/reconnect/public-address.md) · [Español](../docs/reconnect/public-address-es.md).

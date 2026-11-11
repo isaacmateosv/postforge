@@ -182,3 +182,8 @@ Use the Compose player to preview selected media; playback pauses when leaving t
 In **WhatsApp → Audience**, select all contacts or selected international phone numbers and save. New plans use this audience; already queued plans retain their previous audience. Changes are blocked while a Status is sending. Large audiences may take several minutes per segment; follow the visible segment progress instead of resending. Delivery receipts can be expanded or hidden, filtered by date/type, and browsed five per page.
 
 YouTube descriptions end with your business hashtag, or `#shorts` if it is empty. Titles do not receive an automatic hashtag. The description remains independent of the 100-character title.
+
+
+## Public URL and tunnel
+
+Open **Settings → Public access** or **Public URL & Tunnel** in the menu bar. Choose temporary TryCloudflare, your own domain through a named Cloudflare tunnel, or saved ngrok. Check access before posting. Rotating or restarting a temporary connector changes its hostname: apply the detected URL and update provider OAuth callbacks before reconnecting channels. Domain and token settings remain saved when returning to temporary mode. All provider settings travel in encrypted Backup & Move; verify the destination URL before restarting publishing. See Technical Help for the complete procedure.

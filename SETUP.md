@@ -499,3 +499,8 @@ portable configuration; encrypted credentials exports include it, including
 legacy bot settings. On restore, Telegram remains paused. Stop the old host
 agent and explicitly enable the restored configuration in the destination UI.
 One bot must have only one receiver. See desktop/README.md for the complete flow.
+
+
+## Current Rust desktop public access
+
+The protected default connector uses TryCloudflare. Start the stack, then open **Settings → Public access** and **Apply configuration** to discover and synchronize the temporary URL. For a stable domain use the named Cloudflare profile. The older ngrok steps above remain relevant only when that compatibility provider is selected. See [public access and OAuth migration](docs/reconnect/public-address.md) and [la guía en español](docs/reconnect/public-address-es.md). Never start a connector directly against Postiz; keep the authentication gateway.

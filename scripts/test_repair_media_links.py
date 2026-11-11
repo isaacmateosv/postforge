@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import json
+import os
 import tempfile
 from pathlib import Path
 import unittest
@@ -13,7 +14,8 @@ class RepairTests(unittest.TestCase):
             client.return_value.org_id='synthetic-org'
             result=repair.repair({'FRONTEND_URL':'https://example.test'},[row['id']],apply=True)
             self.assertTrue(result['applied'])
-            self.assertEqual(Path(result['backup']).stat().st_mode&0o777,0o600)
+
+            if os.name != "nt": self.assertEqual(Path(result['backup']).stat().st_mode&0o777,0o600)
             select=sql.call_args_list[0].args[0];update=sql.call_args_list[1].args[0]
             self.assertIn("p.state='ERROR'",select)
             self.assertIn('SET image=',update)

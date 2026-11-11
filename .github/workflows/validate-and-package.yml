@@ -26,6 +26,8 @@ jobs:
         run: ./scripts/recheck.sh
       - name: Operations regression checks
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_operations.py
+      - name: Tunnel provider and rollback checks
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_network_settings.py
       - name: Build the app (universal, portable)
         run: ./tray/build.sh --portable
       - name: Verify icon artwork, sizes, version, architectures and signature

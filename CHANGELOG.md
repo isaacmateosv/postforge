@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.0-rc.26]
+
+- Add selectable TryCloudflare, named Cloudflare/custom-domain and saved ngrok profiles with URL synchronization and deliberate temporary URL rotation in the app and native tray.
+- Preserve gateway authentication, enrollment and media-link protection; verify a cutover and restore private configuration on failure.
+- Rebase saved media origins without reposting and block switches while social posts are queued. A changed public origin invalidates unfinished composer plans.
+- Show a separate public-access warning; store provider/domain/token preferences in encrypted migration credentials and regenerate the connector on restore.
+- Document temporary-hostname, OAuth callback and migration workflows in English and Ecuadorian Spanish.
+
+
 ## [2.0.0-rc.25]
 
 - Show per-channel connection status from Postiz, token validity and renewal/reconnection states; a fresh login supersedes previous authentication failures.

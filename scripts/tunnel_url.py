@@ -4,7 +4,6 @@
 # See COPYRIGHT and LICENSE for copying terms and the no-warranty notice.
 """Switch the public Postiz URL and roll it back if the new endpoint fails."""
 import argparse
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -18,6 +17,9 @@ from urllib.parse import urlsplit, urljoin
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts/lib"))
+import file_lock
+import shutil
 URL_KEYS = ("NGROK_DOMAIN", "FRONTEND_URL", "NEXT_PUBLIC_BACKEND_URL", "MAIN_URL")
 
 
@@ -61,7 +63,7 @@ def private_write(path, content, work):
 def probe(url):
     try:
         response = subprocess.run(
-            ["/usr/bin/curl", "--silent", "--fail", "--max-time", "5",
+            [shutil.which("curl") or "curl", "--silent", "--fail", "--max-time", "5",
              "--max-filesize", "4096", "--header", "ngrok-skip-browser-warning: true",
              "--write-out", "\n%{http_code}", url.rstrip("/") + "/api/"],
             capture_output=True, timeout=7, check=True,
@@ -87,7 +89,7 @@ def compose(path, *args):
 def gateway_ready(url):
     try:
         result = subprocess.run(
-            ["/usr/bin/curl", "--silent", "--max-time", "5", "--output", os.devnull,
+            [shutil.which("curl") or "curl", "--silent", "--max-time", "5", "--output", os.devnull,
              "--header", "ngrok-skip-browser-warning: true", "--header", "Accept: text/html",
              "--header", "Sec-Fetch-Mode: navigate", "--write-out", "%{http_code} %{redirect_url}",
              url + "/api/"], capture_output=True, text=True, timeout=7, check=True,
@@ -99,7 +101,7 @@ def gateway_ready(url):
                 or not (target.path == "/authelia" or target.path.startswith("/authelia/"))):
             return False
         portal = subprocess.run(
-            ["/usr/bin/curl", "--silent", "--max-time", "5", "--output", os.devnull,
+            [shutil.which("curl") or "curl", "--silent", "--max-time", "5", "--output", os.devnull,
              "--header", "ngrok-skip-browser-warning: true", "--write-out", "%{http_code}",
              url + "/authelia/"], capture_output=True, text=True, timeout=7, check=True,
         )
@@ -134,7 +136,10 @@ def check_gateway_config(path, host):
     tunnel = services.get("ngrok", {})
     auth = services.get("postforge-auth")
 
-    if (auth is None or not host or tunnel.get("command", [])[-1:] != ["postforge-gateway:8080"]
+    command=tunnel.get("command", [])
+    direct=any(value in ("postforge-gateway:8080", "http://postforge-gateway:8080") for value in command)
+    named=str(tunnel.get("image", "")).startswith("cloudflare/cloudflared@sha256:") and command[-1:]==["run"]
+    if (auth is None or not host or not (direct or named)
             or proxy.get("environment", {}).get("POSTFORGE_GATEWAY_HOST") != host
             or proxy.get("ports") or auth.get("ports")):
         raise RuntimeError("The effective tunnel and gateway configuration does not protect Postiz.")
@@ -154,11 +159,7 @@ def switch(path, value):
     backup = run / "tunnel-url.previous"
     gateway_backup = run / "tunnel-gateway.previous"
     gateway = path.parent / "data/gateway/configuration.yml"
-    with (run / "tunnel-url.lock").open("a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise ValueError("Another tunnel change is running.") from exc
+    with file_lock.exclusive(str(run / "tunnel-url.lock"), blocking=False):
         if backup.exists() or gateway_backup.exists():
             raise ValueError(f"A previous switch needs recovery. Check the tunnel recovery files in {run} before retrying.")
         original = path.read_bytes()
@@ -231,7 +232,13 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     try:
         path = args.env_file.resolve()
-        print(switch(path, args.url) if args.url is not None else read_setting(path.read_text(), "FRONTEND_URL"))
+        provider=read_setting(path.read_text(),"PM_TUNNEL_PROVIDER","ngrok")
+        if args.url is not None and provider=="trycloudflare":
+            raise ValueError("Temporary hostnames are assigned by Cloudflare. Use the app's Public URL & Tunnel controls to rotate or synchronize them.")
+        if args.url is not None and provider=="cloudflare" and path==ROOT/".env":
+            import network_settings
+            print(network_settings.apply({"provider":"cloudflare","custom_domain":args.url,"confirm":True})["url"])
+        else:print(switch(path, args.url) if args.url is not None else read_setting(path.read_text(), "FRONTEND_URL"))
         return 0
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
         print(f"✖ {exc}", file=sys.stderr)

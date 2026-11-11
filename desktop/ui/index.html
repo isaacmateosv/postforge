@@ -31,6 +31,7 @@
 </svg><div><strong data-en="Baking your idea" data-es="Horneando tu idea"></strong><span data-en="Finding the right words" data-es="Buscando las palabras precisas"></span></div>
 </div>
 <main>
+<button id="public-access-warning" class="callout" hidden></button>
 <section id="home" class="page">
   <div class="home-banner"><div><span class="eyebrow" data-en="YOUR PUBLISHING SPACE" data-es="TU ESPACIO DE PUBLICACIÓN"></span><h2 data-en="Good ideas deserve a clear plan." data-es="Las buenas ideas merecen un buen plan."></h2><p data-en="Everything you are preparing, in one place." data-es="Todo lo que estás preparando, en un solo lugar."></p></div><button id="start-post" class="primary" data-en="＋ New post" data-es="＋ Nueva publicación"></button></div>
   <div id="health" class="health-row" aria-live="polite"></div>
@@ -152,9 +153,25 @@
 </section>
 </main>
 <footer><span id="workspace-status"></span><button id="new"></button></footer>
+<dialog hidden role="dialog" id="network-dialog" aria-labelledby="network-title">
+<h2 id="network-title" data-en="Public URL & tunnel" data-es="URL pública y túnel"></h2>
+<p data-en="The gateway login remains enabled for every provider. Switching the URL signs you out of the gateway and requires updating OAuth callbacks in your developer apps." data-es="El acceso del gateway se mantiene con cualquier proveedor. Cambiar la URL cierra la sesión del gateway y requiere actualizar las URL de redirección OAuth en tus apps de desarrollador."></p>
+<div id="network-result" class="callout" role="status"></div>
+<label class="settings-field"><span data-en="Current public URL" data-es="URL pública actual"></span><input id="network-current" readonly></label>
+<label class="settings-field"><span data-en="Provider" data-es="Proveedor"></span><select id="network-provider"><option value="trycloudflare" data-en="TryCloudflare · temporary URL" data-es="TryCloudflare · URL temporal"></option><option value="cloudflare" data-en="Cloudflare · my own domain" data-es="Cloudflare · mi propio dominio"></option><option value="ngrok">ngrok</option></select></label>
+<p id="network-hint" class="hint"></p>
+<div id="network-custom-fields" hidden>
+<label class="settings-field"><span data-en="Your domain · saved when switching back" data-es="Tu dominio · se conserva al volver al modo temporal"></span><input id="network-domain" placeholder="https://postiz.example.com" autocomplete="off"></label>
+<label class="settings-field"><span data-en="Cloudflare tunnel token · blank keeps the saved token" data-es="Token del túnel de Cloudflare · déjalo vacío para conservar el guardado"></span><input id="network-token" type="password" autocomplete="new-password"></label>
+<p data-en="Create a named tunnel in Cloudflare and route your hostname to http://postforge-gateway:8080. This setup requires a domain on Cloudflare. The token stays private and travels in encrypted backups." data-es="Crea un túnel con nombre en Cloudflare y dirige tu dominio a http://postforge-gateway:8080. Esta opción requiere un dominio en Cloudflare. El token permanece privado y se incluye en los respaldos cifrados."></p></div>
+<label id="network-ngrok-fields" class="settings-field" hidden><span data-en="Saved ngrok hostname" data-es="Dominio guardado de ngrok"></span><input id="network-ngrok-domain" autocomplete="off"></label>
+<details><summary data-en="OAuth callbacks after a URL change" data-es="Redirecciones OAuth después de cambiar la URL"></summary><p data-en="Existing channel tokens may remain usable, but reconnecting requires the new redirect URI in each provider console. Updating the URL here cannot edit Google, Meta or TikTok developer settings for you." data-es="Los tokens existentes pueden seguir funcionando, pero para reconectar necesitas la nueva URI de redirección en cada consola. Cambiar la URL aquí no modifica por sí solo las apps de Google, Meta o TikTok."></p><div id="network-callbacks"></div></details>
+<div class="actions wrap"><button id="network-check" data-en="Check access" data-es="Comprobar acceso"></button><button id="network-rotate" data-en="Rotate temporary URL" data-es="Rotar URL temporal"></button><button id="network-apply" class="primary" data-en="Apply configuration" data-es="Aplicar configuración"></button><button id="network-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
 <dialog hidden role="dialog" id="app-settings" aria-labelledby="settings-title">
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
 <div class="settings-row"><label for="language" data-en="Language" data-es="Idioma"></label><select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></div>
+<div class="settings-row"><div><strong data-en="Public access" data-es="Acceso público"></strong><small data-en="Tunnel provider, URL rotation and your own domain" data-es="Proveedor del túnel, rotación de URL y dominio propio"></small></div><button id="network-open" data-en="Configure network" data-es="Configurar red"></button></div>
 <div class="settings-section"><h3 data-en="App & data" data-es="App y datos"></h3>
 <div class="settings-row"><div><strong data-en="Updates" data-es="Actualizaciones"></strong><small data-en="Check the app and local services" data-es="Revisa la app y los servicios locales"></small></div><button id="updates-open" data-en="Check for updates" data-es="Buscar actualizaciones"></button></div>
 <div class="settings-row"><div><strong data-en="Backup & Move" data-es="Respaldo y traslado"></strong><small data-en="Export or restore an encrypted backup" data-es="Exporta o restaura un respaldo cifrado"></small></div><button id="backup-open" data-en="Open assistant" data-es="Abrir asistente"></button></div>

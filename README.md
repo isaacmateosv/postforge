@@ -297,3 +297,8 @@ See [LICENSE](LICENSE), [COPYRIGHT](COPYRIGHT), [AUTHORS.md](AUTHORS.md), [NOTIC
 The app is ad-hoc signed; the installer is unsigned and not Apple notarized. The project is provided
 as-is, without a guarantee of third-party availability or approval. Provider credentials and a working
 login do not make an integration official. Use platform integrations only where permitted.
+
+
+### Public access providers
+
+Use **Settings → Public access** or **Public URL & Tunnel** in the Rust menu bar to switch between temporary TryCloudflare, a named Cloudflare tunnel with your own domain, and saved ngrok. Gateway authentication stays enabled. URL changes synchronize Postiz and its media origins, but developer-console OAuth callbacks require manual updates. Temporary URLs change on connector restart and are intended for testing. Provider preferences and secrets are included in encrypted migrations. [English setup](docs/reconnect/public-address.md) · [Guía en español](docs/reconnect/public-address-es.md).

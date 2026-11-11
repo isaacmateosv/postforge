@@ -534,6 +534,7 @@ async function refreshDashboard(force=false) {
     const changed = JSON.stringify(data) !== JSON.stringify(state.dashboard);
     state.dashboard = data; state.dashboardAt = Date.now();
     showConnections();
+    checkPublicAccess();
     updateTray();
     if (changed || force) renderDashboard();
   }
@@ -983,7 +984,7 @@ bind("backup-start",()=>backupRun($("backup-mode").value));
 bind("backup-restore",()=>backupRun("restore"));
 if (window.__TAURI__?.event) {
   window.__TAURI__.event.listen("postforge-tray-action",async event=>{
-    if (document.querySelector("dialog[open]") || state.busy) return;
+    if (document.querySelector("dialog[open]") || state.busy || state.networkBusy) return;
     try {
       const action=event.payload;
       if(action==="home") showPage("home");
@@ -994,6 +995,7 @@ if (window.__TAURI__?.event) {
       else if(action==="telegram") await telegramSettings();
       else if(action==="backup") backupOpen();
       else if(action==="updates") await checkUpdates(true);
+      else if(action==="network") await networkOpen();
       else if(action==="settings") openDialog("app-settings");
       else if(action==="help") await help();
       else if(action==="about") await modal("PostForge · "+(state.options?.version || ""),text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
@@ -1072,3 +1074,44 @@ async function showConnections(){
 bind("connections-open",()=>{openDialog("connections-dialog");return showConnections();});
 bind("connections-refresh",showConnections);
 bind("connections-close",()=>$("connections-dialog").close());
+
+function networkFields(){
+  const provider=$("network-provider").value;
+  $("network-custom-fields").hidden=provider!=="cloudflare";$("network-ngrok-fields").hidden=provider!=="ngrok";
+  $("network-rotate").hidden=provider!=="trycloudflare";
+  $("network-hint").textContent=provider==="trycloudflare"?text("Temporary testing endpoint: its hostname changes when the connector restarts. Use Apply to synchronize a changed URL, or Rotate to request another one. No uptime guarantee.","Dirección temporal de pruebas: cambia al reiniciar el conector. Usa Aplicar para sincronizar una URL que cambió o Rotar para pedir otra. No tiene garantía de disponibilidad."):provider==="cloudflare"?text("A named tunnel keeps your domain stable. You can return to TryCloudflare without erasing these settings.","Un túnel con nombre mantiene tu dominio estable. Puedes volver a TryCloudflare sin borrar estos ajustes."):text("Uses your saved ngrok domain and credentials. The account must have bandwidth available.","Usa el dominio y las credenciales guardados de ngrok. La cuenta debe tener ancho de banda disponible.");
+}
+function networkCallbacks(url){
+  $("network-callbacks").replaceChildren();
+  for(const name of ["youtube","facebook","instagram","threads","tiktok"]){const row=document.createElement("p");const label=document.createElement("strong");label.textContent=name+": ";const value=document.createElement("code");value.textContent=url+"/integrations/social/"+name;row.append(label,value);$("network-callbacks").append(row);}
+}
+async function networkCheck(fill=false){
+  $("network-result").textContent=text("Checking public access","Comprobando el acceso público");
+  try{const result=await engine("network_status",{force:true});state.network=result;$("network-current").value=result.url;
+    if(fill){$("network-provider").value=result.provider;$("network-domain").value=result.custom_domain;$("network-ngrok-domain").value=result.ngrok_domain;$("network-token").value="";networkFields();}
+    $("network-result").textContent=result.needs_sync?text("The temporary URL changed. Apply configuration to synchronize Postiz and the gateway before posting.","La URL temporal cambió. Aplica la configuración para sincronizar Postiz y el gateway antes de publicar."):result.reachable?text("✓ Public gateway is reachable. Channel sign-ins are checked separately under Connections.","✓ El gateway público está disponible. Revisa las sesiones de los canales en Conexiones."):text("Public access is unavailable. Do not retry publishing until this check succeeds.","El acceso público no está disponible. No vuelvas a publicar hasta que esta comprobación sea exitosa.");
+    networkCallbacks(result.url);
+  }catch(error){$("network-result").textContent=friendlyError(error);}
+}
+async function networkOpen(){openDialog("network-dialog");await networkCheck(true);}
+async function networkApply(rotate=false){
+  if(state.networkBusy)return;
+  const confirmed=await modal(rotate?text("Rotate the temporary URL?","¿Rotar la URL temporal?"):text("Change public access?","¿Cambiar el acceso público?"),text("Finish or cancel queued posts first. This restarts Postiz and the gateway. Existing media origins are updated; published posts are not reposted. Developer OAuth callbacks must be updated manually.","Primero completa o cancela las publicaciones en cola. Se reiniciarán Postiz y el gateway. Se actualizarán los enlaces de los archivos; lo ya publicado no se reenviará. Debes actualizar manualmente las redirecciones OAuth."),text("Continue","Continuar"));
+  if(!confirmed)return;
+  state.networkBusy=true;for(const id of ["network-apply","network-rotate","network-check","network-close","network-provider"])$(id).disabled=true;
+  $("network-result").textContent=text("Applying configuration and verifying the gateway. This can take a few minutes. Keep this window open.","Aplicando la configuración y verificando el gateway. Puede tardar unos minutos. Mantén esta ventana abierta.");
+  try{const result=await engine("network_apply",{provider:$("network-provider").value,custom_domain:$("network-domain").value,ngrok_domain:$("network-ngrok-domain").value,token:$("network-token").value,rotate,confirm:true});$("network-token").value="";invalidate();state.options=await engine("options");await networkCheck(true);$("network-result").textContent=text("✓ Public access verified. Sign in at the new address and update the callbacks below before reconnecting channels.","✓ Acceso público verificado. Inicia sesión en la nueva dirección y actualiza las redirecciones de abajo antes de reconectar los canales.");networkCallbacks(result.url);}
+  catch(error){$("network-result").textContent=friendlyError(error);}
+  finally{state.networkBusy=false;for(const id of ["network-apply","network-rotate","network-check","network-close","network-provider"])$(id).disabled=false;}
+}
+bind("network-open",()=>fromSettings(networkOpen));bind("network-check",()=>networkCheck());bind("network-apply",()=>networkApply());bind("network-rotate",()=>networkApply(true));bind("network-close",()=>$("network-dialog").close());$("network-provider").onchange=networkFields;
+$("network-dialog").addEventListener("cancel",event=>{if(state.networkBusy)event.preventDefault();else $("network-token").value="";});
+
+async function checkPublicAccess(){
+  if(state.networkBusy || state.publicCheckPending)return;
+  state.publicCheckPending=true;
+  try{const result=await engine("network_status");state.network=result;const warning=$("public-access-warning");warning.hidden=result.reachable && !result.needs_sync;warning.textContent=result.needs_sync?text("Public URL changed · open network settings to synchronize","La URL pública cambió · abre los ajustes de red para sincronizar"):text("Public access unavailable · check network settings before publishing","Acceso público no disponible · revisa los ajustes de red antes de publicar");}
+  catch(error){$("public-access-warning").hidden=false;$("public-access-warning").textContent=text("Public access could not be checked · open network settings","No se pudo comprobar el acceso público · abre los ajustes de red");}
+  finally{state.publicCheckPending=false;}
+}
+bind("public-access-warning",networkOpen);
