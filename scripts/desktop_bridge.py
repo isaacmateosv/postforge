@@ -17,6 +17,9 @@ import manage_posts
 
 
 def dispatch(operation, payload):
+    if operation in ("media_inspect", "media_frame"):
+        import media_preview
+        return media_preview.inspect(payload["path"]) if operation=="media_inspect" else media_preview.frame(payload["path"],payload.get("second",0))
     if operation in ("backup_start", "backup_status"):
         import backup_assistant
         return backup_assistant.start(payload) if operation == "backup_start" else backup_assistant.status(payload["id"])
@@ -26,10 +29,16 @@ def dispatch(operation, payload):
     if operation == "update_download":
         import desktop_update_install
         return desktop_update_install.download()
+    if operation in ("whatsapp_audience", "whatsapp_audience_save"):
+        import whatsapp_audience
+        return whatsapp_audience.status() if operation=="whatsapp_audience" else whatsapp_audience.save(payload)
     env = pmlib.load_env()
+    if operation == "connections":
+        import desktop_status
+        return desktop_status.connections(env)
     if operation == "whatsapp_receipts":
         import desktop_status
-        return desktop_status.receipts(env)
+        return desktop_status.receipts(env,payload)
     if operation == "whatsapp_finish":
         import desktop_status
         import subprocess

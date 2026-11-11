@@ -45,6 +45,7 @@ function localize() {
   $("previous").setAttribute("aria-label", text("Previous caption", "Texto anterior"));
   $("next").setAttribute("aria-label", text("Next caption", "Texto siguiente"));
   $("telegram-owners").setAttribute("aria-label", text("Detected private accounts", "Cuentas privadas encontradas"));
+  $("wa-receipts").textContent=$("wa-receipt-history").hidden?text("View delivery receipts","Ver recibos de entrega"):text("Hide delivery receipts","Ocultar recibos de entrega");
   updateModeHint();
   renderMedia();
   renderSteps();
@@ -82,6 +83,7 @@ function renderSteps() {
 }
 
 function showPage(page) {
+  window.PostForgeMedia.pause();
   state.page = page;
   document.querySelector("main").scrollTop = 0;
   $("steps").hidden = page === "home";
@@ -146,6 +148,7 @@ function renderMedia() {
   $("clear-media").hidden = state.media.length === 0;
   $("cover-options").hidden = !state.media.some(path => /\.(mp4|mov|m4v|webm|mkv|avi|3gp)$/i.test(path));
   $("cover-name").textContent = state.cover?.split(/[\\/]/).pop() || "";
+  window.PostForgeMedia.update(state.media,state.cover,$("cover-second").value || null,state.language);
 }
 
 async function addMedia() {
@@ -207,6 +210,7 @@ function updateNetworkOptions() {
   const selected = new Set([...$("destinations").querySelectorAll("input:checked")].map(input => input.value));
   $("youtube-options").hidden = !selected.has("youtube");
   $("wa-text-options").hidden = state.media.length > 0 || !selected.has("whatsapp");
+  renderYouTubeRoute();
 }
 
 function form() {
@@ -277,6 +281,11 @@ function renderCopy() {
     const button = document.createElement("button"); button.textContent = text("Edit title", "Editar título");
     button.onclick = editYoutubeTitle;
     section.append(heading,value,button); $("copy").append(section);
+  }
+  if(plan.youtube_caption && plan.youtube_caption!==plan.caption){
+    const section=document.createElement("div");section.className="platform-copy";
+    const heading=document.createElement("h3");heading.textContent=text("YouTube description","Descripción de YouTube");
+    const body=document.createElement("p");body.textContent=plan.youtube_caption;section.append(heading,body);$("copy").append(section);
   }
   if (plan.threads_caption) {
     const details = document.createElement("details");
@@ -469,7 +478,8 @@ function renderDashboard() {
   }
   const statusItems = data.status_items || [];
   $("status-card").hidden = false;
-  $("status-count").textContent = " · " + statusItems.length + text(" pending", " pendientes");
+  const sending=statusItems.filter(item=>item.status==="sending").length;
+  $("status-count").textContent = " · " + statusItems.length + text(" items", " estados")+(sending?" · "+sending+text(" sending"," en envío"):"");
   $("dashboard-status").replaceChildren();
   for (const item of statusItems) {
     const row = document.createElement("article"); row.className = "post-row";
@@ -477,8 +487,9 @@ function renderDashboard() {
     const title = document.createElement("strong"); title.textContent = item.caption.slice(0,120) || text("Media Status", "Estado con archivos");
     const note = document.createElement("p"); note.textContent = momentLabel(item.when) + " · " + (item.status === "needs_review"
       ? text("Delivery needs review · automatic retry is held", "Revisa la entrega · el reintento automático está detenido")
-      : item.approved ? text("Approved · waiting for delivery", "Aprobado · esperando el envío") : text("Awaiting your approval", "Espera tu aprobación"));
-    content.append(title,note); row.append(content);
+      : item.status === "sending" ? (item.delivery_parts ? text("Sending part ","Enviando parte ")+item.delivery_part+text(" of "," de ")+item.delivery_parts : text("Sending to audience","Enviando a la audiencia"))+text(" · large audiences can take several minutes"," · las audiencias grandes pueden tardar varios minutos") : item.approved ? text("Approved · waiting for delivery", "Aprobado · esperando el envío") : text("Awaiting your approval", "Espera tu aprobación"));
+    const audience=document.createElement("small");audience.textContent=item.audience==="test" ? text("Selected contacts: ","Contactos seleccionados: ")+item.recipient_count : text("Audience: all contacts","Audiencia: todos los contactos");
+    content.append(title,note,audience); row.append(content);
     if (item.status === "pending" && !item.approved) {
       const approve = document.createElement("button"); approve.textContent = text("Review Status", "Revisar Estado");
       approve.onclick = async () => {
@@ -522,6 +533,7 @@ async function refreshDashboard(force=false) {
     const data = await engine("dashboard");
     const changed = JSON.stringify(data) !== JSON.stringify(state.dashboard);
     state.dashboard = data; state.dashboardAt = Date.now();
+    showConnections();
     updateTray();
     if (changed || force) renderDashboard();
   }
@@ -568,6 +580,7 @@ async function whatsappSettings() {
   $("wa-state").textContent = text("Checking connection", "Comprobando conexión");
   $("wa-refresh").hidden = false;
   openDialog("whatsapp-settings");
+  await readAudience();
   await waState();
   if ($("whatsapp-settings").open && !$("wa-refresh").hidden) waTimer = setInterval(waState, 4000);
 }
@@ -630,7 +643,11 @@ async function help() {
     option.textContent = label;
     choices.append(option);
   }
-  if (!await modal(text("PostForge Help", "Ayuda de PostForge"), choices)) return;
+  const picker=document.createElement("div");picker.className="help-picker";
+  const label=document.createElement("label");label.textContent=text("Choose a guide","Elige una guía");choices.id="help-guide-choice";label.htmlFor=choices.id;
+  const explanation=document.createElement("p");explanation.textContent=text("A short walkthrough to get started, or detailed setup and troubleshooting.","Una guía breve para empezar o los detalles de configuración y solución de problemas.");
+  picker.append(label,choices,explanation);
+  if (!await modal(text("PostForge Help", "Ayuda de PostForge"), picker,text("Open guide","Abrir guía"))) return;
   const result = await engine("help", { language: state.language, technical: choices.value === "technical" });
   const content = document.createElement("div");
   content.className = "help-document";
@@ -716,7 +733,7 @@ $("body").oninput = () => {
 };
 document.querySelectorAll('input[name="mode"]').forEach(input => input.onchange = () => { invalidate(); updateModeHint(); });
 for (const id of ["post-at", "placement", "final-tag", "cover-second", "youtube-mode", "wa-background"]) {
-  $(id).onchange = () => { if (id === "cover-second") state.cover = null; invalidate(); };
+  $(id).onchange = () => { if (id === "cover-second") { state.cover = null; renderMedia(); } invalidate(); if(id==="youtube-mode")renderYouTubeRoute(); };
 }
 bind("add-media", addMedia);
 bind("clear-media", () => { state.media = []; state.cover = null; invalidate(); renderMedia(); });
@@ -842,6 +859,20 @@ if (window.__TAURI__?.event) {
     renderMedia();
   });
 }
+function renderYouTubeRoute() {
+  const info=state.mediaInfo;
+  let message=text("YouTube classifies the upload by its dimensions and duration.","YouTube clasifica el archivo según sus dimensiones y duración.");
+  if(info?.video){
+    const vertical=info.height>=info.width;const mode=$("youtube-mode").value;
+    message=mode==="auto" ? (vertical ? text("Shorts · vertical or square. A separate 2:59 copy is made if needed.","Shorts · vertical o cuadrado. Se crea una copia de 2:59 si hace falta.") : text("Regular video · horizontal, full duration.","Video normal · horizontal, duración completa.")) :
+      mode==="regular" && vertical && info.duration<=180 ? text("YouTube will classify this file as a Short. Choose a horizontal version for a regular video.","YouTube clasificará este archivo como Short. Elige una versión horizontal para un video normal.") :
+      mode==="shorts" && !vertical ? text("Shorts need a vertical or square version; this horizontal file will not be cropped automatically.","Shorts necesita una versión vertical o cuadrada; este archivo horizontal no se recorta automáticamente.") : message;
+  }
+  $("youtube-route-hint").textContent=message;
+}
+window.PostForgeMedia.configure({onInfo:info=>{state.mediaInfo=info;renderYouTubeRoute();},onFrame:second=>{
+  state.cover=null;$("cover-second").value=String(second);invalidate();renderMedia();
+}});
 localize();
 showPage("home");
 loadOptions();
@@ -854,7 +885,7 @@ engine("telegram_resume").catch(() => {
 // Native tray mirrors the same window workflows, without creating a second app.
 function updateTray() {
   invoke("tray_state", { language:state.language, drafts:state.dashboard?.drafts || 0,
-    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!state.backupBusy), update:!!state.updateAvailable }).catch(() => {});
+    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!state.backupBusy)+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length, update:!!state.updateAvailable }).catch(() => {});
 }
 async function checkUpdates(manual=false) {
   if (state.updateChecking) return;
@@ -973,15 +1004,71 @@ if (window.__TAURI__?.event) {
 checkUpdates();
 setInterval(()=>checkUpdates(),6*60*60*1000);
 
-bind("wa-receipts",async()=>{
-  try {
-    const result=await engine("whatsapp_receipts");
-    $("wa-receipt-history").replaceChildren();
-    for(const item of result.items) {
-      const row=document.createElement("p");
-      row.textContent=new Date(item.at*1000).toLocaleString(state.language==="es"?"es-EC":"en")+" · "+text("Received: ","Recibido: ")+(item.received ?? "—")+" · "+text("Viewed: ","Visto: ")+(item.viewed ?? "—");
-      $("wa-receipt-history").append(row);
+let receiptPage=0,receiptRequest=0;
+async function loadReceipts(){
+  const request=++receiptRequest;
+  $("receipt-rows").textContent=text("Loading receipts","Cargando recibos");
+  $("receipt-prev").disabled=true;$("receipt-next").disabled=true;
+  try{
+    const result=await engine("whatsapp_receipts",{page:receiptPage,period:$("receipt-period").value,kind:$("receipt-kind").value});
+    if(request!==receiptRequest || $("wa-receipt-history").hidden)return;
+    $("receipt-rows").replaceChildren();
+    for(const item of result.items){
+      const row=document.createElement("article");row.className="receipt-row";
+      const date=document.createElement("strong");date.textContent=new Date(Number(item.at)*1000).toLocaleString(state.language==="es"?"es-EC":"en");
+      const caption=document.createElement("p");caption.textContent=item.text || (item.kind==="videoMessage"?"Video":item.kind==="imageMessage"?text("Image","Imagen"):text("Text","Texto"));
+      const counters=document.createElement("small");counters.textContent=text("Received: ","Recibido: ")+(item.received ?? "—")+" · "+text("Viewed: ","Visto: ")+(item.viewed ?? "—");
+      row.append(date,caption,counters);$("receipt-rows").append(row);
     }
-    const note=document.createElement("p");note.className="hint";note.textContent=text("Views depend on both phones enabling read receipts. No history means no recorded receipts yet.","Las vistas dependen de que ambos teléfonos tengan activadas las confirmaciones de lectura. Si no hay historial, aún no hay recibos registrados.");$("wa-receipt-history").append(note);
-  } catch(error) {$("wa-receipt-history").textContent=friendlyError(error);}
+    if(!result.items.length)$("receipt-rows").textContent=text("No receipts match these filters.","No hay recibos con estos filtros.");
+    $("receipt-page").textContent=text("Page ","Página ")+(receiptPage+1);
+    $("receipt-prev").disabled=receiptPage===0;$("receipt-next").disabled=!result.has_more;
+  }catch(error){if(request===receiptRequest)$("receipt-rows").textContent=friendlyError(error);}
+}
+bind("wa-receipts",()=>{
+  const open=$("wa-receipt-history").hidden;$("wa-receipt-history").hidden=!open;
+  $("wa-receipts").setAttribute("aria-expanded",String(open));
+  $("wa-receipts").textContent=open?text("Hide delivery receipts","Ocultar recibos de entrega"):text("View delivery receipts","Ver recibos de entrega");
+  if(open)return loadReceipts();receiptRequest++;
 });
+bind("receipt-prev",()=>{receiptPage=Math.max(0,receiptPage-1);return loadReceipts();});
+bind("receipt-next",()=>{receiptPage++;return loadReceipts();});
+for(const id of ["receipt-period","receipt-kind"])$(id).onchange=()=>{receiptPage=0;loadReceipts();};
+async function readAudience(){
+  try{
+    const settings=await engine("whatsapp_audience");$("wa-audience").value=settings.audience;$("wa-recipients").value=settings.recipients;
+    $("wa-recipient-field").hidden=settings.audience!=="test";$("wa-audience-result").textContent="";
+  }catch(error){$("wa-audience-result").textContent=friendlyError(error);}
+}
+$("wa-audience").onchange=()=>{$("wa-recipient-field").hidden=$("wa-audience").value!=="test";};
+bind("wa-audience-save",async()=>{
+  const audience=$("wa-audience").value,recipients=$("wa-recipients").value;
+  if(!await modal(text("Apply this audience to new Status plans?","¿Aplicar esta audiencia a los planes nuevos de Estados?"),text("Already queued plans keep their previous audience.","Los planes que ya están en cola conservan su audiencia anterior."),text("Save audience","Guardar audiencia")))return;
+  try{await engine("whatsapp_audience_save",{audience,recipients});$("wa-audience-result").textContent=text("Audience saved for new plans.","Audiencia guardada para los planes nuevos.");}
+  catch(error){$("wa-audience-result").textContent=friendlyError(error);}
+});
+async function showConnections(){
+  if(state.connectionsPending)return;state.connectionsPending=true;
+  $("connection-rows").textContent=text("Checking connections","Revisando conexiones");
+  try{
+    const result=await engine("connections");$("connection-rows").replaceChildren();
+    const names={facebook:"Facebook",instagram:"Instagram",threads:"Threads",youtube:"YouTube",tiktok:"TikTok"};
+    for(const item of result.items){
+      const row=document.createElement("article");row.className="connection-row";
+      const label=document.createElement("strong");label.textContent=(names[item.network] || item.network)+" · "+item.name;
+      const stateLabel=document.createElement("span");stateLabel.className=item.state==="connected"?"connection-ok":"connection-attention";
+      stateLabel.textContent=item.state==="connected"?text("✓ Connected","✓ Conectado"):item.state==="reconnect"?text("Reconnect required","Debes volver a conectar"):item.state==="renewal"?text("Automatic renewal pending","Renovación automática pendiente"):text("Paused","En pausa");
+      row.append(label,stateLabel);
+      if(item.expires){const expiry=document.createElement("small");expiry.textContent=(item.can_renew?text("Access token renews automatically · current validity: ","El token de acceso se renueva automáticamente · vigencia actual: "):text("Credential valid until: ","Credencial vigente hasta: "))+new Date(/(Z|[+-]\d{2}:\d{2})$/.test(item.expires)?item.expires:item.expires+'Z').toLocaleString(state.language==="es"?"es-EC":"en");row.append(expiry);}
+      $("connection-rows").append(row);
+    }
+    const good=result.items.filter(item=>item.state==="connected").length;
+    $("connections-open").textContent=text("Connections ","Conexiones ")+good+"/"+result.items.length;
+    $("connections-open").classList.toggle("ready",good===result.items.length && good>0);
+    $("connection-checked").textContent=text("Checked: ","Revisado: ")+new Date(result.checked_at).toLocaleTimeString(state.language==="es"?"es-EC":"en");
+  }catch(error){$("connection-rows").textContent=friendlyError(error);}
+  finally{state.connectionsPending=false;}
+}
+bind("connections-open",()=>{openDialog("connections-dialog");return showConnections();});
+bind("connections-refresh",showConnections);
+bind("connections-close",()=>$("connections-dialog").close());

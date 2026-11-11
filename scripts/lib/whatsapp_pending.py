@@ -31,10 +31,12 @@ def _read():
 
 def _write(items):
     os.makedirs(pmlib.RUN_DIR, exist_ok=True)
-    tmp = QUEUE_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(items, fh, ensure_ascii=False, indent=1)
-    os.replace(tmp, QUEUE_FILE)
+    fd,tmp=tempfile.mkstemp(prefix=".wa-pending-",dir=os.path.dirname(QUEUE_FILE))
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as fh:json.dump(items,fh,ensure_ascii=False,indent=1)
+        os.replace(tmp,QUEUE_FILE)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
 
 
 @contextmanager
@@ -61,10 +63,13 @@ def enqueue(caption, media_paths, post_ids, when, background="#128C7E"):
         "approval_source": None,
         "status": "pending",
     }
-    with _queue_lock():
-        items = _read()
-        items.append(item)
-        _write(items)
+    with file_lock.exclusive(os.path.join(pmlib.RUN_DIR, "wa-audience.lock")):
+        env=pmlib.load_env()
+        item.update(audience=env.get("WA_STATUS_AUDIENCE","all"),recipients=env.get("WA_TEST_RECIPIENTS",""))
+        with _queue_lock():
+            items = _read()
+            items.append(item)
+            _write(items)
     return item["id"]
 
 
@@ -114,7 +119,9 @@ def _video_parts(path, folder):
 
 def _send_item(item):
     script = os.path.join(pmlib.ROOT, "scripts", "lib", "broadcast_story.py")
-    audience = pmlib.load_env().get("WA_STATUS_AUDIENCE", "all")
+    audience = item.get("audience", pmlib.load_env().get("WA_STATUS_AUDIENCE", "all"))
+    delivery_env=dict(os.environ)
+    if "recipients" in item:delivery_env["WA_TEST_RECIPIENTS"]=item["recipients"]
     with tempfile.TemporaryDirectory(prefix="status-", dir=pmlib.whatsapp_scratch()) as folder:
         commands = []
         for path in item.get("media") or []:
@@ -122,7 +129,9 @@ def _send_item(item):
                 commands.extend(("--video", part) for part in _video_parts(path, folder))
             else:
                 commands.append(("--image", path))
-        for flag, path in commands or [(None, None)]:
+        parts=commands or [(None,None)]
+        for index,(flag,path) in enumerate(parts):
+            _delivery_progress(item["id"],index+1,len(parts),index)
             args = [sys.executable, script, "--to", audience, "--bg", item.get("background", "#128C7E")]
             if audience != "test":
                 args.append("--yes")
@@ -130,7 +139,17 @@ def _send_item(item):
                 args.extend((flag, path))
             if item.get("caption"):
                 args.append(item["caption"])
-            subprocess.run(args, check=True)
+            subprocess.run(args, check=True,env=delivery_env)
+            _delivery_progress(item["id"],index+1,len(parts),index+1)
+
+
+def _delivery_progress(identifier,part,total,completed):
+    with _queue_lock():
+        items=_read()
+        for item in items:
+            if item.get("id")==identifier and item.get("status")=="sending":
+                item.update(delivery_part=part,delivery_parts=total,completed_parts=completed,progress_at=int(time.time()))
+                _write(items);return
 
 
 def _ready(item):

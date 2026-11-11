@@ -73,15 +73,52 @@ def dashboard(env):
         result['status_items'] = [{'id': item['id'], 'caption': item.get('caption',''), 'when': item.get('when'),
                                    'status': item.get('status'), 'approved': bool(item.get('approved')),
                                    'media': [Path(file).name for file in item.get('media',[])],
-                                   'background': item.get('background','#128C7E')}
-                                  for item in whatsapp_pending._read() if item.get('status') in ('pending','needs_review')]
+                                   'background': item.get('background','#128C7E'),
+                                   'audience':item.get('audience',env.get('WA_STATUS_AUDIENCE','all')),
+                                   'recipient_count':len([p for p in item.get('recipients',env.get('WA_TEST_RECIPIENTS','')).split(',') if p]),
+                                   'delivery_part':item.get('delivery_part'),'delivery_parts':item.get('delivery_parts'),'completed_parts':item.get('completed_parts',0)}
+                                  for item in whatsapp_pending._read() if item.get('status') in ('pending','needs_review','sending')]
     return result
 
 
-def receipts(env):
-    """Bounded aggregate receipt history; never return recipients or phone numbers."""
+def receipts(env, payload=None):
+    """Five rows per page; date/type filters; no recipient identities returned."""
     import broadcast_story
+    payload=payload or {}
+    page=payload.get('page',0);period=payload.get('period','30');kind=payload.get('kind','all')
+    if type(page) is not int or not 0<=page<=10000 or period not in ('7','30','all') or kind not in ('all','video','image','text'):
+        raise pmlib.PMError('Choose valid history filters. / Elige filtros válidos para el historial.')
     instance="'"+env.get('WA_INSTANCE','status-engine').replace("'","''")+"'"
     count='(SELECT count(DISTINCT u.participant) FROM evolution."MessageUpdate" u WHERE u."messageId"=m.id AND u.participant IS DISTINCT FROM i."ownerJid"%s)'
-    rows=pmlib.psql('SELECT m."messageTimestamp", m."messageType", '+count%''+', '+count%" AND u.status='READ'"+' FROM evolution."Message" m JOIN evolution."Instance" i ON i.id=m."instanceId" WHERE i.name='+instance+' AND m.key->>\'remoteJid\'=\'status@broadcast\' AND (m.key->>\'fromMe\')::boolean ORDER BY m."messageTimestamp" DESC LIMIT 12;',env)
-    return {'items':[{'at':int(row[0]),'kind':row[1],'received':int(row[2]) if int(row[0])>=broadcast_story.RECEIPTS_SINCE else None,'viewed':int(row[3]) if int(row[0])>=broadcast_story.RECEIPTS_SINCE else None} for row in rows]}
+    where='i.name='+instance+" AND m.key->>'remoteJid'='status@broadcast' AND (m.key->>'fromMe')::boolean"
+    if period!='all':where+=' AND m."messageTimestamp">=extract(epoch FROM now()-interval \''+period+' days\')'
+    if kind!='all':where+=' AND m."messageType" '+({'video':"='videoMessage'",'image':"='imageMessage'",'text':"IN ('conversation','extendedTextMessage')"}[kind])
+    sql='SELECT jsonb_build_object(\'at\',m."messageTimestamp",\'kind\',m."messageType",\'received\','+count%''+',\'viewed\','+count%" AND u.status='READ'"+',\'text\',left('+broadcast_story.STATUS_TEXT_SQL+',160))::text FROM evolution."Message" m JOIN evolution."Instance" i ON i.id=m."instanceId" WHERE '+where+' ORDER BY m."messageTimestamp" DESC,m.id DESC LIMIT 6 OFFSET '+str(page*5)
+    rows=[json.loads(row[0]) for row in pmlib.psql(sql,env)]
+    for item in rows:
+        if int(item['at'])<broadcast_story.RECEIPTS_SINCE:item.update(received=None,viewed=None)
+    return {'items':rows[:5],'page':page,'has_more':len(rows)>5}
+
+
+def connections(env):
+    from datetime import datetime,timezone
+    client=pmlib.Postiz(env);org="'"+client.org_id.replace("'","''")+"'"
+    sql='''SELECT jsonb_build_object('name',coalesce(i."customName",i.name),'network',i."providerIdentifier",
+      'disabled',i.disabled,'refresh_needed',i."refreshNeeded",'has_token',length(coalesce(i.token,''))>0,
+      'can_renew',length(coalesce(i."refreshToken",''))>0,'expires',i."tokenExpiration",'updated',i."updatedAt",
+      'auth_error',(SELECT max(p."updatedAt") FROM "Post" p WHERE p."integrationId"=i.id AND p.state='ERROR' AND p.error LIKE '%refresh_token%'))::text
+      FROM "Integration" i WHERE i."organizationId"='''+org+''' AND i."deletedAt" IS NULL ORDER BY i."providerIdentifier"'''
+    result=[];now=datetime.now(timezone.utc)
+    def date(value):
+        if not value:return None
+        value=re.sub(r'\.(\d{1,5})(?=[+-]|$)',lambda m:'.'+m.group(1).ljust(6,'0'),value.replace('Z','+00:00'))
+        parsed=datetime.fromisoformat(value)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    for row in pmlib.psql(sql,env):
+        item=json.loads(row[0]);item['can_renew']=bool(item['can_renew'] and item['network'] in ('youtube','tiktok','threads'));expiry=date(item.get('expires'));updated=date(item.get('updated'));error=date(item.get('auth_error'))
+        state='connected'
+        if item['refresh_needed'] or not item['has_token'] or (error and (not updated or error>=updated)):state='reconnect'
+        elif item['disabled']:state='paused'
+        elif expiry and expiry<=now:state='renewal' if item['can_renew'] else 'reconnect'
+        result.append({key:item.get(key) for key in ('name','network','expires','updated')}|{'state':state,'can_renew':item['can_renew']})
+    return {'items':result,'checked_at':now.isoformat()}

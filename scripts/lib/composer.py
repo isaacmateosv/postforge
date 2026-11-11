@@ -17,7 +17,7 @@ import plan_post
 import pmlib
 
 TICKET_AGE = 24 * 3600
-PIPELINE_REVISION = 2
+PIPELINE_REVISION = 3
 ID = re.compile(r"[a-f0-9]{32}")
 FIELDS = ("body", "mode", "networks", "post_at", "media", "placement", "cover_image",
           "cover_second", "final_tag", "language", "text_confirmed", "whatsapp_background", "youtube_mode")
@@ -78,7 +78,7 @@ def fields(value):
     if not media:
         if not data.get("text_confirmed") or not set(networks) <= {"facebook", "threads", "whatsapp"}:
             raise pmlib.PMError("Confirm text-only destinations: Facebook posts, Threads posts, or WhatsApp Status.")
-    if data.get("youtube_mode", "shorts") not in ("shorts", "regular"):
+    if data.get("youtube_mode", "auto") not in ("auto", "shorts", "regular"):
         raise pmlib.PMError("Choose a YouTube format.")
     if not re.fullmatch(r"#[0-9a-fA-F]{6}", data.get("whatsapp_background", "#128C7E")):
         raise pmlib.PMError("Choose a valid WhatsApp background color.")
@@ -125,7 +125,8 @@ def build_plan(env, data):
     p["exact"] = data["body"] if data["mode"] == "exact" else None
     p["idea"] = data["body"] if data["mode"] == "idea" else None
     p["final_tag"] = data.get("final_tag", env.get("CAPTION_FINAL_TAG", ""))
-    p["youtube_trim"] = data.get("youtube_mode", "shorts") == "shorts"
+    p["youtube_mode"] = data.get("youtube_mode", "auto")
+    p["youtube_trim"] = p["youtube_mode"] in ("auto", "shorts")
     p["whatsapp_background"] = data.get("whatsapp_background", "#128C7E")
     return p
 

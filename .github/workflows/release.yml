@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: "22"
       - name: Dialog accessibility and confirmation regression tests
-        run: node --test desktop/test/dialogs.test.cjs
+        run: node --test desktop/test/dialogs.test.cjs desktop/test/signed-media.test.cjs
       - name: Compile native client
         run: cargo build --release --locked --manifest-path desktop/Cargo.toml
       - name: Package native artifact and notices

@@ -9,6 +9,7 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::{Manager, Emitter};
 mod tray_ui;
+mod media_ui;
 use tauri_plugin_dialog::DialogExt;
 
 struct Workspace(Mutex<PathBuf>);
@@ -29,7 +30,7 @@ fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Val
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["options", "updates", "update_download", "backup_start", "backup_status", "whatsapp_receipts", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
@@ -63,7 +64,11 @@ fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Val
 }
 
 #[tauri::command]
-async fn engine(state: tauri::State<'_, Workspace>, operation: String, payload: Value) -> Result<Value, String> {
+async fn engine(app:tauri::AppHandle, state: tauri::State<'_, Workspace>, operation: String, mut payload: Value) -> Result<Value, String> {
+    if operation=="media_inspect" || operation=="media_frame" {
+        let path=media_ui::checked(&app,payload["path"].as_str().unwrap_or(""))?;
+        payload["path"]=Value::String(path.to_string_lossy().into_owned());
+    }
     let root = state.0.lock().map_err(|_| "Workspace is busy.")?.clone();
     tauri::async_runtime::spawn_blocking(move || run_engine(root, operation, payload))
         .await.map_err(|_| "The planner task stopped.".to_string())?
@@ -75,9 +80,8 @@ async fn choose_files(app: tauri::AppHandle, images_only: bool) -> Result<Vec<St
         let extensions = if images_only { vec!["jpg", "jpeg", "png", "webp"] }
             else { vec!["jpg", "jpeg", "png", "webp", "heic", "mp4", "mov", "m4v", "webm", "mkv"] };
         let files = app.dialog().file().add_filter("Media", &extensions).blocking_pick_files();
-        Ok(files.unwrap_or_default().into_iter()
-            .filter_map(|file| file.into_path().ok())
-            .map(|path| path.to_string_lossy().into_owned()).collect())
+        let paths:Vec<PathBuf>=files.unwrap_or_default().into_iter().filter_map(|file|file.into_path().ok()).collect();
+        Ok(media_ui::grant(&app,&paths))
     }).await.map_err(|_| "File selection stopped.".to_string())?
 }
 
@@ -250,6 +254,7 @@ fn main() {
                 .and_then(|directory| std::fs::read_to_string(directory.join("workspace")).ok())
                 .map(PathBuf::from).filter(|path| valid_workspace(path));
             app.manage(Workspace(Mutex::new(saved.unwrap_or(fallback))));
+            app.manage(media_ui::SelectedFiles::default());
             tray_ui::install(app.handle())?;
             size_starting_window(app.handle())?;
             Ok(())
@@ -261,6 +266,8 @@ fn main() {
             }
         })
         .on_window_event(|window,event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop{paths,..})=event {media_ui::grant(window.app_handle(),paths);}
+
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
         .invoke_handler(tauri::generate_handler![engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
