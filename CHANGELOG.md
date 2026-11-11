@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.28]
+
+- Refresh the displayed public URL and OAuth callbacks together after external URL changes, on window focus and while the network panel is visible.
+- Recheck the current configuration before copying; preserve callback paths while using the latest origin and reject outdated status responses.
+- Disable stale links when a temporary connector needs synchronization and show the detected URL with a clear synchronization action.
+
+
 ## [2.0.0-rc.27]
 
 - Copy the public URL by clicking its field or using Copy link; show a brief green confirmation and accessible status message.

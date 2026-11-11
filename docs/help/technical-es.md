@@ -414,3 +414,6 @@ Fuentes: [Quick Tunnels y sus límites](https://developers.cloudflare.com/tunnel
 
 
 Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El control cambia brevemente a verde y confirma **Enlace copiado**. Las URL de redirección OAuth también se copian al hacer clic; con el teclado, usa Tab y Enter o Espacio.
+
+
+La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Sincronizar URL actual** antes de copiar o abrir Postiz.
