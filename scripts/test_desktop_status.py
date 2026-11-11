@@ -13,6 +13,12 @@ import plan_post
 from datetime import datetime, timezone, timedelta
 
 class DesktopStatusTests(unittest.TestCase):
+    def setUp(self):
+        # Synthetic planner fixtures have no real video to probe. Real-file
+        # orientation is exercised separately by test_media_preview.py.
+        orientation=patch.object(pmlib,'display_dimensions',side_effect=lambda path,width,height:(width,height))
+        orientation.start();self.addCleanup(orientation.stop)
+
     def test_linked_whatsapp_never_creates_or_replaces_session(self):
         with patch.object(pmlib, 'http', return_value=(200, {'instance': {'state': 'open'}})) as api:
             result = desktop_status.whatsapp({'AUTHENTICATION_API_KEY': 'synthetic'}, connect=True)
