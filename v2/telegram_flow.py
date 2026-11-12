@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import secrets
 import time
+from datetime import datetime
 
 TTL = 24 * 3600
 
@@ -46,7 +47,8 @@ class Conversation:
 
     def home(self):
         rows = [[(self.t("New post / announcement", "Nueva publicación / anuncio"), "new")],
-                [(self.t("Service status", "Estado de los servicios"), "status")]]
+                [(self.t("Service status", "Estado de los servicios"), "status")],
+                [(self.t("Settings · activity ping", "Ajustes · aviso de actividad"), "settings")]]
         if self.state.get("stage") in ("ready", "review", "assets", "destinations", "time", "formats"):
             rows.insert(0, [(self.t("Resume current plan", "Retomar el plan actual"), "resume")])
         note = self.t("PostForge · What would you like to do?", "PostForge · ¿Qué quieres hacer?")
@@ -54,6 +56,42 @@ class Conversation:
             note += self.t("\nA submission was interrupted. Review Postiz before starting another batch.",
                            "\nSe interrumpió un envío. Revisa Postiz antes de preparar otro lote.")
         self.emit(note, rows)
+
+    def settings_menu(self, saved=False):
+        prefs = self.actions.heartbeat_preferences()
+        minutes = prefs["minutes"]
+        cadence = self.t("Off", "Apagado") if not minutes else self.t(f"Every {minutes} minutes", f"Cada {minutes} minutos")
+        note = (self.t("✓ Saved.\n", "✓ Guardado.\n") if saved else "") + self.t("Telegram activity ping · ", "Aviso de actividad de Telegram · ") + cadence
+        note += self.t("\nA short service-status message, only while PostForge is running. Changing this never publishes posts or starts services. Your current plan is kept.",
+                       "\nUn mensaje breve del estado del servicio, solo mientras PostForge está activo. Cambiar esto no publica contenido ni enciende servicios. Se conserva tu plan actual.")
+        rows = []
+        if prefs["configured"]:
+            for value, en, es in ((0,"Off","Apagado"),(30,"Every 30 minutes","Cada 30 minutos"),(60,"Every hour","Cada hora"),(360,"Every 6 hours","Cada 6 horas"),(1440,"Once a day","Una vez al día")):
+                rows.append([(("✓ " if value == minutes else "") + self.t(en,es), "heartbeat_"+str(value))])
+            if not prefs["active"]:
+                note += self.t("\nTelegram is paused. This preference takes effect when you enable it in the app.", "\nTelegram está en pausa. Este ajuste se aplicará cuando lo actives en la app.")
+        else:
+            note += self.t("\nSet up Telegram in the desktop app first.", "\nPrimero configura Telegram en la app de escritorio.")
+        rows.append([(self.t("Back to my plan", "Volver a mi plan") if self.state.get("data") else self.t("Main menu", "Menú principal"), "settings_back")])
+        self.emit(note, rows)
+
+    def resume(self):
+        renderers = {"ready":self.ready,"review":self.review,"confirm":self.review,"assets":self.assets,"destinations":self.destinations,"time":self.times,"formats":self.formats}
+        stage=self.state.get("stage")
+        if stage in renderers:
+            return renderers[stage]()
+        prompts={"content":("Send your idea or finished caption.","Envía tu idea o el texto terminado."),
+                 "wait_media":("Send a photo or video up to 20 MB.","Envía una foto o un video de hasta 20 MB."),
+                 "wait_cover":("Send one cover image.","Envía una imagen de portada."),
+                 "wait_frame":("Send the cover second, for example 12.5.","Envía el segundo de portada, por ejemplo 12,5."),
+                 "wait_tag":("Send a hashtag, or - to omit it.","Envía una etiqueta o - para omitirla."),
+                 "wait_time":("Send YYYY-MM-DD HH:MM, for example 2026-12-15 19:30.","Envía AAAA-MM-DD HH:MM, por ejemplo 2026-12-15 19:30."),
+                 "edit":("Send the complete replacement caption.","Envía el texto completo corregido.")}
+        if stage in prompts:
+            return self.emit(self.t(*prompts[stage]),[[(self.t("Cancel","Cancelar"),"cancel")]])
+        if stage == "mode":
+            return self.emit(self.t("How should we prepare the caption?","¿Cómo preparamos el texto?"),[[(self.t("Write from my idea","Redactar a partir de mi idea"),"mode_idea")],[(self.t("Use my exact words","Usar mis palabras exactas"),"mode_exact")],[(self.t("Cancel","Cancelar"),"cancel")]])
+        self.home()
 
     def start(self):
         self.actions.discard(self.state.get("data") or {})
@@ -101,7 +139,9 @@ class Conversation:
         self.emit(self.t("Choose post formats where supported.", "Elige los formatos compatibles."), [
             [(self.t("Posts and stories", "Publicaciones e historias"), "format_both")],
             [(self.t("Posts only", "Solo publicaciones"), "format_feed"),
-             (self.t("Stories only", "Solo historias"), "format_story")]])
+             (self.t("Stories only", "Solo historias"), "format_story")],
+            [(self.t("Back to destinations", "Volver a destinos"), "back_destinations"),
+             (self.t("Cancel", "Cancelar"), "cancel")]])
 
     def times(self):
         self.state["stage"] = "time"
@@ -109,18 +149,29 @@ class Conversation:
                          "4 · Elige una hora futura en tu zona horaria configurada."), [
             [(self.t("Today 19:00", "Hoy 19:00"), "time_today"),
              (self.t("Tomorrow 09:00", "Mañana 09:00"), "time_tomorrow")],
+            [(self.t("In 10 minutes", "En 10 minutos"), "time_soon")],
             [(self.t("Enter date and time", "Ingresar fecha y hora"), "time_custom")],
+            [(self.t("Back to destinations", "Volver a destinos"), "back_destinations")],
             [(self.t("Cancel", "Cancelar"), "cancel")]])
 
     def ready(self):
         self.state["stage"] = "ready"
         data = self.state["data"]
+        options=self.state.get("options") or {}
+        names={item["id"]:item["name"] for item in options.get("networks",[])}
+        when=datetime.fromisoformat(data["post_at"]).strftime("%Y-%m-%d %H:%M")
+        if data.get("cover_image"):
+            cover=self.t("✓ Cover image selected","✓ Imagen de portada seleccionada")
+        elif data.get("cover_second") is not None:
+            cover=self.t("✓ Frame at ","✓ Fotograma en ")+str(data["cover_second"])+" s"
+        else:
+            cover=self.t("Platform default","Predeterminada de la plataforma")
         self.emit(self.t("Ready to bake your plan.", "Todo listo para hornear el plan.") +
-                  "\n" + ", ".join(data["networks"]) + "\n" + data["post_at"] +
-                  "\n" + self.t("Mode: ", "Modo: ") + data["mode"] +
-                  "\n" + self.t("Cover: ", "Portada: ") + str(data.get("cover_second") or data.get("cover_image") or
-                                                              self.t("platform default", "predeterminada")) +
-                  "\n" + self.t("Final hashtag: ", "Etiqueta final: ") + data.get("final_tag", ""), [
+                  "\n📍 " + ", ".join(names.get(n,n) for n in data["networks"]) +
+                  "\n🗓 " + when + " · " + options.get("timezone",self.t("local time","hora local")) +
+                  "\n✍ " + (self.t("Your exact words","Tus palabras exactas") if data["mode"]=="exact" else self.t("Write from your idea","Redactar a partir de tu idea")) +
+                  "\n" + cover + "\n# " + self.t("Business hashtag: ","Etiqueta del negocio: ") + (data.get("final_tag") or self.t("Not set","Sin configurar")) +
+                  "\n\n" + self.t("Nothing is published yet. Bake, review, then confirm.","Aún no se publica nada. Hornea, revisa y luego confirma."), [
             [(self.t("👨‍🍳 Bake and review", "👨‍🍳 Hornea y revisa"), "bake")],
             [(self.t("Cover frame…", "Fotograma de portada…"), "cover_frame"),
              (self.t("Cover image…", "Imagen de portada…"), "cover_image")],
@@ -187,6 +238,8 @@ class Conversation:
             value = message.get("text", "").strip()
             if value in ("/start", "/help"):
                 self.home()
+            elif value in ("/settings", "/ajustes"):
+                self.settings_menu()
             elif value == "/new":
                 self.start()
             elif value == "/cancel":
@@ -199,7 +252,9 @@ class Conversation:
         self.send("answerCallbackQuery", callback_query_id=callback["id"])
         expected = self.state.get("id", "home") + ":" + str(self.state.get("version", 0)) + ":"
         value = callback.get("data", "")
-        if not value.startswith(expected) or (self.state.get("created_at") and time.time() > self.state["created_at"] + TTL):
+        action = value[len(expected):] if value.startswith(expected) else ""
+        settings_action = action in ("settings", "settings_back", "heartbeat_0", "heartbeat_30", "heartbeat_60", "heartbeat_360", "heartbeat_1440")
+        if not value.startswith(expected) or (not settings_action and self.state.get("created_at") and time.time() > self.state["created_at"] + TTL):
             self.send("sendMessage", chat_id=self.owner, text=self.t(
                 "This button is outdated. Use /new for a fresh plan.",
                 "Este botón ya no está vigente. Usa /new para preparar otro plan."))
@@ -272,21 +327,36 @@ class Conversation:
                 self.emit(self.t("Use the current buttons or /new.", "Usa los botones actuales o /new."),
                           [[(self.t("New post", "Nueva publicación"), "new")]])
         except Exception:
-            note = self.t(
-                "That input could not be used. Check the format and local services. Bot downloads support up to 20 MB; use the desktop app for larger files.",
-                "No se pudo usar ese dato. Revisa el formato y los servicios locales. El bot descarga hasta 20 MB por archivo; usa la app de escritorio para archivos más grandes.")
+            prompts = {
+                "wait_time": ("Use YYYY-MM-DD HH:MM, at least five minutes ahead, for example 2026-12-15 19:30. Your plan is kept.", "Usa AAAA-MM-DD HH:MM, al menos cinco minutos después de ahora; por ejemplo 2026-12-15 19:30. Se conserva tu plan."),
+                "wait_frame": ("Use a video second such as 12.5. Your plan is kept.", "Escribe un segundo del video, como 12,5. Se conserva tu plan."),
+                "wait_cover": ("Send an image as the cover. Your selected video is kept.", "Envía una imagen para la portada. Se conserva el video elegido."),
+                "wait_tag": ("Use one hashtag without spaces, or - to omit it. Your plan is kept.", "Usa una etiqueta sin espacios o - para omitirla. Se conserva tu plan.")}
+            note = self.t(*prompts[stage]) if stage in prompts else self.t(
+                "That step could not finish. Your current plan is kept. Photos/videos must be at most 20 MB; use the desktop app for larger files. Check local services and try again.",
+                "No se pudo completar ese paso. Se conserva tu plan actual. Las fotos y videos deben pesar como máximo 20 MB; usa la app de escritorio para archivos más grandes. Revisa los servicios locales e intenta de nuevo.")
             self.send("sendMessage", chat_id=self.owner, text=note)
 
     def accept_button(self, action):
         stage = self.state.get("stage")
         data = self.state.get("data", {})
-        if action == "resume":
-            renderers = {"ready": self.ready, "review": self.review, "assets": self.assets,
-                         "destinations": self.destinations, "time": self.times, "formats": self.formats}
-            if stage in renderers:
-                renderers[stage]()
+        if action in ("resume", "settings_back"):
+            if action == "settings_back" and self.state.get("created_at") and time.time() > self.state["created_at"] + TTL:
+                self.home()
+            else:
+                self.resume()
+        elif action == "settings":
+            self.settings_menu()
+        elif action.startswith("heartbeat_"):
+            value=action.removeprefix("heartbeat_")
+            if value not in ("0","30","60","360","1440"):
+                return
+            self.actions.set_heartbeat(int(value))
+            self.settings_menu(saved=True)
         elif action == "new":
             self.start()
+        elif action == "back_destinations" and stage in ("formats", "time", "wait_time"):
+            self.destinations()
         elif action == "status":
             self.actions.status()
         elif action == "cancel":

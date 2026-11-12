@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.0-rc.32]
+
+- Keep the primary next-step buttons in a persistent action bar; use more of the monitor height with a restrained desktop width.
+- Confirm cover previews with persistent success/error states and a short accessible notification; reuse unchanged previews and reject stale results.
+- Show a scheduling success state and return to Dashboard after eight active seconds, with a stay option; interaction, hidden windows and dialogs prevent surprise navigation.
+- Group tray actions into Publishing, Connections, and App & Support; keep About directly before Quit.
+- Explain normal on-demand token renewal without an alarm color. New gateway configurations default to a 30-minute inactivity timeout, keeping MFA and a two-hour session maximum. Existing migration backups preserve their configured session preferences.
+- Add owner-only Telegram ping settings via buttons or /settings, and explicit standalone WhatsApp settings commands. Change only the interval, preserve posting plans and migration holds, and apply the next interval without restarting the worker or sending an immediate ping.
+- Improve Telegram preflight summaries, back navigation, cover confirmation and input recovery; clarify WhatsApp approval consequences and retain loop protection for legacy bot replies.
+
 ## [2.0.0-rc.31]
 
 - Align Telegram direct-scheduling confirmation with approval of the configured WhatsApp audience; require a fresh review for confirmations saved under the older policy. Hide duplicate approval actions for already scheduled Status items.

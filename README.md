@@ -150,6 +150,8 @@ flowchart LR
   G --> H[Human approval → drafts → schedule]
 ```
 
+The composer keeps its next-step buttons visible below the scrolling form. Cover previews confirm success explicitly; direct scheduling offers an eight-second, cancellable return to Dashboard. Telegram provides **Settings · activity ping** (`/settings`). WhatsApp settings require explicit standalone commands: `postforge settings`, `postforge ping 60`, or `postforge ping off`; captions never trigger a settings mode. Ping preferences travel in encrypted backups and do not start stopped services.
+
 ## Connections, history, and updates
 
 - **Language:** choose **Settings & Tools → Language → Español (Ecuador)**. Open windows and the app menu update without discarding the idea or selected media. Dates use `es_EC`; captions, operator content, and raw upstream errors keep their original text. Postiz and Evolution have their own language controls.

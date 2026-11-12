@@ -19,7 +19,7 @@ class GatewayBackupTest(unittest.TestCase):
             root = Path(temporary)
             source = root / "gateway"
             source.mkdir(mode=0o700)
-            config = {"storage": {"encryption_key": "synthetic-encryption-key"}}
+            config = {"storage": {"encryption_key": "synthetic-encryption-key"}, "session": {"inactivity":"30m", "expiration":"2h"}}
             users = {"users": {"owner@example.org": {"disabled": False}}}
             (source / "configuration.yml").write_text(json.dumps(config))
             (source / "users.json").write_text(json.dumps(users))

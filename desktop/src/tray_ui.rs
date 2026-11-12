@@ -8,14 +8,17 @@ pub struct TrayUi {
     pub items: Vec<(String, MenuItem<tauri::Wry>)>,
 }
 const LABELS: &[(&str,&str,&str)] = &[
+ ("section-publish","Publishing","Publicación"),
  ("home","Dashboard","Inicio"),("new","New Post","Nueva publicación"),
  ("calendar","Open Postiz Calendar","Abrir calendario de Postiz"),
  ("wa-review","WhatsApp Plans & Receipts","Planes y recibos de WhatsApp"),
+ ("section-connections","Connections","Conexiones"),
  ("whatsapp","Connect WhatsApp","Conectar WhatsApp"),
  ("telegram","Telegram Settings","Ajustes de Telegram"),
+ ("network","Public URL & Tunnel","URL pública y túnel"),
+ ("section-app","App & Support","App y ayuda"),
  ("backup","Backup & Move","Respaldo y traslado"),
  ("updates","Check for Updates","Buscar actualizaciones"),
- ("network","Public URL & Tunnel","URL pública y túnel"),
  ("settings","Settings & Recovery","Ajustes y recuperación"),
  ("help","Help","Ayuda"),("about","About PostForge","Acerca de PostForge"),
  ("quit","Quit PostForge (services keep running)","Salir de PostForge (los servicios siguen activos)")
@@ -40,8 +43,8 @@ pub fn install(app:&tauri::AppHandle) -> tauri::Result<()> {
     menu.append(&status)?;menu.append(&PredefinedMenuItem::separator(app)?)?;
     let mut items=Vec::new();
     for (id,en,_) in LABELS {
-        if *id=="quit" {menu.append(&PredefinedMenuItem::separator(app)?)?;}
-        let item=MenuItem::with_id(app,*id,*en,true,None::<&str>)?;
+        if *id=="quit" || (*id!="section-publish" && id.starts_with("section-")) {menu.append(&PredefinedMenuItem::separator(app)?)?;}
+        let item=MenuItem::with_id(app,*id,*en,!id.starts_with("section-"),None::<&str>)?;
         menu.append(&item)?;items.push((id.to_string(),item));
     }
     let image=if cfg!(target_os="macos") {

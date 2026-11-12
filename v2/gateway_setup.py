@@ -39,7 +39,7 @@ def config(host):
         "access_control": {"default_policy": "deny",
                            "rules": [{"domain": host, "subject": ["group:postforge"], "policy": "two_factor"}]},
         "session": {"name": "postforge_gateway", "secret": secrets.token_urlsafe(48),
-                    "same_site": "lax", "inactivity": "15m", "expiration": "2h", "remember_me": -1,
+                    "same_site": "lax", "inactivity": "30m", "expiration": "2h", "remember_me": -1,
                     "cookies": [{"domain": host, "authelia_url": origin + "/authelia",
                                  "default_redirection_url": origin + "/"}]},
         "storage": {"encryption_key": secrets.token_urlsafe(48), "local": {"path": "/config/state.sqlite3"}},

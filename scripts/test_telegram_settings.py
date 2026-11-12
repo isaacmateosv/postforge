@@ -53,6 +53,21 @@ class TelegramSettingsTest(unittest.TestCase):
         if sys.platform != 'win32':
             self.assertEqual(self.env.stat().st_mode & 0o777, 0o600)
 
+    def test_mobile_ping_changes_only_interval_and_preserves_migration_hold(self):
+        self.env.write_text('KEEP_ME=synthetic-value\nTELEGRAM_BOT_TOKEN='+TOKEN+'\nTELEGRAM_OWNER_ID=7\nTELEGRAM_ENABLED=false\nTELEGRAM_MIGRATION_HOLD=true\nTELEGRAM_LANGUAGE=es\nTELEGRAM_HEARTBEAT_MINUTES=15\n')
+        before=settings.configuration(self.root)
+        result=settings.set_heartbeat(60,self.root)
+        after=settings.configuration(self.root)
+        self.assertEqual(result['minutes'],60)
+        self.assertFalse(result['active'])
+        before.pop('TELEGRAM_HEARTBEAT_MINUTES');after.pop('TELEGRAM_HEARTBEAT_MINUTES')
+        self.assertEqual(before,after)
+        self.start.assert_not_called();self.stop.assert_not_called()
+        self.assertNotIn(TOKEN,json.dumps(result))
+        for value in (-1,1,1441,True,'60'):
+            with self.assertRaises(ValueError):settings.set_heartbeat(value,self.root)
+        self.assertEqual(settings.heartbeat_preferences(self.root)['minutes'],60)
+
     def test_disable_works_offline_and_keeps_preferences(self):
         self.save()
         with patch.object(settings, 'telegram', side_effect=AssertionError('No network when disabling')):

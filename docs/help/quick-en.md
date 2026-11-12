@@ -204,3 +204,17 @@ In step 3, edit the publication date/time or choose **In 10 minutes**, then **Up
 **Try another title** generates only a YouTube title from the current caption. **Edit title** lets you write it yourself. The configured business hashtag ends the title within its 100-character limit; the description keeps its generated topic hashtags and ends with the business hashtag, or `#shorts` when no business hashtag is set.
 
 **Schedule directly** approves every selected destination, including WhatsApp Status for the configured audience at the reviewed time. **Create drafts** keeps the separate WhatsApp approval. Split Status videos can take several minutes per segment for large audiences. A sending indicator does not mean failure.
+
+### Clear next steps and messaging settings
+
+The next action stays at the bottom of the composer: **Choose delivery**, **Bake and review**, then **Create Drafts** or **Schedule directly**. A green **Cover ready** message confirms that the selected image/frame preview succeeded; preview errors stay visible. Confirmation means the cover was selected, not that every destination accepts it.
+
+After direct scheduling, a success screen returns to Dashboard after **eight active seconds**. Choose **Stay here** or interact with the receipt to stop the countdown. Hidden windows and open dialogs pause it. Draft creation stays on the receipt so you can finish any separate WhatsApp approval.
+
+In Telegram, open **Settings · activity ping**, or send `/settings`. Choose Off, every 30 minutes, hourly, every six hours, or daily. Your current posting plan stays intact. The next interval starts after the change; no test ping is sent. The worker must remain running to send activity messages; a ping cannot wake a stopped Mac or stopped service.
+
+In your WhatsApp self-chat, send **only** `postforge settings` to see preferences. Change the Telegram ping with `postforge ping 60`, or disable it with `postforge ping off`. These are standalone commands: they never open automatically from caption text, change the next message into a settings reply, or consume media waiting for a posting request. Granular 5–1440-minute intervals remain available; 0 means off. Preferences are saved in the installation configuration and included in encrypted migrations. Restoring a backup keeps Telegram paused until you explicitly activate it.
+
+The tray groups **Publishing**, **Connections**, and **App & Support**. WhatsApp Plans & Receipts stays in the main menu; About sits directly before Quit.
+
+Gateway sign-in now defaults to **30 minutes without requests**, with a **two-hour maximum session**. Postiz has a separate login. Backups retain your configured timeout. YouTube's short-lived access token can expire between uses; **Automatic renewal available** means a refresh credential is stored, not that publishing has been tested. Use **Check & renew** to verify it now; reconnect only if renewal fails.

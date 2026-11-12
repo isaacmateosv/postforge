@@ -379,6 +379,18 @@ class Operations(unittest.TestCase):
         with self.assertRaises(pmlib.PMError):
             plan_post.tagged_youtube_title("🍓" * 48, "#Example", strict=True)
 
+    def test_whatsapp_settings_require_an_explicit_standalone_command(self):
+        import telegram_settings
+        with patch.object(telegram_settings,'set_heartbeat') as save, patch.object(telegram_settings,'heartbeat_preferences',return_value={'minutes':60,'configured':True,'active':True}):
+            for text in ('post everywhere; idea: explain settings and ping', 'caption: postforge ping 60', 'I want postforge settings in this caption', '60', 'settings'):
+                self.assertIsNone(wa_inbox.settings_request(text,False))
+            self.assertIn('Every 60 minutes',wa_inbox.settings_request('postforge settings',False))
+            wa_inbox.settings_request('postforge ping off',False,dry_run=True)
+            save.assert_not_called()
+            save.return_value={'minutes':0,'configured':True,'active':True}
+            self.assertIn('guardado',wa_inbox.settings_request('postforge ping apagado',True))
+            save.assert_called_once_with(0)
+
     def test_ollama_reasoning_is_excluded_from_caption(self):
         self.assertEqual(pmlib.ollama_final_text({"response": "<think>analysis</think>Texto"}), "Texto")
         self.assertEqual(pmlib.ollama_final_text({"response": "<think>unfinished"}), "")

@@ -238,8 +238,8 @@ fn size_starting_window(app: &tauri::AppHandle) -> tauri::Result<()> {
             let area=monitor.work_area();let scale=monitor.scale_factor();
             let available_width=area.size.width as f64/scale;
             let available_height=area.size.height as f64/scale;
-            let width=1120.0_f64.min((available_width-48.0).max(320.0));
-            let height=960.0_f64.min((available_height-64.0).max(300.0));
+            let width=1240.0_f64.min((available_width*0.9).min(available_width-48.0).max(320.0));
+            let height=(available_height-40.0).max(300.0);
             window.set_min_size(Some(tauri::LogicalSize::new(width.min(720.0),height.min(600.0))))?;
             window.set_size(tauri::LogicalSize::new(width,height))?;
             window.set_position(tauri::LogicalPosition::new(area.position.x as f64/scale+(available_width-width)/2.0,area.position.y as f64/scale+16.0))?;

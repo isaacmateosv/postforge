@@ -216,3 +216,17 @@ En el paso 3 puedes cambiar la fecha y hora o elegir **En 10 minutos**, y luego 
 **Probar otro título** genera únicamente un título de YouTube a partir del texto actual. **Editar título** permite escribirlo manualmente. El hashtag del negocio cierra el título dentro de sus 100 caracteres; la descripción conserva los hashtags temáticos y termina con el del negocio, o con `#shorts` si no configuraste uno.
 
 **Programar directamente** aprueba todos los destinos seleccionados, incluido el Estado de WhatsApp para el público configurado a la hora revisada. **Crear borradores** conserva la aprobación separada de WhatsApp. Con públicos grandes, cada segmento del Estado puede tardar varios minutos; el indicador de envío no significa que haya fallado.
+
+### Pasos claros y ajustes de mensajería
+
+La siguiente acción permanece al pie de la ventana: **Elegir destinos**, **Hornea y revisa** y luego **Crear borradores** o **Programar directamente**. El aviso verde **Portada lista** confirma que la vista previa de la imagen o del fotograma se preparó correctamente; los errores se mantienen visibles. Esto confirma la selección, no que todos los destinos acepten esa portada.
+
+Después de programar directamente, la pantalla de confirmación vuelve al inicio tras **ocho segundos activos**. Pulsa **Quedarme aquí** o interactúa con el comprobante para detener la cuenta. Si la ventana está oculta o hay un diálogo abierto, se pausa. Al crear borradores se mantiene el comprobante para que puedas completar la aprobación separada de WhatsApp.
+
+En Telegram, abre **Ajustes · aviso de actividad** o envía `/settings`. Elige apagado, cada 30 minutos, cada hora, cada seis horas o una vez al día. Se conserva tu plan de publicación. El siguiente intervalo comienza después del cambio; no se envía un aviso de prueba. El agente debe seguir activo para enviar los avisos; el ping no puede despertar un Mac ni un servicio apagados.
+
+En tu chat contigo mismo de WhatsApp, envía únicamente `postforge ajustes` para ver las preferencias. Cambia el aviso de Telegram con `postforge ping 60` o apágalo con `postforge ping apagado`. Son comandos independientes: no se activan desde el texto de una publicación, no convierten tu siguiente mensaje en una respuesta de ajustes ni consumen archivos que esperan un pedido de publicación. Puedes usar de 5 a 1440 minutos; 0 significa apagado. Las preferencias se guardan en la configuración local y viajan en la migración cifrada. Al restaurar, Telegram queda en pausa hasta que lo actives expresamente.
+
+El menú de la barra organiza **Publicación**, **Conexiones** y **App y ayuda**. Planes y recibos de WhatsApp permanece en el menú principal; Acerca de PostForge está justo antes de Salir.
+
+El acceso del gateway usa por defecto **30 minutos sin solicitudes**, con un **máximo de dos horas por sesión**. Postiz tiene su propio inicio de sesión. Los respaldos conservan el tiempo configurado. El token temporal de YouTube puede vencer entre usos; **Renovación automática disponible** significa que hay una credencial de renovación guardada, no que se haya probado la publicación. Usa **Revisar y renovar** para comprobarlo ahora; vuelve a conectar solo si falla.

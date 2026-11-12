@@ -31,6 +31,17 @@ class Actions:
     def revise(self, identifier, edited=None):
         return composer.revise(self.env, identifier, edited)
 
+    def heartbeat_preferences(self):
+        import telegram_settings
+        return telegram_settings.heartbeat_preferences()
+
+    def set_heartbeat(self, minutes):
+        import telegram_settings
+        return telegram_settings.set_heartbeat(minutes)
+
+    def heartbeat_minutes(self):
+        return self.heartbeat_preferences()["minutes"]
+
     def submit(self, identifier, mode):
         return composer.submit(self.env, identifier, mode)
 
@@ -44,7 +55,9 @@ class Actions:
     def time_value(self, value):
         zone = composer.plan_post.ZoneInfo(self.env.get("PM_TIMEZONE", "America/Guayaquil"))
         now = datetime.now(zone)
-        if value in ("today", "tomorrow"):
+        if value == "soon":
+            when = now + timedelta(minutes=10)
+        elif value in ("today", "tomorrow"):
             when = (now + timedelta(days=value == "tomorrow")).replace(
                 hour=19 if value == "today" else 9, minute=0, second=0, microsecond=0)
         else:
