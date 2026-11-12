@@ -75,6 +75,21 @@ class InteractiveTests(unittest.TestCase):
         action.assert_called_once();act.assert_not_called()
         self.assertIn('tap',state['done']);self.assertNotIn('video',state['done'])
 
+    def test_worker_releases_lock_and_rejects_second_listener(self):
+        from contextlib import contextmanager
+        events=[]
+        @contextmanager
+        def lock(*args,**kwargs):
+            self.assertFalse(kwargs['blocking']);events.append('acquired')
+            try:yield
+            finally:events.append('released')
+        with patch.object(sys,'argv',['wa-inbox','--once','--dry-run']),patch.object(wa_inbox.file_lock,'exclusive',side_effect=lock),patch.object(wa_inbox.pmlib,'RUN_DIR',self.temp.name),patch.object(wa_inbox.pmlib,'load_env',return_value={}),patch.object(wa_inbox,'load_state',return_value={}),patch.object(wa_inbox,'one_pass'),patch.object(wa_inbox,'log'),patch.object(wa_inbox.signal,'signal'):
+            self.assertEqual(wa_inbox.main(),0)
+        self.assertEqual(events,['acquired','released'])
+        with patch.object(sys,'argv',['wa-inbox','--once','--dry-run']),patch.object(wa_inbox.file_lock,'exclusive',side_effect=OSError('locked')),patch.object(wa_inbox.pmlib,'RUN_DIR',self.temp.name),patch.object(wa_inbox.pmlib,'load_env') as env:
+            with self.assertRaisesRegex(wa_inbox.PMError,'already running'):wa_inbox.main()
+            env.assert_not_called()
+
     def test_unsupported_controls_do_not_retry_or_break_text_workflow(self):
         with patch.object(buttons,'Registry',return_value=self.registry),patch.object(wa_inbox,'evo_call',return_value=(400,{})) as call:
             wa_inbox.button_menu({},'synthetic','owner',{},[('Settings','settings')],'Test','Test')

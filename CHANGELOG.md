@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.34]
+
+- Use the shared cross-platform process lock for WhatsApp intake so Windows can load and run the worker; preserve exclusive ownership and release the lock on exit.
+
 ## [2.0.0-rc.33]
 
 - Add WhatsApp self-chat reply buttons for reviewed-plan approval, caption alternatives, cancellation and explicit ping settings, with existing text commands kept as the fallback.

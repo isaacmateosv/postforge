@@ -20,7 +20,7 @@ primary phone becomes Postiz drafts, like the menu bar's New Post window (same e
 """
 import argparse
 import base64
-import fcntl
+from contextlib import ExitStack
 import html
 import json
 import os
@@ -34,6 +34,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import file_lock  # noqa: E402
 import pmlib  # noqa: E402
 import plan_post  # noqa: E402
 import whatsapp_pending  # noqa: E402
@@ -849,41 +850,41 @@ def main():
             print("Sent approval for plan " + args.send_plan_approval)
         return 0
     os.makedirs(pmlib.RUN_DIR, exist_ok=True)
-    lock = open(LOCK_FILE, "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        raise PMError("another WhatsApp door worker is already running")
-    signal.signal(signal.SIGTERM, lambda *_: globals().__setitem__("stopping", True))
-    env = pmlib.load_env()
-    state = load_state()
-    log("listening to your own chat (dry run)" if args.dry_run else "listening to your own chat")
-    if not args.dry_run:
-        interrupted = whatsapp_pending.recover_interrupted()
-        if interrupted:
-            log("%d interrupted WhatsApp Status send(s) held for review" % interrupted)
-    next_cleanup = 0
-    while True:
+    with ExitStack() as locks:
         try:
-            one_pass(env, state, args.dry_run)
-        except PMError as exc:
-            log("pass skipped: %s" % exc)
-        except Exception as exc:  # keep listening; the log shows what went wrong
-            log("pass failed: %s: %s" % (type(exc).__name__, exc))
-        if args.once or stopping:
-            return 0
-        if not args.dry_run and time.monotonic() >= next_cleanup:
-            next_cleanup = time.monotonic() + 86400
+            locks.enter_context(file_lock.exclusive(LOCK_FILE, blocking=False))
+        except OSError:
+            raise PMError("another WhatsApp door worker is already running")
+        signal.signal(signal.SIGTERM, lambda *_: globals().__setitem__("stopping", True))
+        env = pmlib.load_env()
+        state = load_state()
+        log("listening to your own chat (dry run)" if args.dry_run else "listening to your own chat")
+        if not args.dry_run:
+            interrupted = whatsapp_pending.recover_interrupted()
+            if interrupted:
+                log("%d interrupted WhatsApp Status send(s) held for review" % interrupted)
+        next_cleanup = 0
+        while True:
             try:
-                subprocess.run([sys.executable, os.path.join(pmlib.ROOT, "scripts", "retention.py"),
-                                "--whatsapp-cache", "--apply", "--json"], timeout=30,
-                               stdout=subprocess.DEVNULL, check=True)
-            except (OSError, subprocess.SubprocessError):
-                log("WhatsApp cache cleanup could not finish")
-        for _ in range(POLL_SECONDS):
-            if stopping:
+                one_pass(env, state, args.dry_run)
+            except PMError as exc:
+                log("pass skipped: %s" % exc)
+            except Exception as exc:  # keep listening; the log shows what went wrong
+                log("pass failed: %s: %s" % (type(exc).__name__, exc))
+            if args.once or stopping:
                 return 0
-            time.sleep(1)
+            if not args.dry_run and time.monotonic() >= next_cleanup:
+                next_cleanup = time.monotonic() + 86400
+                try:
+                    subprocess.run([sys.executable, os.path.join(pmlib.ROOT, "scripts", "retention.py"),
+                                    "--whatsapp-cache", "--apply", "--json"], timeout=30,
+                                   stdout=subprocess.DEVNULL, check=True)
+                except (OSError, subprocess.SubprocessError):
+                    log("WhatsApp cache cleanup could not finish")
+            for _ in range(POLL_SECONDS):
+                if stopping:
+                    return 0
+                time.sleep(1)
 
 
 if __name__ == "__main__":
