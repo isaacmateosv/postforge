@@ -137,9 +137,9 @@ requieren fotos o videos. WhatsApp usa su propio formato de Estado.
 Si adjuntas un solo video, en **Portada del video** puedes elegir una imagen aparte
 o ingresar un segundo, por ejemplo `12,5`. El plan muestra qué borradores pueden
 usar la portada. Los reels de Instagram admiten ambas opciones. En los videos
-normales de YouTube puedes usar una imagen o un fotograma extraído del video.
+de YouTube, incluidos Shorts, puedes usar una imagen o un fotograma extraído del video; la cuenta debe tener habilitadas las miniaturas personalizadas.
 En publicación directa de TikTok puedes indicar el segundo. Para los envíos a
-la bandeja de TikTok y YouTube Shorts, elige la portada en la plataforma.
+la bandeja de TikTok, elige la portada en la plataforma.
 
 Si el plan incluye un video para un destino que admite portada y todavía no elegiste una, PostForge te pregunta si quieres continuar. En un plan listo para revisar, usa **Editar portada…** para habilitar los controles y volver a hornear el plan.
 
@@ -208,3 +208,11 @@ La ventana de red se actualiza al volver a ella y mientras está visible. Antes 
 
 
 Un token de acceso vencido que tiene una credencial de actualización guardada se muestra como **Se renueva al volver a usarse**, no como una tarea de renovación en cola. Pulsa **Conexiones → Revisar y renovar** para intentarlo mediante consultas de estadísticas de solo lectura. Solo se consultan canales con tokens vencidos que admiten renovación. PostForge vuelve a leer el estado guardado; no marca el canal como conectado únicamente por recibir HTTP 200. Reconecta solo si la renovación falla. Esta acción no publica nada y las comprobaciones en segundo plano no envían solicitudes de renovación.
+
+### Revisar sin empezar de nuevo
+
+En el paso 3 puedes cambiar la fecha y hora o elegir **En 10 minutos**, y luego **Actualizar hora**. Se conservan las versiones del texto, la portada y los destinos. Al enviar también se guarda la hora modificada antes de pedir confirmación.
+
+**Probar otro título** genera únicamente un título de YouTube a partir del texto actual. **Editar título** permite escribirlo manualmente. El hashtag del negocio cierra el título dentro de sus 100 caracteres; la descripción conserva los hashtags temáticos y termina con el del negocio, o con `#shorts` si no configuraste uno.
+
+**Programar directamente** aprueba todos los destinos seleccionados, incluido el Estado de WhatsApp para el público configurado a la hora revisada. **Crear borradores** conserva la aprobación separada de WhatsApp. Con públicos grandes, cada segmento del Estado puede tardar varios minutos; el indicador de envío no significa que haya fallado.

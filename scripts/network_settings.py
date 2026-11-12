@@ -62,6 +62,11 @@ def restore_provider(path):
     """Rebuild the generated connector from encrypted portable settings, without starting it."""
     config=values(path);provider=config['PM_TUNNEL_PROVIDER'] or 'ngrok'
     (path.parent/'run').mkdir(mode=0o700,exist_ok=True)
+    gateway_template=path.parent/'v2/gateway/Caddyfile'
+    if gateway_template.is_file():
+        generated=path.parent/'run/postforge-gateway'
+        generated.mkdir(mode=0o700,parents=True,exist_ok=True)
+        tunnel.private_write(generated/'Caddyfile',gateway_template.read_bytes(),path.parent/'run')
     override=path.parent/'docker-compose.override.yml'
     template=override.read_text() if override.exists() else (path.parent/'v2/compose.gateway.yml').read_text()
     # Replace symlinks atomically; never modify the tracked gateway template.
@@ -89,6 +94,9 @@ def status(check=False,force=False):
                     return dict(result,**{key:saved.get(key) for key in ('reachable','discovered_url','needs_sync','checked_at')})
             except (OSError,ValueError,KeyError):pass
         result['reachable']=tunnel.gateway_ready(result['url']) if result['url'] else False
+        # Confirm failures: a single short timeout during uploads is not proof of an outage.
+        if result['url'] and not result['reachable']:
+            result['reachable']=tunnel.gateway_ready(result['url'])
         try:result['discovered_url']=quick_url() if provider=='trycloudflare' else None
         except (OSError,subprocess.SubprocessError):result['discovered_url']=None
         result['needs_sync']=bool(result['discovered_url'] and result['discovered_url']!=result['url'])

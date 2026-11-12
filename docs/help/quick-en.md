@@ -127,7 +127,7 @@ For a single video, use **Video cover** to choose a separate image or enter a
 second, such as `12.5`. The plan shows which drafts can use the cover.
 Instagram Reels accept both options. Regular YouTube videos use an image or a
 frame extracted from the video. TikTok Direct Post can use a frame timestamp.
-Choose the cover on the platform for TikTok inbox uploads and YouTube Shorts.
+Choose the cover on the platform for TikTok inbox uploads. YouTube videos and Shorts send the selected image or extracted frame as a custom thumbnail; channel eligibility still applies.
 
 If the plan has a video for a destination that accepts a cover and you haven’t chosen one, PostForge asks whether to continue. After reviewing the plan, use **Edit cover…** to unlock the cover controls and bake the revised plan again.
 
@@ -196,3 +196,11 @@ The network window refreshes when you return to it and while it is visible. URL 
 
 
 An expired access token with a saved refresh credential is shown as **Renews on next use**, not a queued renewal job. Choose **Connections → Check & renew** to attempt renewal now through read-only channel analytics. Only expired, renewable channels are checked. PostForge rereads the saved result; it does not mark a channel healthy just because the request returned HTTP 200. Reconnect only if renewal fails. This action does not publish posts, and background status polling does not trigger refresh requests.
+
+### Review without starting again
+
+In step 3, edit the publication date/time or choose **In 10 minutes**, then **Update time**. Your caption iterations, cover and destinations stay intact. Submission also saves a changed review time before confirmation.
+
+**Try another title** generates only a YouTube title from the current caption. **Edit title** lets you write it yourself. The configured business hashtag ends the title within its 100-character limit; the description keeps its generated topic hashtags and ends with the business hashtag, or `#shorts` when no business hashtag is set.
+
+**Schedule directly** approves every selected destination, including WhatsApp Status for the configured audience at the reviewed time. **Create drafts** keeps the separate WhatsApp approval. Split Status videos can take several minutes per segment for large audiences. A sending indicator does not mean failure.

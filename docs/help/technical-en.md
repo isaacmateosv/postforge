@@ -308,7 +308,7 @@ Refresh tokens belong to the Postiz database, not `.env`. Encrypted Backup & Mov
 - **Regular video**: supply landscape footage. YouTube classifies eligible portrait/square uploads of up to three minutes as Shorts; a menu selection or hashtag cannot override that classification. To publish both formats, prepare and review separate landscape and portrait versions.
 - A title has a 100-character limit. The description remains separate and is not shortened to the title limit. Review/edit the generated title before creating drafts.
 - The description ends with the configured business hashtag, alongside the other topic hashtags. If no business hashtag is configured, it ends with `#shorts`. PostForge does not append `#Shorts` to the title. A hashtag does not decide the video's format.
-- Use the local player in Compose to review the selected file. In Delivery, preview an uploaded cover or a video timestamp. A preview does not guarantee the platform supports custom thumbnails: choose Shorts covers in YouTube itself.
+- Use the local player in Compose to review the selected file. In Delivery, preview an uploaded cover or a video timestamp. A preview does not guarantee the platform supports custom thumbnails: YouTube videos and Shorts now use the thumbnail upload API; account eligibility and API errors still apply.
 
 ## Check connection health and test safely
 
@@ -408,3 +408,9 @@ Public URL migration also updates locally hosted channel profile pictures. If yo
 
 
 An expired access token with a saved refresh credential is shown as **Renews on next use**, not a queued renewal job. Choose **Connections → Check & renew** to attempt renewal now through read-only channel analytics. Only expired, renewable channels are checked. PostForge rereads the saved result; it does not mark a channel healthy just because the request returned HTTP 200. Reconnect only if renewal fails. This action does not publish posts, and background status polling does not trigger refresh requests.
+
+### Reviewed submission changes (rc.30)
+
+Review-time edits issue a fresh signed composer ticket without rerunning caption generation. Caption versions share the new reviewed time in the UI. Title-only generation uses the reviewed caption and preserves delivery fields. Direct scheduling explicitly approves the newly created WhatsApp queue item by ID; draft creation never approves it. Family locking still prevents duplicate submission.
+
+The public `/robots.txt` permits only `/postforge-media/` crawling and disallows other paths. Signed media retains HMAC/expiry checks and `X-Robots-Tag: noindex, nofollow, noarchive`; raw uploads and the dashboard retain gateway authentication. Provider/update preparation refreshes the generated Caddy template. Failed gateway probes are confirmed once before reporting a failed verification.

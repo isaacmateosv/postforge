@@ -129,7 +129,10 @@
   <div class="workspace review-grid">
     <article class="card">
       <div class="section-title"><span class="number">3</span><h2 data-en="Review the plan" data-es="Revisa el plan"></h2></div>
-      <div id="plan-meta"></div><div id="warnings"></div><button id="edit-inputs"></button>
+      <div id="plan-meta"></div>
+      <label><span data-en="Publication date and time" data-es="Fecha y hora de publicación"></span><input id="review-post-at" type="datetime-local"></label>
+      <div class="actions wrap"><button id="review-save-time" data-en="Update time" data-es="Actualizar hora"></button><button id="review-asap" data-en="In 10 minutes" data-es="En 10 minutos"></button></div>
+      <small data-en="Changing the time keeps your captions, title and cover." data-es="Cambiar la hora conserva los textos, el título y la portada."></small><div id="warnings"></div><button id="edit-inputs"></button>
     </article>
     <article class="card">
       <div class="copy-toolbar"><h2 data-en="Caption" data-es="Texto"></h2><div>
@@ -141,7 +144,7 @@
       <div class="finish">
         <p data-en="Choose how this plan should continue." data-es="Elige cómo quieres continuar con este plan."></p>
         <div class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
-        <small data-en="WhatsApp Status has its own approval after creation." data-es="El Estado de WhatsApp se aprueba por separado después de crear el plan."></small>
+        <small data-en="Drafts require a separate WhatsApp approval. Schedule directly approves all selected destinations." data-es="Los borradores requieren aprobar WhatsApp por separado. Programar directamente aprueba todos los destinos seleccionados."></small>
       </div>
     </article>
   </div>

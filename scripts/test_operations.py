@@ -344,6 +344,41 @@ class Operations(unittest.TestCase):
             client.create_draft(channel, "Caption", schedule=True)
             self.assertEqual(call.call_args.args[2]["type"], "schedule")
 
+    def test_whatsapp_only_direct_schedule_approves_reviewed_item(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, 'whatsapp tomorrow at 9am; caption: "A synthetic notice"', [], None, now,
+                           text_networks=["whatsapp"])
+        with patch.object(pmlib, "Postiz"), patch.object(plan_post.whatsapp_pending, "enqueue", return_value="new-status") as enqueue, patch.object(plan_post.whatsapp_pending, "approve", return_value="new-status") as approve:
+            preview = plan_post.run({}, p, True)
+            self.assertTrue(preview["direct_schedule_available"])
+            approve.assert_not_called()
+            receipt = plan_post.run({}, p, False, schedule=True)
+            approve.assert_called_once_with("new-status", source="reviewed-direct-schedule")
+            self.assertTrue(receipt["whatsapp_scheduled"])
+            self.assertEqual(enqueue.call_args.args[3], p["when"].astimezone(timezone.utc))
+
+    def test_short_frame_cover_is_uploaded_and_passed_to_youtube(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, 'youtube tomorrow at 9am; caption: "Synthetic video"', ["clip.mp4"], None, now, cover_second=1)
+        def extract(command, **kwargs):
+            if command[0] == "ffmpeg": Path(command[-1]).write_bytes(b"synthetic jpeg")
+        with patch.object(pmlib,"Postiz") as api, patch.object(pmlib,"normalize_media",return_value=("video","clip.mp4")), patch.object(pmlib,"ffprobe",return_value=(30,"h264","aac",1080,1920)), patch.object(pmlib,"is_short",return_value=True), patch.object(pmlib,"run",side_effect=extract), patch.object(pmlib,"append_log"):
+            client=api.return_value
+            client.integrations.return_value=[{"id":"yt","identifier":"youtube","name":"Synthetic"}]
+            client.upload.side_effect=[{"id":"video","path":"https://synthetic.example/video.mp4"},{"id":"cover","path":"https://synthetic.example/cover.jpg"}]
+            client.create_draft.return_value=[{"postId":"synthetic"}]
+            plan_post.run({},p,False)
+            self.assertEqual(client.create_draft.call_args.kwargs["settings"]["thumbnail"]["id"],"cover")
+
+    def test_short_cover_and_business_title_are_supported(self):
+        self.assertEqual(plan_post.cover_mode({}, "youtube", "feed", None, 12, True), "frame-image")
+        self.assertEqual(plan_post.cover_mode({}, "youtube", "feed", "cover.jpg", None, True), "image")
+        title = plan_post.tagged_youtube_title("A complete title " * 15, "#Example")
+        self.assertTrue(title.endswith(" #Example"))
+        self.assertLessEqual(len(title.encode("utf-16-le")) // 2,100)
+        with self.assertRaises(pmlib.PMError):
+            plan_post.tagged_youtube_title("🍓" * 48, "#Example", strict=True)
+
     def test_ollama_reasoning_is_excluded_from_caption(self):
         self.assertEqual(pmlib.ollama_final_text({"response": "<think>analysis</think>Texto"}), "Texto")
         self.assertEqual(pmlib.ollama_final_text({"response": "<think>unfinished"}), "")

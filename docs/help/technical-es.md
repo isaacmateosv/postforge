@@ -323,7 +323,7 @@ Los tokens de actualización se guardan en la base de datos de Postiz, no en `.e
 - **Video normal**: usa un archivo horizontal. YouTube clasifica como Shorts los videos verticales o cuadrados que cumplen el límite de tres minutos; un selector o hashtag no cambia esa regla. Para publicar ambos formatos, prepara y revisa versiones separadas.
 - El título admite hasta 100 caracteres. La descripción es independiente y no se recorta a ese límite. Revisa o edita el título antes de crear los borradores.
 - La descripción termina con la etiqueta configurada para el negocio, además de las etiquetas temáticas. Si está vacía, termina con `#shorts`. No se añade `#Shorts` al título. La etiqueta no determina el formato.
-- Revisa el archivo en el reproductor local de Redacta. En Destinos puedes ver la portada subida o el fotograma elegido. Que exista una vista previa no significa que todos los destinos admitan portadas personalizadas: para Shorts, elígela en YouTube.
+- Revisa el archivo en el reproductor local de Redacta. En Destinos puedes ver la portada subida o el fotograma elegido. Que exista una vista previa no significa que todos los destinos admitan portadas personalizadas: los videos de YouTube y Shorts envían la miniatura mediante la API; se siguen aplicando los permisos de la cuenta y sus posibles errores.
 
 ## Estado de conexión y prueba
 
@@ -423,3 +423,9 @@ Al cambiar la URL pública también se actualizan las fotos de perfil de los can
 
 
 Un token de acceso vencido que tiene una credencial de actualización guardada se muestra como **Se renueva al volver a usarse**, no como una tarea de renovación en cola. Pulsa **Conexiones → Revisar y renovar** para intentarlo mediante consultas de estadísticas de solo lectura. Solo se consultan canales con tokens vencidos que admiten renovación. PostForge vuelve a leer el estado guardado; no marca el canal como conectado únicamente por recibir HTTP 200. Reconecta solo si la renovación falla. Esta acción no publica nada y las comprobaciones en segundo plano no envían solicitudes de renovación.
+
+### Cambios del envío revisado (rc.30)
+
+Cambiar la hora emite un nuevo comprobante de revisión sin regenerar el texto. La interfaz aplica la hora a todas sus versiones. Generar solo el título usa el texto revisado y conserva los campos de entrega. La programación directa aprueba por ID únicamente el nuevo Estado de WhatsApp; crear borradores no lo aprueba. El bloqueo por familia sigue evitando envíos duplicados.
+
+El archivo público `/robots.txt` permite rastrear únicamente `/postforge-media/` y prohíbe las otras rutas. Los enlaces firmados conservan la validación HMAC y su vencimiento, con `X-Robots-Tag: noindex, nofollow, noarchive`; los archivos sin firma y el panel siguen requiriendo autenticación. La preparación de proveedores y actualizaciones renueva la plantilla de Caddy. Una comprobación fallida del gateway se confirma una vez antes de informar que no se pudo verificar.
