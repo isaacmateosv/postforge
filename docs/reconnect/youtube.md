@@ -25,7 +25,7 @@ Refresh tokens belong to the Postiz database, not `.env`. Encrypted Backup & Mov
 - **Regular video**: supply landscape footage. YouTube classifies eligible portrait/square uploads of up to three minutes as Shorts; a menu selection or hashtag cannot override that classification. To publish both formats, prepare and review separate landscape and portrait versions.
 - A title has a 100-character limit. The description remains separate and is not shortened to the title limit. Review/edit the generated title before creating drafts.
 - The description ends with the configured business hashtag, alongside the other topic hashtags. If no business hashtag is configured, it ends with `#shorts`. PostForge does not append `#Shorts` to the title. A hashtag does not decide the video's format.
-- Use the local player in Compose to review the selected file. In Delivery, preview an uploaded cover or a video timestamp. A preview does not guarantee the platform supports custom thumbnails: choose Shorts covers in YouTube itself.
+- Use the local player in Compose to review the selected file. In Delivery, preview an uploaded cover or a video timestamp. A preview does not guarantee the platform supports custom thumbnails: YouTube videos and Shorts send the selected image/frame through the thumbnail API, subject to channel eligibility.
 
 ## Check connection health and test safely
 

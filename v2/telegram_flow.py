@@ -381,12 +381,16 @@ class Conversation:
             if action == "schedule" and not self.current()["plan"].get("direct_schedule_available"):
                 return
             self.state["stage"], self.state["submit_mode"] = "confirm", "draft" if action == "create" else "schedule"
-            self.emit(self.t("Confirm the reviewed plan. Direct scheduling publishes automatically at its time. WhatsApp Status still needs separate approval.",
-                             "Confirma el plan revisado. La programación directa publica automáticamente a esa hora. El Estado de WhatsApp requiere aprobación aparte."), [
+            self.state["confirmation_scope"] = "all-selected-including-status"
+            self.emit(self.t("Confirm the reviewed plan. Direct scheduling approves all selected destinations, including WhatsApp Status for the configured audience at the reviewed time. Draft creation keeps separate WhatsApp approval.",
+                             "Confirma el plan revisado. Programar directamente aprueba todos los destinos seleccionados, incluido el Estado de WhatsApp para el público configurado a la hora revisada. Crear borradores conserva la aprobación separada de WhatsApp."), [
                 [(self.t("Confirm", "Confirmar"), "confirm_submit"), (self.t("Back", "Volver"), "confirm_back")]])
         elif action == "confirm_back" and stage == "confirm":
             self.review()
         elif action == "confirm_submit" and stage == "confirm":
+            if self.state.get("submit_mode") == "schedule" and self.state.get("confirmation_scope") != "all-selected-including-status":
+                self.review()
+                return
             self.state["stage"] = "submitting"
             self.persist()
             try:
@@ -399,7 +403,7 @@ class Conversation:
             self.state["stage"] = "done"
             self.actions.discard(data)
             rows = [[(self.t("New post", "Nueva publicación"), "new")]]
-            if receipt.get("whatsapp_pending_id"):
+            if receipt.get("whatsapp_pending_id") and not receipt.get("whatsapp_scheduled"):
                 rows.insert(0, [(self.t("Review WhatsApp approval…", "Revisar aprobación de WhatsApp…"), "status_approval")])
             self.emit(self.t("Plan submitted. Review the Postiz calendar for the social entries.",
                              "Plan enviado. Revisa los elementos de redes en el calendario de Postiz."), rows)

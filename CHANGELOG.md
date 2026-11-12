@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.31]
+
+- Align Telegram direct-scheduling confirmation with approval of the configured WhatsApp audience; require a fresh review for confirmations saved under the older policy. Hide duplicate approval actions for already scheduled Status items.
+- Update both YouTube reconnection guides for selected Shorts covers.
+
 ## [2.0.0-rc.30]
 
 - Generate a new YouTube title independently from the reviewed caption; preserve titles across caption edits and append the optional business hashtag within 100 UTF-16 units.

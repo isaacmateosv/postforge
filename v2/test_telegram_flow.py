@@ -54,6 +54,13 @@ class FlowTests(unittest.TestCase):
             "targets": [{"network": "facebook", "placement": "feed"}], "warnings": [], "notes": [],
             "direct_schedule_available": True}}
 
+    def test_saved_old_schedule_confirmation_cannot_approve_new_scope(self):
+        self.ready()
+        self.flow.state.update(stage="confirm",submit_mode="schedule",history=[self.actions.preview.return_value],selected=0)
+        self.callback("confirm_submit")
+        self.actions.submit.assert_not_called()
+        self.assertEqual(self.flow.state["stage"],"review")
+
     def test_unauthorized_sender_does_not_touch_planner(self):
         self.message("/new", owner=8)
         self.actions.options.assert_not_called()
