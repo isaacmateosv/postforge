@@ -115,6 +115,40 @@ class ComposerTests(unittest.TestCase):
         with self.assertRaises(pmlib.PMError):
             composer.revise(self.env, original["review_id"], youtube_title="x" * 101)
 
+    def test_time_edit_preserves_copy_and_updates_submission(self):
+        original = self.preview()
+        edited = composer.revise(self.env, original["review_id"], "Hand edited caption")
+        when = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+        moved = composer.revise(self.env, edited["review_id"], post_at=when)
+        self.assertEqual(moved["plan"]["caption"], edited["plan"]["caption"])
+        self.assertEqual(moved["plan"]["targets"], edited["plan"]["targets"])
+        self.assertEqual(moved["plan"]["when_utc"], when)
+        with patch.object(composer.plan_post, "run", return_value={"drafts":[]}) as run:
+            composer.submit(self.env, moved["review_id"], "schedule")
+        self.assertEqual(run.call_args.args[1]["when"].isoformat(), when)
+        self.assertEqual(run.call_args.args[1]["reviewed_caption"], edited["plan"]["caption"])
+        with self.assertRaises(pmlib.PMError):
+            composer.revise(self.env, moved["review_id"], post_at="not-a-time")
+
+    def test_caption_edit_keeps_independently_reviewed_title(self):
+        self.plan.update(youtube_title="Reviewed title #Example", final_tag="#Example")
+        original=self.preview()
+        revised=composer.revise(self.env,original["review_id"],edited="Hand edited caption")
+        self.assertEqual(revised["plan"]["youtube_title"],original["plan"]["youtube_title"])
+        self.assertTrue(revised["plan"]["caption"].endswith("#Example"))
+
+    def test_generated_title_changes_only_title_and_uses_current_caption(self):
+        self.plan.update(youtube_title="Old title", final_tag="#Example")
+        original = self.preview()
+        with patch.object(composer.plan_post, "reviewed_youtube_title", return_value="New title #Example") as generate:
+            revised = composer.revise(self.env, original["review_id"], regenerate_title=True)
+        self.assertEqual(generate.call_args.args[1], original["plan"]["caption"])
+        before = dict(original["plan"]); after = dict(revised["plan"])
+        for key in ("youtube_title", "youtube_title_manual"):
+            before.pop(key,None);after.pop(key,None)
+        self.assertEqual(before,after)
+        self.assertTrue(revised["plan"]["youtube_title"].endswith("#Example"))
+
     def test_new_install_has_no_business_hashtag_and_background_is_validated(self):
         with patch.object(pmlib, "Postiz") as api:
             api.return_value.integrations.return_value = []

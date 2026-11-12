@@ -68,7 +68,7 @@ def dispatch(operation, payload):
     if operation == "preview":
         return composer.preview(env, payload)
     if operation == "revise":
-        return composer.revise(env, payload["review_id"], payload.get("edited"), payload.get("youtube_title"))
+        return composer.revise(env, payload["review_id"], payload.get("edited"), payload.get("youtube_title"), payload.get("regenerate_title", False), payload.get("post_at"))
     if operation == "submit":
         return composer.submit(env, payload["review_id"], payload["mode"])
     if operation in ("cleanup_preview", "cleanup"):

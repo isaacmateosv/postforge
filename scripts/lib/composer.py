@@ -154,7 +154,7 @@ def issue_ticket(data, result, family, expected):
     return {"review_id": identifier, "plan": result}
 
 
-def revise(env, identifier, edited=None, youtube_title=None):
+def revise(env, identifier, edited=None, youtube_title=None, regenerate_title=False, post_at=None):
     ticket = load_ticket(identifier)
     with file_lock.exclusive(str(path_for(ticket["family"])) + ".lock"):
         state = json.loads(path_for(ticket["family"]).read_text())
@@ -166,10 +166,27 @@ def revise(env, identifier, edited=None, youtube_title=None):
         if signature(data) != ticket["signature"]:
             raise pmlib.PMError("An attached file changed. Prepare a fresh plan.")
         instruction = ("idea: " if data["mode"] == "idea" else "caption: ") + data["body"]
-        if youtube_title is not None:
-            if not isinstance(youtube_title, str) or not youtube_title.strip() or len(youtube_title.strip()) > 100:
+        if post_at is not None:
+            data = dict(data, post_at=post_at)
+            delivery = build_plan(env, data)
+            result = dict(copy.deepcopy(ticket["plan"]),
+                          when_utc=delivery["when"].astimezone(timezone.utc).isoformat(),
+                          when_local=delivery["when"].strftime("%a %d %b %Y %H:%M"))
+            return issue_ticket(data, result, ticket["family"], signature(data))
+        if regenerate_title:
+            result = copy.deepcopy(ticket["plan"])
+            if not result.get("youtube_title"):
+                raise pmlib.PMError("This plan has no YouTube destination.")
+            with pmlib.Job("compose-title", "Try another YouTube title"):
+                result["youtube_title"] = plan_post.reviewed_youtube_title(
+                    env, result["caption"], None, result["lang"], result.get("short", False),
+                    force=True, tag=result.get("final_tag", ""), previous=result["youtube_title"])
+            result["youtube_title_manual"] = True
+        elif youtube_title is not None:
+            if not isinstance(youtube_title, str) or not youtube_title.strip() or len(youtube_title.strip().encode("utf-16-le")) // 2 > 100:
                 raise pmlib.PMError("YouTube titles must contain 1–100 characters. / El título de YouTube debe tener entre 1 y 100 caracteres.")
-            result = dict(copy.deepcopy(ticket["plan"]), youtube_title=youtube_title.strip(), youtube_title_manual=True)
+            title = plan_post.tagged_youtube_title(youtube_title.strip(), ticket["plan"].get("final_tag", ""), strict=True)
+            result = dict(copy.deepcopy(ticket["plan"]), youtube_title=title, youtube_title_manual=True)
         else:
             with pmlib.Job("compose-caption", "Revise a caption"):
                 result = plan_post.revise_copy(env, ticket["plan"], instruction, edited)

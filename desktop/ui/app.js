@@ -262,6 +262,7 @@ function renderReview() {
     destinations.append(item);
   }
   $("plan-meta").append(when, destinations);
+  $("review-post-at").value = new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(plan.when_utc)).replace(" ","T");
   $("warnings").textContent = [...(plan.notes || []), ...(plan.warnings || [])].join("\n\n");
   renderCopy();
   updateVersionControls();
@@ -280,7 +281,13 @@ function renderCopy() {
     const value = document.createElement("p"); value.textContent = plan.youtube_title;
     const button = document.createElement("button"); button.textContent = text("Edit title", "Editar título");
     button.onclick = editYoutubeTitle;
-    section.append(heading,value,button); $("copy").append(section);
+    const retry = document.createElement("button"); retry.textContent = text("Try another title", "Probar otro título");
+    retry.onclick = async () => { await work(text("Preparing another title", "Preparando otro título"), async () => {
+      state.history[state.selected] = await engine("revise", {review_id:current().review_id, regenerate_title:true});
+      renderCopy();
+    }); };
+    const actions = document.createElement("div"); actions.className = "actions wrap"; actions.append(button,retry);
+    section.append(heading,value,actions); $("copy").append(section);
   }
   if(plan.youtube_caption && plan.youtube_caption!==plan.caption){
     const section=document.createElement("div");section.className="platform-copy";
@@ -374,11 +381,13 @@ async function revise(edited) {
 }
 
 async function submit(mode) {
+  if (!current() || state.busy) return;
+  if ($("review-post-at").value !== new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(current().plan.when_utc)).replace(" ","T")) { if (!await rescheduleReview()) return; }
   const result = current();
   if (!result) return;
   const prompt = mode === "schedule"
-    ? text("These social posts will publish automatically at the reviewed time. WhatsApp Status requires separate approval.",
-           "Las publicaciones de redes saldrán automáticamente a la hora revisada. El Estado de WhatsApp requiere aprobación aparte.")
+    ? text("All selected destinations, including WhatsApp Status, will publish at the reviewed time. This also approves delivery to your configured WhatsApp audience.",
+           "Todos los destinos seleccionados, incluido el Estado de WhatsApp, se publicarán a la hora revisada. Esto también aprueba el envío al público de WhatsApp configurado.")
     : text("Create this plan as Postiz drafts for later approval?", "¿Crear este plan como borradores de Postiz para aprobar después?");
   const confirm = mode === "schedule" ? text("Schedule posts", "Programar publicaciones") : labels.create[state.language === "es" ? 1 : 0];
   if (!await modal(text("Confirm this plan", "Confirma este plan"), prompt, confirm)) return;
@@ -388,8 +397,8 @@ async function submit(mode) {
     $("receipt-title").textContent = mode === "schedule" ? text("Posts scheduled", "Publicaciones programadas") : text("Drafts prepared", "Borradores preparados");
     $("receipt-content").textContent = text("Postiz entries: ", "Elementos de Postiz: ")
       + (state.receipt.drafts || []).filter(item => item.post_id).length
-      + (state.receipt.whatsapp_pending_id ? text("\nWhatsApp Status is waiting for separate approval.", "\nEl Estado de WhatsApp espera su aprobación por separado.") : "");
-    $("approve-status").hidden = !state.receipt.whatsapp_pending_id;
+      + (state.receipt.whatsapp_scheduled ? text("\nWhatsApp Status is approved and scheduled.", "\nEl Estado de WhatsApp está aprobado y programado.") : state.receipt.whatsapp_pending_id ? text("\nWhatsApp Status is waiting for separate approval.", "\nEl Estado de WhatsApp espera su aprobación por separado.") : "");
+    $("approve-status").hidden = !state.receipt.whatsapp_pending_id || state.receipt.whatsapp_scheduled;
     showPage("receipt");
   });
 }
@@ -1157,7 +1166,7 @@ $("network-dialog").addEventListener("cancel",event=>{if(state.networkBusy)event
 async function checkPublicAccess(){
   if(state.networkBusy || state.publicCheckPending)return;
   state.publicCheckPending=true;
-  try{const result=await engine("network_status");if(!renderNetworkStatus(result))return;const warning=$("public-access-warning");warning.hidden=result.reachable && !result.needs_sync;warning.textContent=result.needs_sync?text("Public URL changed · open network settings to synchronize","La URL pública cambió · abre los ajustes de red para sincronizar"):text("Public access unavailable · check network settings before publishing","Acceso público no disponible · revisa los ajustes de red antes de publicar");}
+  try{const result=await engine("network_status");if(!renderNetworkStatus(result))return;const warning=$("public-access-warning");warning.hidden=result.reachable && !result.needs_sync;warning.textContent=result.needs_sync?text("Public URL changed · open network settings to synchronize","La URL pública cambió · abre los ajustes de red para sincronizar"):text("Public access could not be verified · check network settings before publishing","No se pudo verificar el acceso público · revisa los ajustes de red antes de publicar");}
   catch(error){$("public-access-warning").hidden=false;$("public-access-warning").textContent=text("Public access could not be checked · open network settings","No se pudo comprobar el acceso público · abre los ajustes de red");}
   finally{state.publicCheckPending=false;}
 }
@@ -1165,3 +1174,23 @@ bind("public-access-warning",networkOpen);
 
 window.addEventListener("focus",()=>{if($("network-dialog").open && !state.networkBusy)networkCheck();});
 setInterval(()=>{if($("network-dialog").open && document.visibilityState==="visible" && document.hasFocus() && !state.networkBusy && !state.copyPending)networkCheck();},15000);
+
+async function rescheduleReview() {
+  const post_at = $("review-post-at").value;
+  let saved = false;
+  await work(text("Updating the reviewed time", "Actualizando la hora del plan"), async () => {
+    // Every caption iteration keeps its text and receives the same reviewed delivery time.
+    const updated = [];
+    for (const version of state.history) updated.push(await engine("revise", {review_id:version.review_id, post_at}));
+    state.history = updated;
+    $("post-at").value = post_at;
+    renderReview();
+    saved = true;
+  });
+  return saved;
+}
+bind("review-save-time", rescheduleReview);
+bind("review-asap", () => {
+  $("review-post-at").value = new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(Date.now()+10*60000)).replace(" ","T");
+  rescheduleReview();
+});

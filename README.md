@@ -18,9 +18,9 @@ window), Postiz
 drafts and scheduling, local caption generation, WhatsApp self-chat intake,
 durable Temporal scheduling, and a guarded maintenance/rollback process.
 
-**Publishing requires human approval:** automated work creates
-Postiz **drafts** or waits for an explicit WhatsApp approval. It does not
-silently publish content.
+**Publishing requires human approval:** create Postiz drafts for later approval,
+or explicitly confirm **Schedule directly** in the Rust desktop app to approve
+all selected destinations, including WhatsApp Status, at the reviewed time.
 
 > **Project status:** operational on an Apple Silicon Mac; migration and
 > distribution remain gated by the validation checklist below. This is a
@@ -97,12 +97,12 @@ activation on the destination. Full bilingual instructions are in Help.
 
 1. **Bring media and an idea** through the native Mac window or your WhatsApp self-chat.
 2. **Bake idea locally.** Ollama prepares the caption; check the plan before creating drafts.
-3. **Approve in Postiz.** Review the caption, accounts, media, and schedule. WhatsApp plans also require explicit approval.
+3. **Review and approve.** Create drafts for later approval in Postiz (with a separate WhatsApp approval), or confirm **Schedule directly** to approve every selected destination. Edit the date/time in step 3 without regenerating your caption.
 4. **Let Temporal run the schedule.** Keep the Mac and stack online; the tray shows health, waiting work, and connections that need attention.
 
 The Mac composer uses two columns, with media and the request beside the scrollable
 plan. Bake with **⌘ Return**, review the resolved time and destinations, and then
-use **Create Drafts** or confirm **Schedule Directly…**. **Try Another Caption**,
+use **Create Drafts** or confirm **Schedule directly**. **Try Another Caption**,
 **Edit Caption…**, and the **‹ / ›** version controls update the copy section.
 Changing scheduling inputs requires a fresh bake. Use **idea:** with an unquoted
 brief to generate copy, or **caption:** and double quotes to preserve your wording.
@@ -157,7 +157,9 @@ flowchart LR
 - **Saved history defaults to 30 days.** Change it through **Settings & Tools → Maintenance → Saved History…** (`PM_RETENTION_DAYS`). The age applies to logs and unused uploaded media. Review `./postforge.sh retention` before applying `./postforge.sh retention --apply`; changing the setting alone deletes nothing. PostForge automatically cleans expired WhatsApp staging while the listener runs. Future confirmations, approved pending sends, media referenced by Postiz, databases, credentials, and backups are preserved. If Postiz cannot be checked, uploads are retained. `--days N` overrides the setting for one cleanup.
 - **App updates:** stable releases are checked on launch and hourly. Available updates appear in the main window and tray and can trigger a macOS notification. Installation is an explicit action. PostForge downloads the package, verifies its published SHA-256 checksum, and invokes the macOS installer, which may request administrator authentication. Package updates recreate running PostForge services and reload WhatsApp intake. Runtime data is retained. Prereleases are excluded. Both the main window's **Updates** button and the tray’s **Check for Updates…** item show explicit app/component results, hide the progress bar when finished, and offer **Done**, **Try Again**, or a direct update action. App and component checks run concurrently with bounded timeouts.
 - **Idle mode:** after an hour with a verified empty queue and no app interaction, PostForge stops its containers. WhatsApp intake resumes when you turn it back on. You can enable **Notify My WhatsApp Before Idle** for a notice in your self-chat. Use the **New post in PostForge** Siri shortcut on your Mac to open the composer and turn it on. Use **Settings & Tools → Turn Off When Idle** to keep intake available.
-- **Video checks:** a Facebook clip of at least one minute gets an editorial advisory. Explicit YouTube Shorts requests require an eligible vertical or square video of up to three minutes. WhatsApp Status previews show how many clips of up to 60 seconds an approved video will become.
+- **Video checks:** the Instagram advisory concerns Reels longer than three minutes and discovery by new audiences. Automatic YouTube routing uses vertical/square videos for Shorts and horizontal videos for regular uploads; long Shorts receive a separate 2:59 copy. WhatsApp Status previews show the number of clips of up to 60 seconds. Large audiences can take several minutes per clip.
+- **YouTube copy and covers:** **Try another title** uses the reviewed caption without changing it; **Edit title** is independent. The optional business hashtag closes the title within 100 UTF-16 units, while the description keeps topic hashtags and closes with that business tag (or `#shorts` if empty). Uploaded images and extracted frames are passed as thumbnails for videos and Shorts, subject to channel eligibility.
+- **TikTok inbox:** Upload to Inbox sends the video for completion in TikTok; this route does not transfer a video caption. Copy the reviewed caption into TikTok. Direct Post supports captions when the developer app and account are approved for that route.
 - **Activity badges:** the Dock shows a red count for active work. The tray shows the count and a separate update dot beside the logo.
 - **Component updates:** checks compare local Docker image digests with the declared tags, separately from Homebrew. Approved updates save code and local image IDs, download before stopping services, restart, and run the live watchdog. Progress shows each stage and reports failure. A rollback restores code and image tags; it does not reverse database migrations. The checker reports stable upstream releases for Evolution API and its bundled Manager separately. A new upstream version needs a compatible PostForge release.
 

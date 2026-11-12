@@ -8,6 +8,25 @@ import network_settings as net
 from v2.gateway_setup import config
 
 class NetworkTests(unittest.TestCase):
+    def test_health_confirms_a_failed_probe_without_hiding_an_outage(self):
+        for results, expected in (([False,True],True),([False,False],False)):
+            with tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);(root/'run').mkdir()
+                settings={key:'' for key in ('PM_CUSTOM_DOMAIN','PM_NGROK_DOMAIN','NGROK_DOMAIN','CLOUDFLARE_TUNNEL_TOKEN')}
+                settings.update(PM_TUNNEL_PROVIDER='ngrok',FRONTEND_URL='https://synthetic.example')
+                with patch.object(net,'ROOT',root),patch.object(net,'values',return_value=settings),patch.object(net.tunnel,'gateway_ready',side_effect=results) as probe:
+                    self.assertEqual(net.status(check=True,force=True)['reachable'],expected)
+                    self.assertEqual(probe.call_count,2)
+
+    def test_crawler_policy_allows_signed_media_not_private_pages(self):
+        from urllib.robotparser import RobotFileParser
+        body=(Path(__file__).resolve().parent.parent/'v2/gateway/Caddyfile').read_text().split('respond `',1)[1].split('` 200',1)[0]
+        robots=RobotFileParser();robots.parse(body.splitlines())
+        for agent in ('facebookexternalhit','meta-externalfetcher','Facebot','other-crawler'):
+            self.assertTrue(robots.can_fetch(agent,'https://synthetic.example/postforge-media/123/signature/uploads/video.mp4'))
+            self.assertFalse(robots.can_fetch(agent,'https://synthetic.example/uploads/video.mp4'))
+            self.assertFalse(robots.can_fetch(agent,'https://synthetic.example/launches'))
+
     def test_provider_specs_keep_gateway_and_private_token(self):
         for provider in net.PROVIDERS:
             spec=json.loads(net.provider_block(provider).split(': ',1)[1])

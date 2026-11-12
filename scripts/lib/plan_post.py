@@ -291,7 +291,7 @@ def cover_mode(env, network, place, image, second, short):
         return None
     if network == "instagram":
         return "image" if image else "frame"
-    if network == "youtube" and not short:
+    if network == "youtube":
         return "image" if image else "frame-image"
     if network == "tiktok" and second is not None:
         if pmlib.draft_settings("tiktok", "", env)["content_posting_method"] == "DIRECT_POST":
@@ -329,17 +329,30 @@ def threads_caption(env, caption, lang, limit=500):
     raise PMError("The model could not produce a complete Threads caption within 500 characters.")
 
 
-def reviewed_youtube_title(env, caption, idea, lang, short):
+def tagged_youtube_title(title, tag, strict=False):
+    tag = pmlib.final_tag(tag)
+    body = pmlib.remove_final_tag(title, tag).strip() if tag else title.strip()
+    suffix = " " + tag if tag else ""
+    if strict and not pmlib.youtube_title_fits(body + suffix):
+        raise PMError("Leave room for the business hashtag within 100 characters. / Deja espacio para el hashtag del negocio dentro de los 100 caracteres.")
+    budget = 100 - len(suffix.encode("utf-16-le")) // 2
+    if len(body.encode("utf-16-le")) // 2 > budget:
+        clipped = body.encode("utf-16-le")[:max(0,budget-1)*2].decode("utf-16-le", errors="ignore")
+        body = (clipped.rsplit(" ",1)[0] if " " in clipped else clipped).rstrip(" ,;:") + "…"
+    return body + suffix
+
+
+def reviewed_youtube_title(env, caption, idea, lang, short, *, force=False, tag="", previous=""):
     original = pmlib.youtube_title_line(caption)
-    if not original or pmlib.youtube_title_fits(original, short):
-        return pmlib.youtube_title(caption, short)
-    limit = pmlib.YOUTUBE_TITLE_LIMIT
+    if not force and (not original or pmlib.youtube_title_fits(original + (" " + tag if tag else ""), short)):
+        return tagged_youtube_title(pmlib.youtube_title(caption, short), tag)
+    limit = pmlib.YOUTUBE_TITLE_LIMIT - (len(tag.encode("utf-16-le")) // 2 + 1 if tag else 0)
     prompt = (
         f"Write one complete YouTube title in {lang}, at most {limit} characters. "
         "Keep the subject and distinctive details. Use a short phrase that makes sense on its own. "
         "Avoid generic invitations, hashtags, quotation marks, and invented facts. "
         "Return only the title.\n"
-        f"Topic: {(idea or '')[:350]}\nCaption: {caption[:600]}"
+        f"Topic: {(idea or '')[:350]}\nCaption: {caption[:600]}\nOffer a different wording from: {previous}"
     )
     model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")
     try:
@@ -349,11 +362,13 @@ def reviewed_youtube_title(env, caption, idea, lang, short):
                                         "options": {"temperature": 0.2, "num_predict": 55, "num_ctx": 2048}}, timeout=45)
         if status == 200 and isinstance(data, dict):
             suggestion = pmlib.youtube_title_line(pmlib.ollama_final_text(data).strip('"“”'))
-            if pmlib.youtube_title_fits(suggestion, short):
-                return pmlib.youtube_title(suggestion, short)
+            if pmlib.youtube_title_fits(suggestion + (" " + tag if tag else ""), short):
+                return tagged_youtube_title(pmlib.youtube_title(suggestion, short), tag)
     except PMError:
         pass
-    return pmlib.youtube_title(caption, short)
+    if force:
+        raise PMError("Could not generate another title. Try again or edit it manually. / No se pudo generar otro título. Intenta de nuevo o edítalo manualmente.")
+    return tagged_youtube_title(pmlib.youtube_title(caption, short), tag)
 
 
 def tagged_threads_caption(env, caption, lang, tag):
@@ -383,9 +398,7 @@ def revise_copy(env, snapshot, instruction, edited=None):
     caption = pmlib.apply_final_tag(caption, tag)
     networks = {target["network"] for target in snapshot.get("targets", [])}
     threads = tagged_threads_caption(env, caption, lang, tag) if "threads" in networks else caption
-    title = (snapshot.get("youtube_title") if snapshot.get("youtube_title_manual") else
-             reviewed_youtube_title(env, caption, idea, lang, snapshot.get("short", False))
-             if "youtube" in networks else None)
+    title = snapshot.get("youtube_title")
     return dict(snapshot, caption=caption, caption_source=source,
                 threads_caption=threads if threads != caption else None, youtube_title=title,
                 youtube_caption=pmlib.youtube_description(caption,tag) if "youtube" in networks else None)
@@ -586,9 +599,6 @@ def run(env, p, dry_run, schedule=False):
                 "The secure gateway blocks social platforms from downloading media. "
                 "You can save drafts, but wait to approve them in Postiz until media delivery is fixed.")
         if schedule:
-            if not has_social_posts:
-                raise PMError("El Estado de WhatsApp requiere su propia aprobación." if es else
-                              "WhatsApp Status requires its own approval.")
             if media_blocked:
                 raise PMError("La programación directa de archivos está pausada mientras se corrige la entrega por el acceso seguro."
                               if es else "Direct scheduling of media is paused until delivery through the secure gateway is fixed.")
@@ -630,8 +640,8 @@ def run(env, p, dry_run, schedule=False):
                  for n, _, place in usable]
         if cover_requested and not any(modes):
             result["warnings"].append(
-                "La portada elegida no se aplica a estos destinos. Para TikTok en bandeja o YouTube Shorts, configúrala en la plataforma."
-                if es else "The selected cover does not apply to these destinations. For TikTok inbox uploads or YouTube Shorts, choose the cover on the platform.")
+                "La portada elegida no se aplica a estos destinos. Para TikTok en bandeja, configúrala en la plataforma."
+                if es else "The selected cover does not apply to these destinations. For TikTok inbox uploads, choose the cover on the platform.")
         if cover_requested and any(modes):
             unsupported = sorted({NAMES[n] for (n, _, place), mode in zip(usable, modes)
                                   if place == "feed" and mode is None})
@@ -640,6 +650,9 @@ def run(env, p, dry_run, schedule=False):
                 result["warnings"].append(
                     f"La portada elegida no se aplica a: {names}." if es else
                     f"The selected cover does not apply to: {names}.")
+        if any(n == "tiktok" for n, _, _ in usable) and pmlib.draft_settings("tiktok", "", env)["content_posting_method"] == "UPLOAD":
+            result["notes"].append("TikTok: se enviará el video a tu bandeja; pega el texto revisado y termina la publicación en TikTok. Esta vía no transfiere el texto automáticamente."
+                                   if es else "TikTok: the video goes to your inbox; paste the reviewed caption and finish publishing in TikTok. This route does not transfer the caption automatically.")
         tag = pmlib.final_tag(p.get("final_tag", env.get("CAPTION_FINAL_TAG", "")))
         caption = pmlib.apply_final_tag(caption, tag)
         thread_caption = caption
@@ -652,14 +665,14 @@ def run(env, p, dry_run, schedule=False):
             selected_title = p.get("reviewed_youtube_title")
             if selected_title and not 1 <= len(selected_title.strip()) <= 100:
                 raise PMError("YouTube titles must contain 1–100 characters.")
-            youtube_title = (selected_title.strip() if selected_title else
-                             reviewed_youtube_title(env, caption, p["idea"], p["lang"], short))
+            youtube_title = (tagged_youtube_title(selected_title.strip(), tag, strict=True) if selected_title else
+                             reviewed_youtube_title(env, caption, p["idea"], p["lang"], short, tag=tag))
         cover_available = kinds == ["video"] and any(
             cover_mode(env, network, place, None, 0, short) for network, _, place in usable)
         result.update({"caption": caption, "caption_source": source, "short": short,
                        "final_tag": tag,
                        "can_rewrite": bool(p["idea"] or p["exact"]),
-                       "direct_schedule_available": has_social_posts and not media_blocked,
+                       "direct_schedule_available": bool(usable) and not media_blocked,
                        "direct_schedule_blocked_by_gateway": has_social_posts and media_blocked,
                        "youtube_title": youtube_title, "youtube_caption": pmlib.youtube_description(caption,tag) if youtube_title else None, "youtube_trim_seconds": 179 if youtube_trim else None,
                        "whatsapp_background": p.get("whatsapp_background", "#128C7E"),
@@ -762,8 +775,13 @@ def run(env, p, dry_run, schedule=False):
         if whatsapp_requested and not dry_run:
             pending_id = whatsapp_pending.enqueue(caption, [path for _, path in ready], whatsapp_post_ids, when_utc, background=p.get("whatsapp_background", "#128C7E"))
             result["whatsapp_pending_id"] = pending_id
-            result["notes"].append("El Estado de WhatsApp espera aprobación." if es else
-                                   "WhatsApp Status waits for approval")
+            if schedule:
+                if not whatsapp_pending.approve(pending_id, source="reviewed-direct-schedule"):
+                    raise PMError("Could not approve the scheduled WhatsApp Status. Check the queue before retrying.")
+                result["whatsapp_scheduled"] = True
+            result["notes"].append(
+                ("Estado de WhatsApp programado con tu aprobación." if es else "WhatsApp Status scheduled with your approval.")
+                if schedule else ("El Estado de WhatsApp espera aprobación." if es else "WhatsApp Status waits for approval"))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     result["review_url"] = "https://%s/launches" % env.get("NGROK_DOMAIN", "<NGROK_DOMAIN>")

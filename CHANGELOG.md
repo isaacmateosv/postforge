@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.30]
+
+- Generate a new YouTube title independently from the reviewed caption; preserve titles across caption edits and append the optional business hashtag within 100 UTF-16 units.
+- Apply selected image/frame covers to Shorts through the YouTube thumbnail API.
+- Edit the reviewed date/time without regenerating captions; direct scheduling explicitly approves the selected WhatsApp Status, including WhatsApp-only plans.
+- Serve a crawler policy allowing only signed media paths, with explicit Meta fetcher rules; keep gateway authentication and media-signature checks. Refresh generated gateway policy during update/provider preparation.
+- Confirm failed gateway probes and explain TikTok inbox caption limitations in both languages.
+
 ## [2.0.0-rc.29]
 
 - Explain on-demand access-token renewal and add a manual Check & renew action that uses read-only channel analytics to renew expired tokens, then rereads saved status.

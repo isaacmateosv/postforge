@@ -8,6 +8,23 @@
     route {
         respond @unexpected 421
 
+        # Crawlers must discover that signed media is fetchable without a browser login.
+        # This policy grants no access: signatures and expiry are still verified below.
+        @robots path /robots.txt
+        handle @robots {
+            header Content-Type "text/plain; charset=utf-8"
+            respond `User-agent: *
+Allow: /postforge-media/
+Disallow: /
+
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: meta-externalfetcher
+Allow: /postforge-media/
+Disallow: /
+` 200
+        }
+
         @portal path /authelia /authelia/*
         handle @portal {
             reverse_proxy postforge-auth:9091 {
@@ -23,6 +40,7 @@
                 }
                 rewrite * {re.signedMedia.1}
                 header Cache-Control "private, no-store"
+                header X-Robots-Tag "noindex, nofollow, noarchive"
                 reverse_proxy postiz:5000 {
                     header_up -Cookie
                     header_up -Authorization
