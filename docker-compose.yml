@@ -147,7 +147,7 @@ services:
     # (its logo URLs 404 upstream), with node
     # exec'd directly instead of through `npm run start:prod` (one idle process less). The patches
     # always exit 0, so Evolution boots even if one can't apply. tini (init) passes `docker stop` on.
-    entrypoint: ["/bin/bash", "-c", "node /pm-patches/status-receipts.js; node /pm-patches/manager-logo.js; . ./Docker/scripts/deploy_database.sh && exec node dist/main"]
+    entrypoint: ["/bin/bash", "-c", "node /pm-patches/status-receipts.js; node /pm-patches/interactive-replies.js; node /pm-patches/manager-logo.js; . ./Docker/scripts/deploy_database.sh && exec node dist/main"]
     init: true
     depends_on:
       postgres:

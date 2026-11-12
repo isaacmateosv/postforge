@@ -150,7 +150,9 @@ flowchart LR
   G --> H[Human approval → drafts → schedule]
 ```
 
-The composer keeps its next-step buttons visible below the scrolling form. Cover previews confirm success explicitly; direct scheduling offers an eight-second, cancellable return to Dashboard. Telegram provides **Settings · activity ping** (`/settings`). WhatsApp settings require explicit standalone commands: `postforge settings`, `postforge ping 60`, or `postforge ping off`; captions never trigger a settings mode. Ping preferences travel in encrypted backups and do not start stopped services.
+The composer keeps its next-step buttons visible below the scrolling form. Cover previews confirm success explicitly; direct scheduling offers an eight-second, cancellable return to Dashboard. Telegram provides **Settings · activity ping** (`/settings`). WhatsApp settings require explicit commands or a deliberate Settings-button tap: `postforge settings`, `postforge ping 60`, or `postforge ping off`; captions never trigger a settings mode. Ping preferences travel in encrypted backups and do not start stopped services.
+
+WhatsApp self-chat plans also offer reply buttons for approval review, caption revision and plan options. Final approval is a separate confirmation; buttons refer to the exact reviewed plan and expire after use. Copyable text commands remain available as a fallback. The pinned Evolution service receives a targeted rendering compatibility patch at every boot.
 
 ## Connections, history, and updates
 

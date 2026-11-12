@@ -218,3 +218,9 @@ In your WhatsApp self-chat, send **only** `postforge settings` to see preference
 The tray groups **Publishing**, **Connections**, and **App & Support**. WhatsApp Plans & Receipts stays in the main menu; About sits directly before Quit.
 
 Gateway sign-in now defaults to **30 minutes without requests**, with a **two-hour maximum session**. Postiz has a separate login. Backups retain your configured timeout. YouTube's short-lived access token can expire between uses; **Automatic renewal available** means a refresh credential is stored, not that publishing has been tested. Use **Check & renew** to verify it now; reconnect only if renewal fails.
+
+### WhatsApp buttons
+
+When you prepare a plan in your self-chat, PostForge sends its copyable caption and a compact action card. **Review approval** shows exactly what will happen; **Confirm plan** creates the social drafts and approves WhatsApp Status when selected. It does not automatically publish social drafts. **Try another caption** changes the copy, and **More options** offers preview cancellation or Settings. Discarding a preview also requires confirmation and leaves saved Postiz posts alone.
+
+Open ping settings with `postforge settings` or the explicit **Settings** button. Interval buttons change only the Telegram activity-ping preference; **Back** returns to your plan. A normal caption never opens settings. Typed commands remain available if a client cannot display the card. Outdated, expired or already-used buttons cannot approve a changed plan; use the latest review instead.

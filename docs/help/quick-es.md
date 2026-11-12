@@ -230,3 +230,9 @@ En tu chat contigo mismo de WhatsApp, envía únicamente `postforge ajustes` par
 El menú de la barra organiza **Publicación**, **Conexiones** y **App y ayuda**. Planes y recibos de WhatsApp permanece en el menú principal; Acerca de PostForge está justo antes de Salir.
 
 El acceso del gateway usa por defecto **30 minutos sin solicitudes**, con un **máximo de dos horas por sesión**. Postiz tiene su propio inicio de sesión. Los respaldos conservan el tiempo configurado. El token temporal de YouTube puede vencer entre usos; **Renovación automática disponible** significa que hay una credencial de renovación guardada, no que se haya probado la publicación. Usa **Revisar y renovar** para comprobarlo ahora; vuelve a conectar solo si falla.
+
+### Botones de WhatsApp
+
+Al preparar un plan en tu chat contigo mismo, PostForge envía el texto para copiar y una tarjeta compacta de acciones. **Revisar aprobación** muestra qué ocurrirá; **Confirmar plan** crea los borradores de redes y aprueba el Estado de WhatsApp si lo seleccionaste. No publica automáticamente los borradores de redes. **Probar otro texto** cambia el texto y **Más opciones** permite descartar la revisión o abrir Ajustes. Descartar una revisión también requiere confirmación y no elimina publicaciones guardadas en Postiz.
+
+Abre los avisos de actividad con `postforge ajustes` o con el botón explícito **Ajustes**. Los botones de intervalo solo cambian el aviso de Telegram; **Volver** regresa al plan. Un texto normal nunca abre los ajustes. Los comandos escritos siguen disponibles si un cliente no muestra la tarjeta. Los botones vencidos, ya usados o de una versión anterior no pueden aprobar un plan modificado; usa la revisión más reciente.
