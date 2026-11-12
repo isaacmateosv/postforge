@@ -114,13 +114,13 @@ def literal(value):return "'"+value.replace("'","''")+"'"
 
 
 def rebase_media(env,org,old,new):
-    """Change media origins only. Never captions, credentials, post states or schedules."""
+    """Rebase local media, cover and avatar URLs without changing tokens or post state."""
     if old==new:return
     old_upload=old.rstrip('/')+'/uploads/';new_upload=new.rstrip('/')+'/uploads/'
     old_signed=old.rstrip('/')+'/postforge-media/';new_signed=new.rstrip('/')+'/postforge-media/'
     def replace(column):
         return 'replace(replace('+column+','+literal(old_upload)+','+literal(new_upload)+'),'+literal(old_signed)+','+literal(new_signed)+')'
-    pmlib.psql('BEGIN; UPDATE "Post" SET image='+replace('image')+', settings='+replace('settings')+' WHERE "organizationId"='+literal(org)+'; UPDATE "Media" SET path='+replace('path')+', thumbnail='+replace('thumbnail')+' WHERE "organizationId"='+literal(org)+'; COMMIT;',env)
+    pmlib.psql('BEGIN; UPDATE "Post" SET image='+replace('image')+', settings='+replace('settings')+' WHERE "organizationId"='+literal(org)+'; UPDATE "Media" SET path='+replace('path')+', thumbnail='+replace('thumbnail')+' WHERE "organizationId"='+literal(org)+'; UPDATE "Integration" SET picture='+replace('picture')+' WHERE "organizationId"='+literal(org)+'; COMMIT;',env)
 
 
 

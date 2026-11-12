@@ -74,8 +74,9 @@ class NetworkTests(unittest.TestCase):
         with patch.object(net.pmlib,'psql') as sql:
             net.rebase_media({},'org', 'https://old.example.org','https://new.example.org')
         query=sql.call_args.args[0]
-        for field in ('image=','settings=','path=','thumbnail='):self.assertIn(field,query)
-        for field in ('content=','state=','publishDate='):self.assertNotIn(field,query)
+        for field in ('image=','settings=','path=','thumbnail=','picture='):self.assertIn(field,query)
+        self.assertIn('UPDATE "Integration" SET picture=',query)
+        for field in ('content=','state=','publishDate=','token=','refreshToken='):self.assertNotIn(field,query)
 
     def test_quick_hostname_parser_does_not_accept_lookalike_domains(self):
         self.assertIsNone(net.QUICK.search('https://safe.trycloudflare.com.attacker.example'))
