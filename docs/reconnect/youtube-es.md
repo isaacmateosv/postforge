@@ -25,7 +25,7 @@ Los tokens de actualización se guardan en la base de datos de Postiz, no en `.e
 - **Video normal**: usa un archivo horizontal. YouTube clasifica como Shorts los videos verticales o cuadrados que cumplen el límite de tres minutos; un selector o hashtag no cambia esa regla. Para publicar ambos formatos, prepara y revisa versiones separadas.
 - El título admite hasta 100 caracteres. La descripción es independiente y no se recorta a ese límite. Revisa o edita el título antes de crear los borradores.
 - La descripción termina con la etiqueta configurada para el negocio, además de las etiquetas temáticas. Si está vacía, termina con `#shorts`. No se añade `#Shorts` al título. La etiqueta no determina el formato.
-- Revisa el archivo en el reproductor local de Redacta. En Destinos puedes ver la portada subida o el fotograma elegido. Que exista una vista previa no significa que todos los destinos admitan portadas personalizadas: para Shorts, elígela en YouTube.
+- Revisa el archivo en el reproductor local de Redacta. En Destinos puedes ver la portada subida o el fotograma elegido. Que exista una vista previa no significa que todos los destinos admitan portadas personalizadas: los videos y Shorts de YouTube envían la imagen o el fotograma mediante la API de miniaturas, según los permisos de la cuenta.
 
 ## Estado de conexión y prueba
 
