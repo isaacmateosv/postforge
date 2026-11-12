@@ -420,3 +420,6 @@ La ventana de red se actualiza al volver a ella y mientras está visible. Antes 
 
 
 Al cambiar la URL pública también se actualizan las fotos de perfil de los canales alojadas localmente. Si el calendario ya estaba abierto, recárgalo después de la migración para obtener los enlaces nuevos. Esta corrección no requiere reconectar los canales.
+
+
+Un token de acceso vencido que tiene una credencial de actualización guardada se muestra como **Se renueva al volver a usarse**, no como una tarea de renovación en cola. Pulsa **Conexiones → Revisar y renovar** para intentarlo mediante consultas de estadísticas de solo lectura. Solo se consultan canales con tokens vencidos que admiten renovación. PostForge vuelve a leer el estado guardado; no marca el canal como conectado únicamente por recibir HTTP 200. Reconecta solo si la renovación falla. Esta acción no publica nada y las comprobaciones en segundo plano no envían solicitudes de renovación.

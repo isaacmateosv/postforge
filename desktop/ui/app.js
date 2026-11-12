@@ -1049,30 +1049,32 @@ bind("wa-audience-save",async()=>{
   try{await engine("whatsapp_audience_save",{audience,recipients});$("wa-audience-result").textContent=text("Audience saved for new plans.","Audiencia guardada para los planes nuevos.");}
   catch(error){$("wa-audience-result").textContent=friendlyError(error);}
 });
-async function showConnections(){
+async function showConnections(renew=false){
   if(state.connectionsPending)return;state.connectionsPending=true;
-  $("connection-rows").textContent=text("Checking connections","Revisando conexiones");
+  $("connections-refresh").disabled=true;
+  $("connection-rows").textContent=renew?text("Checking connections and renewing expired access tokens","Revisando conexiones y renovando tokens de acceso vencidos"):text("Checking connections","Revisando conexiones");
   try{
-    const result=await engine("connections");$("connection-rows").replaceChildren();
+    const result=await engine("connections",{renew});$("connection-rows").replaceChildren();
     const names={facebook:"Facebook",instagram:"Instagram",threads:"Threads",youtube:"YouTube",tiktok:"TikTok"};
     for(const item of result.items){
       const row=document.createElement("article");row.className="connection-row";
       const label=document.createElement("strong");label.textContent=(names[item.network] || item.network)+" · "+item.name;
       const stateLabel=document.createElement("span");stateLabel.className=item.state==="connected"?"connection-ok":"connection-attention";
-      stateLabel.textContent=item.state==="connected"?text("✓ Connected","✓ Conectado"):item.state==="reconnect"?text("Reconnect required","Debes volver a conectar"):item.state==="renewal"?text("Automatic renewal pending","Renovación automática pendiente"):text("Paused","En pausa");
+      stateLabel.textContent=item.state==="connected"?text("✓ Connected","✓ Conectado"):item.state==="reconnect"?text("Reconnect required","Debes volver a conectar"):item.state==="renewal"?text("Renews on next use","Se renueva al volver a usarse"):text("Paused","En pausa");
       row.append(label,stateLabel);
-      if(item.expires){const expiry=document.createElement("small");expiry.textContent=(item.can_renew?text("Access token renews automatically · current validity: ","El token de acceso se renueva automáticamente · vigencia actual: "):text("Credential valid until: ","Credencial vigente hasta: "))+new Date(/(Z|[+-]\d{2}:\d{2})$/.test(item.expires)?item.expires:item.expires+'Z').toLocaleString(state.language==="es"?"es-EC":"en");row.append(expiry);}
+      if(item.state==="renewal"){const hint=document.createElement("small");hint.textContent=text("Postiz attempts renewal when requesting channel data or publishing. Use Check & renew to try now; reconnect only if renewal fails.","Postiz intenta renovar al consultar el canal o publicar. Pulsa Revisar y renovar para hacerlo ahora; reconecta solo si la renovación falla.");row.append(hint);}
+      if(item.expires){const expiry=document.createElement("small");expiry.textContent=(item.state==="renewal"?text("Last access token expired: ","El último token de acceso venció: "):item.can_renew?text("Access token renews automatically · current validity: ","El token de acceso se renueva automáticamente · vigencia actual: "):text("Credential valid until: ","Credencial vigente hasta: "))+new Date(/(Z|[+-]\d{2}:\d{2})$/.test(item.expires)?item.expires:item.expires+'Z').toLocaleString(state.language==="es"?"es-EC":"en");row.append(expiry);}
       $("connection-rows").append(row);
     }
     const good=result.items.filter(item=>item.state==="connected").length;
     $("connections-open").textContent=text("Connections ","Conexiones ")+good+"/"+result.items.length;
     $("connections-open").classList.toggle("ready",good===result.items.length && good>0);
-    $("connection-checked").textContent=text("Checked: ","Revisado: ")+new Date(result.checked_at).toLocaleTimeString(state.language==="es"?"es-EC":"en");
+    $("connection-checked").textContent=text("Checked: ","Revisado: ")+new Date(result.checked_at).toLocaleTimeString(state.language==="es"?"es-EC":"en")+(result.checks_incomplete?text(" · Some renewal checks could not finish. Check local services and try again."," · Algunas comprobaciones no terminaron. Revisa los servicios locales y vuelve a intentar."):"");
   }catch(error){$("connection-rows").textContent=friendlyError(error);}
-  finally{state.connectionsPending=false;}
+  finally{state.connectionsPending=false;$("connections-refresh").disabled=false;}
 }
 bind("connections-open",()=>{openDialog("connections-dialog");return showConnections();});
-bind("connections-refresh",showConnections);
+bind("connections-refresh",()=>showConnections(true));
 bind("connections-close",()=>$("connections-dialog").close());
 
 function networkFields(){

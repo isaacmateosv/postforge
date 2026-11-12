@@ -141,6 +141,35 @@ class ConnectionHealthTests(unittest.TestCase):
         self.assertEqual(self.health(disabled=True)['state'],'paused')
         self.assertEqual(self.health(network='facebook',expires='2000-01-01T00:00:00')['state'],'reconnect')
 
+    def refresh_fixture(self, failed=False, renew=True, code=200):
+        import json
+        before=dict(id='synthetic-channel',name='Synthetic',network='youtube',disabled=False,
+                    refresh_needed=False,has_token=True,can_renew=True,expires='2000-01-01T00:00:00',updated='2026-11-11T01:25:57',auth_error=None)
+        after=dict(before,expires='2099-01-01T00:00:00') if not failed else dict(before,refresh_needed=True)
+        with patch.object(pmlib,'Postiz') as client,patch.object(pmlib,'psql',side_effect=[[[json.dumps(before)]],[[json.dumps(after)]]]),patch.object(pmlib,'http',return_value=(code,[])) as api:
+            client.return_value.org_id='synthetic-org';client.return_value.base='http://localhost:4200/api/public/v1';client.return_value._key='synthetic-key'
+            result=desktop_status.connections({},renew=renew)
+        return result,api
+
+    def test_manual_check_renews_expired_token_via_read_only_analytics(self):
+        result,api=self.refresh_fixture()
+        self.assertEqual(result['items'][0]['state'],'connected')
+        self.assertEqual(api.call_args.args[0],'GET')
+        self.assertTrue(api.call_args.args[1].endswith('/analytics/synthetic-channel?date=1'))
+        self.assertNotIn('synthetic-key',str(result))
+
+    def test_http_success_does_not_override_failed_renewal_metadata(self):
+        result,api=self.refresh_fixture(failed=True)
+        self.assertEqual(result['items'][0]['state'],'reconnect');self.assertEqual(api.call_count,1)
+
+    def test_background_polling_never_renews_tokens(self):
+        result,api=self.refresh_fixture(renew=False)
+        self.assertEqual(result['items'][0]['state'],'renewal');api.assert_not_called()
+
+    def test_failed_local_request_is_reported_without_assuming_reconnection(self):
+        result,_=self.refresh_fixture(failed=False,code=503)
+        self.assertTrue(result['checks_incomplete'])
+
     def test_receipts_validate_filters_and_limit_database_rows(self):
         import json
         with patch.object(pmlib,'psql',return_value=[[json.dumps({'at':2000000000})]]*6) as query:

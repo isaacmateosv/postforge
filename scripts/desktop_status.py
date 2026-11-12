@@ -100,15 +100,15 @@ def receipts(env, payload=None):
     return {'items':rows[:5],'page':page,'has_more':len(rows)>5}
 
 
-def connections(env):
+def connections(env, renew=False):
     from datetime import datetime,timezone
     client=pmlib.Postiz(env);org="'"+client.org_id.replace("'","''")+"'"
-    sql='''SELECT jsonb_build_object('name',coalesce(i."customName",i.name),'network',i."providerIdentifier",
+    sql='''SELECT jsonb_build_object('id',i.id,'name',coalesce(i."customName",i.name),'network',i."providerIdentifier",
       'disabled',i.disabled,'refresh_needed',i."refreshNeeded",'has_token',length(coalesce(i.token,''))>0,
       'can_renew',length(coalesce(i."refreshToken",''))>0,'expires',i."tokenExpiration",'updated',i."updatedAt",
       'auth_error',(SELECT max(p."updatedAt") FROM "Post" p WHERE p."integrationId"=i.id AND p.state='ERROR' AND p.error LIKE '%refresh_token%'))::text
       FROM "Integration" i WHERE i."organizationId"='''+org+''' AND i."deletedAt" IS NULL ORDER BY i."providerIdentifier"'''
-    result=[];now=datetime.now(timezone.utc)
+    result=[];expired=[];now=datetime.now(timezone.utc)
     def date(value):
         if not value:return None
         value=re.sub(r'\.(\d{1,5})(?=[+-]|$)',lambda m:'.'+m.group(1).ljust(6,'0'),value.replace('Z','+00:00'))
@@ -120,5 +120,19 @@ def connections(env):
         if item['refresh_needed'] or not item['has_token'] or (error and (not updated or error>=updated)):state='reconnect'
         elif item['disabled']:state='paused'
         elif expiry and expiry<=now:state='renewal' if item['can_renew'] else 'reconnect'
+        if state=='renewal' and item.get('id'):expired.append(item['id'])
         result.append({key:item.get(key) for key in ('name','network','expires','updated')}|{'state':state,'can_renew':item['can_renew']})
+    if renew and expired:
+        from concurrent.futures import ThreadPoolExecutor
+        def check(identifier):
+            try:
+                code,_=pmlib.http('GET',client.base+'/analytics/'+quote(identifier,safe='')+'?date=1',{'Authorization':client._key},timeout=30)
+                return code
+            except (pmlib.PMError,OSError):return None
+        with ThreadPoolExecutor(max_workers=2) as pool:codes=list(pool.map(check,expired))
+        # Read persisted state after the provider refresh. HTTP 200 alone does
+        # not prove renewal succeeded; Postiz can return an empty result.
+        refreshed=connections(env)
+        refreshed["checks_incomplete"]=any(code!=200 for code in codes)
+        return refreshed
     return {'items':result,'checked_at':now.isoformat()}
