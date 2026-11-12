@@ -405,3 +405,6 @@ The network window refreshes when you return to it and while it is visible. URL 
 
 
 Public URL migration also updates locally hosted channel profile pictures. If your calendar was already open, reload it after a migration to fetch the new avatar URLs; channel reconnection is not required for this repair.
+
+
+An expired access token with a saved refresh credential is shown as **Renews on next use**, not a queued renewal job. Choose **Connections → Check & renew** to attempt renewal now through read-only channel analytics. Only expired, renewable channels are checked. PostForge rereads the saved result; it does not mark a channel healthy just because the request returned HTTP 200. Reconnect only if renewal fails. This action does not publish posts, and background status polling does not trigger refresh requests.

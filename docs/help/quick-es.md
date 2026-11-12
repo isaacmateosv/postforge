@@ -205,3 +205,6 @@ Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El cont
 
 
 La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Sincronizar URL actual** antes de copiar o abrir Postiz.
+
+
+Un token de acceso vencido que tiene una credencial de actualización guardada se muestra como **Se renueva al volver a usarse**, no como una tarea de renovación en cola. Pulsa **Conexiones → Revisar y renovar** para intentarlo mediante consultas de estadísticas de solo lectura. Solo se consultan canales con tokens vencidos que admiten renovación. PostForge vuelve a leer el estado guardado; no marca el canal como conectado únicamente por recibir HTTP 200. Reconecta solo si la renovación falla. Esta acción no publica nada y las comprobaciones en segundo plano no envían solicitudes de renovación.

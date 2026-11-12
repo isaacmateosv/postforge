@@ -2,6 +2,7 @@
 
 ## [2.0.0-rc.29]
 
+- Explain on-demand access-token renewal and add a manual Check & renew action that uses read-only channel analytics to renew expired tokens, then rereads saved status.
 - Include channel profile pictures when rebasing Postiz media origins so avatars keep working after tunnel or domain changes. Preserve external profile-image URLs and channel credentials.
 
 

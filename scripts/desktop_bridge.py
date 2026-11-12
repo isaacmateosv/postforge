@@ -38,7 +38,7 @@ def dispatch(operation, payload):
     env = pmlib.load_env()
     if operation == "connections":
         import desktop_status
-        return desktop_status.connections(env)
+        return desktop_status.connections(env,renew=payload.get("renew") is True)
     if operation == "whatsapp_receipts":
         import desktop_status
         return desktop_status.receipts(env,payload)

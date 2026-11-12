@@ -193,3 +193,6 @@ Click the current public URL or **Copy link** to copy it. The control briefly tu
 
 
 The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Synchronize current URL** before copying or opening Postiz.
+
+
+An expired access token with a saved refresh credential is shown as **Renews on next use**, not a queued renewal job. Choose **Connections → Check & renew** to attempt renewal now through read-only channel analytics. Only expired, renewable channels are checked. PostForge rereads the saved result; it does not mark a channel healthy just because the request returned HTTP 200. Reconnect only if renewal fails. This action does not publish posts, and background status polling does not trigger refresh requests.
