@@ -61,6 +61,39 @@ class FlowTests(unittest.TestCase):
         self.actions.submit.assert_not_called()
         self.assertEqual(self.flow.state["stage"],"review")
 
+    def test_ping_settings_preserve_the_reviewed_plan_and_do_not_publish(self):
+        self.ready();self.callback("bake")
+        reviewed=self.flow.current()
+        self.actions.heartbeat_preferences.return_value={"minutes":60,"configured":True,"active":True}
+        self.message("/settings")
+        self.assertEqual(self.flow.state["stage"],"review")
+        self.callback("heartbeat_360")
+        self.actions.set_heartbeat.assert_called_once_with(360)
+        self.assertEqual(self.flow.current(),reviewed)
+        self.callback("settings_back")
+        self.assertEqual(self.flow.state["stage"],"review")
+        self.actions.submit.assert_not_called()
+        self.actions.preview.assert_called_once()
+        self.actions.status.assert_not_called()
+
+    def test_ready_does_not_expose_private_cover_paths_and_supports_frame_zero(self):
+        self.ready()
+        self.flow.state['data']['cover_image']='/private/synthetic-cover.jpg'
+        self.flow.ready()
+        message=self.send.call_args.args[0] if self.send.call_args.args else ''
+        self.assertNotIn('/private/',self.send.call_args.kwargs['text'])
+        self.flow.state['data'].update(cover_image=None,cover_second=0)
+        self.flow.ready()
+        self.assertIn('0 s',self.send.call_args.kwargs['text'])
+
+    def test_ping_settings_work_after_an_old_posting_plan_expires(self):
+        self.ready();self.callback("bake")
+        self.flow.state['created_at']=1
+        self.actions.heartbeat_preferences.return_value={"minutes":0,"configured":True,"active":True}
+        self.message('/settings');self.callback('heartbeat_60')
+        self.actions.set_heartbeat.assert_called_once_with(60)
+        self.actions.submit.assert_not_called()
+
     def test_unauthorized_sender_does_not_touch_planner(self):
         self.message("/new", owner=8)
         self.actions.options.assert_not_called()

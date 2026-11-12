@@ -31,6 +31,16 @@ class PreviewTests(unittest.TestCase):
             release.set()
             pool.shutdown(wait=True)
 
+    def test_ping_interval_changes_start_a_full_interval_and_off_never_sends(self):
+        state={"heartbeat":0}
+        self.assertFalse(bot.heartbeat_due(state,60,1000))
+        self.assertFalse(bot.heartbeat_due(state,60,4599))
+        self.assertTrue(bot.heartbeat_due(state,60,4600))
+        self.assertFalse(bot.heartbeat_due(state,30,4700))
+        self.assertEqual(state['heartbeat'],4700)
+        self.assertFalse(bot.heartbeat_due(state,0,8000))
+        self.assertFalse(bot.heartbeat_due(state,0,800000))
+
     def test_google_policy_is_fail_closed_and_uses_exact_addresses(self):
         for values in ([], ["*@example.org"], ['x@example.org" || true']):
             with self.subTest(values=values), self.assertRaises(ValueError):

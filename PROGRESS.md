@@ -1,10 +1,18 @@
-# Publish Machine — Work Progress & Resume State
+# PostForge — Work Progress & Resume State
 
-> Living state file. If a session runs out of context, the next agent should read this
-> file first, then `ARCHITECTURAL HANDOFF & SYSTEM SPECIFICATION.md` (in ~/Downloads).
-> Last updated: 2026-11-01 18:30 EC (session 5: all five channels connected — Facebook, Instagram, Threads, TikTok sandbox, YouTube Shorts; channel expiry warnings; reconnect guides; Siri shortcuts fixed)
+## Current development state · 2026-11-12
 
-## Status board
+The supported desktop client is the Rust/Tauri app in `desktop/`. The Swift tray and Publish Machine app instructions below are historical; do not launch or reinstall those clients. Use `VERSION`, the current source, local installed bundle metadata and GitHub Actions to establish current publication/installation state.
+
+The rc.32 work adds persistent next-step actions, successful cover-preview feedback, cancellable completion navigation, monitor-aware sizing, sectioned tray menus and clearer on-demand token renewal. Authelia provisioning now defaults to 30 minutes of inactivity, preserving MFA and the two-hour session maximum; encrypted migrations retain configured session preferences.
+
+Telegram Settings / `/settings` exposes owner-only ping interval controls without discarding a posting plan or restarting the worker. WhatsApp settings are explicit standalone `postforge settings` / `postforge ajustes` / `postforge ping ...` commands; no inferred or persistent settings mode is used, and pending media is not consumed. Only the interval is changed in the private `.env`; identity, enabled state and migration hold remain untouched. No test ping is sent. The live worker must be reloaded after code updates; avoid interrupting an active WhatsApp send.
+
+Validation: 141 Python script tests, 21 service/Telegram tests and 17 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
+
+The guides in `docs/help/` (English and Ecuadorian Spanish), README and CHANGELOG describe the current workflow. The remainder of this file is an archived development ledger, retained for historical context.
+
+## Historical status board
 
 | # | Task | Status |
 |---|------|--------|

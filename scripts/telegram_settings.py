@@ -154,7 +154,7 @@ def commands(language):
     es = language == 'es'
     return [{'command': key, 'description': spanish if es else english} for key, english, spanish in (
         ('start', 'Open PostForge', 'Abrir PostForge'), ('new', 'New post or announcement', 'Nueva publicación o anuncio'),
-        ('status', 'Check services', 'Revisar servicios'), ('cancel', 'Discard current plan', 'Descartar el plan actual'),
+        ('status', 'Check services', 'Revisar servicios'), ('settings', 'Activity ping settings', 'Ajustes del aviso de actividad'), ('cancel', 'Discard current plan', 'Descartar el plan actual'),
         ('help', 'Show the menu', 'Mostrar el menú'))]
 
 
@@ -218,3 +218,28 @@ def save(payload, root=ROOT):
                 host_agent.start()
             raise
         return status(root)
+
+
+def heartbeat_preferences(root=ROOT):
+    """Read only non-secret preferences; mobile menus never expose credentials."""
+    config = configuration(root)
+    raw = config.get('TELEGRAM_HEARTBEAT_MINUTES', '0')
+    return {'minutes': int(raw) if raw.isdigit() else 0,
+            'configured': bool(config['TELEGRAM_BOT_TOKEN'] and config['TELEGRAM_OWNER_ID']),
+            'active': active(config)}
+
+
+def set_heartbeat(minutes, root=ROOT):
+    """Change this one preference without restarting the worker handling the request."""
+    if type(minutes) is not int or (minutes != 0 and not 5 <= minutes <= 1440):
+        raise ValueError('Choose 0 (off), or 5–1440 minutes. / Elige 0 (apagado) o de 5 a 1440 minutos.')
+    root = Path(root)
+    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')):
+        if not heartbeat_preferences(root)['configured']:
+            raise ValueError('Set up Telegram in the desktop app first. / Primero configura Telegram en la app de escritorio.')
+        path = root / '.env'
+        if not path.is_file() or path.is_symlink():
+            raise ValueError('Telegram settings are unavailable. / Los ajustes de Telegram no están disponibles.')
+        content = re.sub(r'^\s*TELEGRAM_HEARTBEAT_MINUTES\s*=.*\n?', '', path.read_text(), flags=re.M)
+        atomic_write(path, content.rstrip() + '\nTELEGRAM_HEARTBEAT_MINUTES=' + str(minutes) + '\n')
+    return heartbeat_preferences(root)

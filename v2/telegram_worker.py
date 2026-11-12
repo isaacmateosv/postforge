@@ -83,6 +83,14 @@ def save_state(state):
     temporary.replace(STATE)
 
 
+def heartbeat_due(state, minutes, now):
+    # Preference changes start a full interval, never an unsolicited immediate ping.
+    if state.get("heartbeat_minutes") != minutes:
+        state.update(heartbeat_minutes=minutes, heartbeat=now)
+        return False
+    return bool(minutes and now >= state.get("heartbeat", now) + minutes * 60)
+
+
 def run():
     try:
         token = Path(os.environ["TELEGRAM_TOKEN_FILE"]).read_text(encoding="utf-8").strip()
@@ -141,9 +149,13 @@ def run():
             now = int(time.time())
             if actions:
                 actions.tick()
-            if minutes and now >= state["heartbeat"] + minutes * 60:
+            if actions:
+                minutes = actions.heartbeat_minutes()
+            before_heartbeat = (state.get("heartbeat_minutes"), state["heartbeat"])
+            if heartbeat_due(state, minutes, now):
                 send_status(call, owner, es, heartbeat=True)
                 state["heartbeat"] = now
+            if before_heartbeat != (state.get("heartbeat_minutes"), state["heartbeat"]):
                 save_state(state)
             updates = call("getUpdates", offset=state["offset"], timeout=25, limit=25,
                            allowed_updates=["message", "callback_query"])

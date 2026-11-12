@@ -5,11 +5,11 @@ window.PostForgeMedia = (() => {
   const $=id=>document.getElementById(id);
   const video=$('video-preview');
   let language='en',selected=null,files=[],cover=null,second=null,sequence=0,frameSequence=0,framePending=null,frameRunning=false;
-  let onFrame=()=>{},onInfo=()=>{};
+  let onFrame=()=>{},onInfo=()=>{},onCover=()=>{},coverSignature=null;
   const say=(en,es)=>language==='es'?es:en;
   const engine=(operation,payload)=>window.__TAURI__.core.invoke('engine',{operation,payload});
   const source=path=>window.__TAURI__.core.convertFileSrc(path);
-  const isVideo=path=>/\.(mp4|mov|m4v|webm|mkv)$/i.test(path);
+  const isVideo=path=>/\.(mp4|mov|m4v|webm|mkv|avi|3gp)$/i.test(path);
   const basename=path=>path.split(/[\\/]/).pop();
   function pause(){video.pause();}
   async function drainFrame(){
@@ -22,16 +22,19 @@ window.PostForgeMedia = (() => {
           const result=await engine('media_frame',{path:job.path,second:job.second});
           if(job.id!==frameSequence)continue;
           $('cover-preview').src=result.image;$('cover-preview').hidden=false;
-          $('cover-preview-status').textContent=job.uploaded?say('Selected cover image','Imagen de portada seleccionada'):say('Video frame at ','Fotograma en ')+result.second.toFixed(2)+' s';
-        }catch(error){if(job.id===frameSequence){$('cover-preview').hidden=true;$('cover-preview-status').textContent=String(error).split(' / ')[language==='es'?1:0]||String(error);}}
+          $('cover-preview-status').textContent=job.uploaded?say('✓ Cover ready · ','✓ Portada lista · ')+basename(job.path):say('✓ Cover ready · frame at ','✓ Portada lista · fotograma en ')+result.second.toFixed(2)+' s';
+          $('cover-preview-box').dataset.state='ready';
+          onCover({state:'ready',message:$('cover-preview-status').textContent});
+        }catch(error){if(job.id===frameSequence){$('cover-preview').hidden=true;$('cover-preview-box').dataset.state='error';$('cover-preview-status').textContent=String(error).split(' / ')[language==='es'?1:0]||String(error);onCover({state:'error',message:$('cover-preview-status').textContent});}}
       }
     }finally{frameRunning=false;}
   }
   function updateCover(){
-    frameSequence++;framePending=null;
+    frameSequence++;framePending=null;$('cover-preview-box').dataset.state='empty';
     $('cover-preview').hidden=true;$('cover-preview').removeAttribute('src');
     const chosen=cover || (second!==null && second!=='' && files.filter(isVideo).length===1?files.find(isVideo):null);
     if(!chosen){$('cover-preview-status').textContent=say('Choose an image or a video timestamp to preview the cover.','Elige una imagen o un segundo del video para ver la portada.');return;}
+    $('cover-preview-box').dataset.state='pending';
     $('cover-preview-status').textContent=say('Preparing cover preview','Preparando vista previa de la portada');
     framePending={id:frameSequence,path:chosen,second:cover?0:second,uploaded:!!cover};drainFrame();
   }
@@ -63,7 +66,7 @@ window.PostForgeMedia = (() => {
   window.addEventListener('blur',pause);
   return {
     pause,
-    configure(callbacks){onFrame=callbacks.onFrame;onInfo=callbacks.onInfo;},
+    configure(callbacks){onFrame=callbacks.onFrame;onInfo=callbacks.onInfo;onCover=callbacks.onCover || (()=>{});},
     update(paths,image,timestamp,lang){
       language=lang;cover=image;second=timestamp;files=[...paths];
       $('preview-file').setAttribute('aria-label',say('Preview file','Archivo de vista previa'));
@@ -71,7 +74,9 @@ window.PostForgeMedia = (() => {
       $('media-preview-pane').hidden=!files.length;$('preview-file').hidden=files.length<2;
       $('preview-file').replaceChildren(...files.map(path=>{const option=document.createElement('option');option.value=path;option.textContent=basename(path);return option;}));
       const path=files.includes(selected)?selected:files[0];$('preview-file').value=path || '';
-      if(path!==selected || !path)show(path);updateCover();
+      if(path!==selected || !path)show(path);
+      const signature=JSON.stringify([files,cover,second,language]);
+      if(signature!==coverSignature || $("cover-preview-box").dataset.state==='error'){coverSignature=signature;updateCover();}
     }
   };
 })();

@@ -10,6 +10,27 @@ const state = {
   history: [], selected: -1, busy: false, receipt: null
 };
 const text = (en, es) => state.language === "es" ? es : en;
+let feedbackTimeout;
+function selectionFeedback({state:result,message}) {
+  clearTimeout(feedbackTimeout);
+  const box=$("selection-feedback");box.textContent=message;box.dataset.state=result;box.hidden=false;
+  feedbackTimeout=setTimeout(()=>{box.hidden=true;},4500);
+}
+const receiptReturn=window.PostForgeCompletionTimer.create({
+  isActive:()=>state.page==="receipt" && !document.hidden && document.hasFocus() && !document.querySelector("dialog[open]"),
+  onTick:seconds=>{
+    $("receipt-countdown").textContent=text("Returning to Dashboard in ","Volverás al inicio en ")+seconds+text(" seconds"," segundos");
+    $("receipt-progress").value=seconds;
+  },
+  onDone:()=>showPage("home")
+});
+function stopReceiptReturn(){receiptReturn.stop();$("receipt-return").hidden=true;}
+function renderActionDock(){
+  const page=state.page;$("workflow-actions").hidden=!["compose","delivery","review"].includes(page);
+  for(const name of ["compose","delivery","review"])$(name+"-actions").hidden=name!==page;
+  $("workflow-next-title").textContent=page==="compose"?text("Next: choose where and when","Siguiente: elige dónde y cuándo"):page==="delivery"?text("Next: bake and review your plan","Siguiente: hornea y revisa tu plan"):text("Ready to save or schedule?","¿Listo para guardar o programar?");
+  $("workflow-next-detail").textContent=page==="delivery"?text("⌘ / Ctrl + Enter · nothing is published yet","⌘ / Ctrl + Enter · aún no se publica nada"):page==="review"?text("Drafts for later approval, or schedule the reviewed plan","Guarda borradores para aprobar después o programa el plan revisado"):text("Your caption and media stay with you","Se conservan tu texto y tus archivos");
+}
 const labels = {
   subtitle: ["Compose, choose delivery, then review", "Redacta, elige destinos y revisa"],
   help: ["Help", "Ayuda"], reconnect: ["Refresh status", "Actualizar estado"], workspace: ["Locate recovered installation", "Localizar instalación recuperada"],
@@ -63,6 +84,7 @@ function updateModeHint() {
 }
 
 function renderSteps() {
+  renderActionDock();
   $("steps").replaceChildren();
   const steps = [
     ["compose", text("1 · Compose", "1 · Redacta")],
@@ -84,6 +106,7 @@ function renderSteps() {
 
 function showPage(page) {
   window.PostForgeMedia.pause();
+  if(page!=="receipt")stopReceiptReturn();
   state.page = page;
   document.querySelector("main").scrollTop = 0;
   $("steps").hidden = page === "home";
@@ -110,7 +133,7 @@ async function work(message, action, baking=false) {
   state.busy = true;
   updateTray();
   renderSteps();
-  const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
+  const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #workflow-actions button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
   controls.forEach(node => node.disabled = true);
   notice(baking ? "" : message, true);
   $("baking-visual").hidden = !baking;
@@ -255,10 +278,11 @@ function renderReview() {
     const item = document.createElement("li");
     const network = target.network === "whatsapp" ? text("WhatsApp Status", "Estado de WhatsApp")
       : state.options.networks.find(item => item.id === target.network)?.name || target.network;
-    const placement = target.placement === "story" ? text(" · Story", " · Historia")
+    const placement = target.network === "youtube" ? (plan.short ? " · Short" : text(" · Video", " · Video")) : target.placement === "story" ? text(" · Story", " · Historia")
       : target.placement === "feed" ? text(" · Post", " · Publicación") : "";
     item.textContent = network + (target.network === "whatsapp" ? "" : " · " + target.channel + placement)
-      + (target.parts > 1 ? text(" · ", " · ") + target.parts + text(" segments / drafts", " segmentos / borradores") : "");
+      + (target.parts > 1 ? text(" · ", " · ") + target.parts + text(" segments / drafts", " segmentos / borradores") : "")
+      + (target.cover ? text(" · ✓ Selected cover", " · ✓ Portada elegida") : "");
     destinations.append(item);
   }
   $("plan-meta").append(when, destinations);
@@ -400,6 +424,8 @@ async function submit(mode) {
       + (state.receipt.whatsapp_scheduled ? text("\nWhatsApp Status is approved and scheduled.", "\nEl Estado de WhatsApp está aprobado y programado.") : state.receipt.whatsapp_pending_id ? text("\nWhatsApp Status is waiting for separate approval.", "\nEl Estado de WhatsApp espera su aprobación por separado.") : "");
     $("approve-status").hidden = !state.receipt.whatsapp_pending_id || state.receipt.whatsapp_scheduled;
     showPage("receipt");
+    $("receipt-title").focus({preventScroll:true});
+    if(mode==="schedule") {$("receipt-return").hidden=false;receiptReturn.start(8);}
   });
 }
 
@@ -880,7 +906,7 @@ function renderYouTubeRoute() {
   }
   $("youtube-route-hint").textContent=message;
 }
-window.PostForgeMedia.configure({onInfo:info=>{state.mediaInfo=info;renderYouTubeRoute();},onFrame:second=>{
+window.PostForgeMedia.configure({onCover:selectionFeedback,onInfo:info=>{state.mediaInfo=info;renderYouTubeRoute();},onFrame:second=>{
   state.cover=null;$("cover-second").value=String(second);invalidate();renderMedia();
 }});
 localize();
@@ -1068,15 +1094,17 @@ async function showConnections(renew=false){
     for(const item of result.items){
       const row=document.createElement("article");row.className="connection-row";
       const label=document.createElement("strong");label.textContent=(names[item.network] || item.network)+" · "+item.name;
-      const stateLabel=document.createElement("span");stateLabel.className=item.state==="connected"?"connection-ok":"connection-attention";
-      stateLabel.textContent=item.state==="connected"?text("✓ Connected","✓ Conectado"):item.state==="reconnect"?text("Reconnect required","Debes volver a conectar"):item.state==="renewal"?text("Renews on next use","Se renueva al volver a usarse"):text("Paused","En pausa");
+      const stateLabel=document.createElement("span");stateLabel.className=item.state==="connected"?"connection-ok":item.state==="renewal"?"connection-renewal":"connection-attention";
+      stateLabel.textContent=item.state==="connected"?text("✓ Connected","✓ Conectado"):item.state==="reconnect"?text("Reconnect required","Debes volver a conectar"):item.state==="renewal"?text("↻ Automatic renewal available","↻ Renovación automática disponible"):text("Paused","En pausa");
       row.append(label,stateLabel);
-      if(item.state==="renewal"){const hint=document.createElement("small");hint.textContent=text("Postiz attempts renewal when requesting channel data or publishing. Use Check & renew to try now; reconnect only if renewal fails.","Postiz intenta renovar al consultar el canal o publicar. Pulsa Revisar y renovar para hacerlo ahora; reconecta solo si la renovación falla.");row.append(hint);}
+      if(item.state==="renewal"){const hint=document.createElement("small");hint.textContent=text("This is normal between uses: the temporary access token expired. Postiz can request a fresh one with the saved refresh credential. Use Check & renew to verify now; reconnect only if renewal fails.","Es normal entre usos: venció el token de acceso temporal. Postiz puede solicitar otro con la credencial de renovación guardada. Usa Revisar y renovar para comprobarlo ahora; reconecta solo si falla.");row.append(hint);}
       if(item.expires){const expiry=document.createElement("small");expiry.textContent=(item.state==="renewal"?text("Last access token expired: ","El último token de acceso venció: "):item.can_renew?text("Access token renews automatically · current validity: ","El token de acceso se renueva automáticamente · vigencia actual: "):text("Credential valid until: ","Credencial vigente hasta: "))+new Date(/(Z|[+-]\d{2}:\d{2})$/.test(item.expires)?item.expires:item.expires+'Z').toLocaleString(state.language==="es"?"es-EC":"en");row.append(expiry);}
       $("connection-rows").append(row);
     }
     const good=result.items.filter(item=>item.state==="connected").length;
-    $("connections-open").textContent=text("Connections ","Conexiones ")+good+"/"+result.items.length;
+    const renewal=result.items.filter(item=>item.state==="renewal").length;
+    const attention=result.items.length-good-renewal;
+    $("connections-open").textContent=attention?text("Connections · needs attention","Conexiones · requiere atención"):renewal?text("Connections · refresh on use","Conexiones · renovación al usarse"):text("Connections ","Conexiones ")+good+"/"+result.items.length;
     $("connections-open").classList.toggle("ready",good===result.items.length && good>0);
     $("connection-checked").textContent=text("Checked: ","Revisado: ")+new Date(result.checked_at).toLocaleTimeString(state.language==="es"?"es-EC":"en")+(result.checks_incomplete?text(" · Some renewal checks could not finish. Check local services and try again."," · Algunas comprobaciones no terminaron. Revisa los servicios locales y vuelve a intentar."):"");
   }catch(error){$("connection-rows").textContent=friendlyError(error);}
@@ -1194,3 +1222,12 @@ bind("review-asap", () => {
   $("review-post-at").value = new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(Date.now()+10*60000)).replace(" ","T");
   rescheduleReview();
 });
+
+bind("receipt-stay",stopReceiptReturn);
+bind("receipt-dashboard",()=>showPage("home"));
+$("receipt").addEventListener("pointerdown",stopReceiptReturn);
+$("receipt").addEventListener("keydown",stopReceiptReturn);
+// Suspend the countdown's interval when the window is away; no background timer wakeups.
+window.addEventListener("blur",()=>receiptReturn.pause());
+window.addEventListener("focus",()=>{if(state.page==="receipt")receiptReturn.resume();});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)receiptReturn.pause();else if(state.page==="receipt" && document.hasFocus())receiptReturn.resume();});

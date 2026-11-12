@@ -44,7 +44,7 @@ EVO = "http://localhost:8080"
 STATE_FILE = os.path.join(pmlib.RUN_DIR, "wa-inbox.json")
 LOCK_FILE = os.path.join(pmlib.RUN_DIR, "wa-inbox.lock")
 CONFIRM_DIR = os.path.join(pmlib.RUN_DIR, "wa-confirmations")
-REPLY_MARK = "🤖 Publish Machine"  # its own replies start with this, so it never acts on them
+REPLY_MARK = "🤖 PostForge"  # its own replies start with this, so it never acts on them
 MEDIA_WINDOW = 10 * 60  # seconds a photo or video waits for its instruction
 SETTLE = 5  # seconds to wait for the rest of an album before acting
 POLL_SECONDS = 15
@@ -397,7 +397,7 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
         when = " ".join(ES_DATES.get(part, part.lower() if part.isalpha() else part) for part in when.split())
     lines.append(head % (when, ", ".join(targets)))
     if has_caption:
-        lines += ["", ("El caption para todas las redes sociales aparece en el siguiente mensaje." if es
+        lines += ["", ("Tu texto aparece en el siguiente mensaje para que puedas copiarlo." if es
                         else "Caption follows in the next message:")]
     if result.get("youtube_title"):
         lines += ["", "Título de YouTube" if es else "YouTube title", result["youtube_title"]]
@@ -421,13 +421,13 @@ def summary(result, lang, heard=None, has_caption=False, confirmation_id=None):
             lines.append(f"Para probar otro texto, responde `mejora plan {confirmation_id}`."
                          if es else f"To try another caption, reply `improve plan {confirmation_id}`.")
         if es:
-            lines += ["", f"Responde `aprobar plan {confirmation_id}` para continuar.",
+            lines += ["", f"✅ `aprobar plan {confirmation_id}`: crea borradores de redes y aprueba el Estado de WhatsApp si lo elegiste.",
                       f"Para cambiarlo, responde `rechazar plan {confirmation_id}` y vuelve a enviar tu pedido "
                       "con los archivos. Puedes indicar «solo publicaciones», «solo historias» o "
                       "«publicaciones e historias», y «portada en el segundo 12,5» o «imagen de portada» "
                       "si adjuntas un video y una sola foto."]
         else:
-            lines += ["", f"Reply `approve plan {confirmation_id}` to continue.",
+            lines += ["", f"✅ `approve plan {confirmation_id}`: creates social drafts and approves WhatsApp Status if selected.",
                       f"To change it, reply `reject plan {confirmation_id}` and resend your request with its files. "
                       "You can say ‘only posts’, ‘only stories’, or ‘posts and stories’, and ‘cover at 12.5 s’ "
                       "or ‘cover image’ if you attach one video and one photo."]
@@ -465,8 +465,39 @@ def reply(env, instance, number, own_number, text, state, dry_run, timeout=120):
         state["sent"] = (state.get("sent", []) + [sent_id])[-200:]
 
 
+SETTINGS_COMMAND = re.compile(r"^postforge\s+(?:(?:settings|ajustes)|ping(?:\s+(?:off|apagado|[0-9]{1,4}))?)$", re.IGNORECASE)
+
+
+def settings_request(instruction, es, dry_run=False):
+    command = approval_text(instruction)
+    if not SETTINGS_COMMAND.fullmatch(command):
+        return None
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import telegram_settings
+    parts = command.lower().split()
+    changed = len(parts) == 3
+    try:
+        if changed and not dry_run:
+            minutes = 0 if parts[2] in ('off', 'apagado') else int(parts[2])
+            prefs = telegram_settings.set_heartbeat(minutes)
+        else:
+            prefs = telegram_settings.heartbeat_preferences()
+    except ValueError as exc:
+        return REPLY_MARK + "\n" + str(exc).split(' / ')[1 if es else 0]
+    cadence = ('Apagado' if es else 'Off') if not prefs['minutes'] else (("Cada %s minutos" if es else "Every %s minutes") % prefs['minutes'])
+    heading = ('✓ Ajuste guardado.' if es else '✓ Preference saved.') if changed and not dry_run else ('Ajustes de PostForge' if es else 'PostForge settings')
+    return REPLY_MARK + "\n" + heading + "\n" + ('Aviso de actividad en Telegram: ' if es else 'Telegram activity ping: ') + cadence + "\n\n" + (
+        'Para cambiarlo: `postforge ping 60` (cada hora). Para apagarlo: `postforge ping apagado`. No se envía un aviso de prueba; el próximo intervalo empieza al aplicar el cambio. Se conserva tu plan. Puedes seguir enviando pedidos normalmente.'
+        if es else 'Change it: `postforge ping 60` (every hour). Turn it off: `postforge ping off`. No test ping is sent; a fresh interval starts when the change is applied. Your plan is kept. You can continue sending posting requests normally.') + (
+        ('\nTelegram está en pausa o sin configurar; actívalo desde la app para recibir avisos.' if es else '\nTelegram is paused or not configured; enable it in the app to receive pings.') if not prefs['active'] else '')
+
+
 def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=None):
     name, _, number, _ = ident
+    preference_reply = settings_request(instruction, ui_language() == "Spanish", dry_run)
+    if preference_reply is not None:
+        reply(env, name, number, number, preference_reply, state, dry_run)
+        return True
     tz = plan_post.ZoneInfo(env.get("PM_TIMEZONE", "America/Guayaquil")) if plan_post.ZoneInfo \
         else timezone(timedelta(hours=-5))
     now = datetime.now(tz)
@@ -627,7 +658,7 @@ def one_pass(env, state, dry_run):
             if row["ts"] > now_ts - SETTLE:
                 continue  # wait a pass for the rest of an album
             text = text_of(row).strip()
-            if text.startswith(REPLY_MARK):
+            if text.startswith((REPLY_MARK, "🤖 Publish Machine")):
                 finished.append(row["id"])
                 continue
             heard = None
@@ -644,6 +675,8 @@ def one_pass(env, state, dry_run):
                 continue
             media = [m for m in fresh if m["type"] in MEDIA_TYPES and m["id"] not in finished
                      and row["ts"] - MEDIA_WINDOW <= m["ts"] <= row["ts"] + SETTLE]
+            if SETTINGS_COMMAND.fullmatch(approval_text(text)):
+                media = []  # Settings never consume files waiting for a posting request.
             if text and act(env, ident, row, text, media, folder, state, dry_run, heard):
                 finished += [m["id"] for m in media]
             finished.append(row["id"])

@@ -10,6 +10,7 @@
   <script src="dialogs.js" defer></script>
   <script src="media-preview.js" defer></script>
   <script src="network-links.js" defer></script>
+  <script src="completion-timer.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -74,7 +75,7 @@
 <video id="video-preview" controls playsinline preload="metadata" hidden></video><img id="image-preview" alt="Selected media" hidden>
 <div class="media-preview-caption"><span id="media-preview-info"></span><button id="use-current-frame" data-en="Use current frame as cover" data-es="Usar este fotograma como portada" hidden></button></div>
 </div>
-<div class="actions end"><button id="to-delivery" class="primary"></button></div>
+
     </article>
     <aside class="card quiet">
       <h2 data-en="A review comes first" data-es="Primero revisas"></h2>
@@ -122,7 +123,7 @@
         </div>
       </div>
     </details>
-    <div class="actions between"><button id="back-compose"></button><button id="bake" class="primary"></button></div>
+
   </article>
 </section>
 <section id="review" class="page" hidden>
@@ -143,7 +144,7 @@
       <div class="actions wrap"><button id="another"></button><button id="edit-caption"></button></div>
       <div class="finish">
         <p data-en="Choose how this plan should continue." data-es="Elige cómo quieres continuar con este plan."></p>
-        <div class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
+
         <small data-en="Drafts require a separate WhatsApp approval. Schedule directly approves all selected destinations." data-es="Los borradores requieren aprobar WhatsApp por separado. Programar directamente aprueba todos los destinos seleccionados."></small>
       </div>
     </article>
@@ -151,11 +152,19 @@
 </section>
 <section id="receipt" class="page" hidden>
   <article class="card">
-    <h2 id="receipt-title"></h2><div id="receipt-content"></div>
-    <div class="actions wrap"><button id="calendar"></button><button id="approve-status"></button><button id="new-plan" class="primary"></button></div>
+    <div class="success-mark" aria-hidden="true">✓</div><h2 id="receipt-title" tabindex="-1"></h2><div id="receipt-content"></div>
+    <div id="receipt-return" hidden><p id="receipt-countdown" aria-live="off"></p><progress id="receipt-progress" max="8" value="8" aria-label="Return to dashboard"></progress><button id="receipt-stay" data-en="Stay here" data-es="Quedarme aquí"></button></div>
+    <div class="actions wrap"><button id="receipt-dashboard" class="primary" data-en="Go to Dashboard" data-es="Ir al inicio"></button><button id="new-plan"></button><button id="calendar"></button><button id="approve-status"></button></div>
   </article>
 </section>
 </main>
+<section id="workflow-actions" aria-label="Next step" hidden>
+  <div><strong id="workflow-next-title"></strong><small id="workflow-next-detail"></small></div>
+  <div id="compose-actions" class="actions"><button id="to-delivery" class="primary"></button></div>
+  <div id="delivery-actions" class="actions"><button id="back-compose"></button><button id="bake" class="primary"></button></div>
+  <div id="review-actions" class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
+</section>
+<div id="selection-feedback" role="status" aria-live="polite" hidden></div>
 <footer><span id="workspace-status"></span><button id="new"></button></footer>
 <dialog hidden role="dialog" id="network-dialog" aria-labelledby="network-title">
 <h2 id="network-title" data-en="Public URL & tunnel" data-es="URL pública y túnel"></h2>
