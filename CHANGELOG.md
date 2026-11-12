@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.33]
+
+- Add WhatsApp self-chat reply buttons for reviewed-plan approval, caption alternatives, cancellation and explicit ping settings, with existing text commands kept as the fallback.
+- Bind action IDs to the owner and exact plan revision; expire menus, consume sibling actions atomically and require a final confirmation before approving a plan or discarding its preview. Button taps never consume attached media waiting for a posting request.
+- Backport the upstream native reply-button envelope and relay metadata fix to the pinned Evolution 2.3.7 provider; reapply it at every service boot, leaving normal messages, media and Status delivery paths intact.
+- Keep private button capabilities out of release artifacts and migration data; bound their storage and protect it with owner-only file permissions.
+
 ## [2.0.0-rc.32]
 
 - Keep the primary next-step buttons in a persistent action bar; use more of the monitor height with a restrained desktop width.

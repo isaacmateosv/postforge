@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pmlib  # noqa: E402
 import plan_post  # noqa: E402
 import whatsapp_pending  # noqa: E402
+import wa_interactive  # noqa: E402
 from pmlib import PMError  # noqa: E402
 from wa_settings import redis_text  # noqa: E402
 
@@ -465,6 +466,100 @@ def reply(env, instance, number, own_number, text, state, dry_run, timeout=120):
         state["sent"] = (state.get("sent", []) + [sent_id])[-200:]
 
 
+def button_menu(env, instance, own, state, choices, title, description, reference=None, dry_run=False):
+    if dry_run:return
+    try:
+        record=None
+        if reference:
+            _,record=resolve_confirmation_ref(reference)
+            if not record:return
+            reference=record['id']
+        buttons=wa_interactive.Registry().issue(own,choices,reference,wa_interactive.fingerprint(record) if record else None)
+        code,data=evo_call(env,'POST','/message/sendButtons/'+instance,
+                           {'number':own,'title':REPLY_MARK+' · '+title,'description':description,
+                            'footer':'Usa los comandos de texto si no aparecen los botones.' if ui_language()=='Spanish' else 'Use the text commands if buttons are unavailable.',
+                            'buttons':buttons},timeout=15)
+        if code not in (200,201):
+            log('Interactive controls unavailable; text commands remain available.')
+            return
+        sent_id=((data or {}).get('key') or {}).get('id') if isinstance(data,dict) else None
+        if sent_id:state['sent']=(state.get('sent',[])+[sent_id])[-200:]
+        return True
+    except Exception:
+        # Decorative controls must never retry or fail the posting operation.
+        log('Interactive controls could not be confirmed; text commands remain available.')
+
+
+def plan_buttons(env,instance,own,state,reference,dry_run=False):
+    es=ui_language()=='Spanish'
+    button_menu(env,instance,own,state,[('Revisar aprobación' if es else 'Review approval','review_approval'),
+                ('Probar otro texto' if es else 'Try another caption','rewrite'),('Más opciones' if es else 'More options','options')],
+                'Revisa tu plan' if es else 'Review your plan',
+                'Nada se envía al tocar Revisar aprobación: primero verás una confirmación.' if es else 'Review approval opens a confirmation before anything is submitted.',reference,dry_run)
+
+
+def settings_buttons(env,instance,own,state,reference=None,dry_run=False):
+    es=ui_language()=='Spanish'
+    button_menu(env,instance,own,state,[('Elegir intervalo' if es else 'Choose interval','interval_menu'),
+                ('Apagar aviso' if es else 'Turn ping off','ping_0'),('Volver' if es else 'Back','back')],
+                'Aviso de Telegram' if es else 'Telegram activity ping',
+                'Solo cambias los avisos. Se conserva tu plan; no se publica nada.' if es else 'Changes notifications only. Your posting plan is kept; nothing is published.',reference,dry_run)
+
+
+def button_action(env,ident,row,token,folder,state,dry_run=False):
+    instance,_,own,_=ident
+    es=ui_language()=='Spanish'
+    status,record=wa_interactive.Registry().consume(token,own,dry_run=dry_run)
+    if status!='ok':
+        reply(env,instance,own,own,REPLY_MARK+'\n'+('Este menú ya se usó o venció. Usa los comandos del último plan o `postforge ajustes`.' if es else 'This menu was already used or expired. Use the latest plan commands or `postforge settings`.'),state,dry_run)
+        return
+    reference=record.get('reference')
+    saved=None
+    if reference:
+        _,saved=resolve_confirmation_ref(reference)
+        if not saved or wa_interactive.fingerprint(saved)!=record.get('plan_hash'):
+            reply(env,instance,own,own,REPLY_MARK+'\n'+('El plan cambió o ya se completó. Usa la revisión más reciente; no lo vuelvas a enviar sin revisar Postiz.' if es else 'The plan changed or was already handled. Use its latest review; check Postiz before submitting again.'),state,dry_run)
+            return
+    action=record['action']
+    if action=='probe':
+        reply(env,instance,own,own,REPLY_MARK+'\n'+('✓ Los botones y sus respuestas funcionan. No se cambió ningún ajuste ni publicación.' if es else '✓ Buttons and replies work. No settings or posts were changed.'),state,dry_run)
+        return
+    if action=='confirm_plan':
+        return act(env,ident,row,'approve plan '+reference,[],folder,state,dry_run)
+    if action=='confirm_reject':
+        return act(env,ident,row,'reject plan '+reference,[],folder,state,dry_run)
+    if action=='rewrite':
+        return act(env,ident,row,'improve plan '+reference,[],folder,state,dry_run)
+    if action=='review_approval':
+        result=saved['result'];has_whatsapp=any(t['network']=='whatsapp' for t in result['targets'])
+        text=('Se crearán borradores de redes para aprobar en Postiz.' if es else 'Social drafts will be created for approval in Postiz.')
+        if has_whatsapp:text+=(' También aprobarás el Estado de WhatsApp para el público configurado.' if es else ' This also approves WhatsApp Status for the configured audience.')
+        text+='\n'+result['when_local']
+        reply(env,instance,own,own,REPLY_MARK+'\n'+text,state,dry_run)
+        return button_menu(env,instance,own,state,[('Confirmar plan' if es else 'Confirm plan','confirm_plan'),('Volver' if es else 'Back','back')],
+                           'Confirmación final' if es else 'Final confirmation',text,reference,dry_run)
+    if action=='review_reject':
+        text='Solo se descarta esta revisión; no se eliminan publicaciones guardadas en Postiz.' if es else 'Only this preview is discarded; saved Postiz posts are unaffected.'
+        reply(env,instance,own,own,REPLY_MARK+'\n'+text,state,dry_run)
+        return button_menu(env,instance,own,state,[('Descartar revisión' if es else 'Discard preview','confirm_reject'),('Volver' if es else 'Back','back')],
+                           '¿Descartar revisión?' if es else 'Discard this preview?',text,reference,dry_run)
+    if action=='options':
+        return button_menu(env,instance,own,state,[('Descartar revisión' if es else 'Discard preview','review_reject'),('Ajustes' if es else 'Settings','settings'),('Volver' if es else 'Back','back')],
+                           'Opciones del plan' if es else 'Plan options','Se conserva tu plan.' if es else 'Your plan is kept.',reference,dry_run)
+    if action in ('interval_menu','interval_more'):
+        choices=([('30 minutos' if es else '30 minutes','ping_30'),('Cada hora' if es else 'Every hour','ping_60'),('Más intervalos' if es else 'More intervals','interval_more')]
+                 if action=='interval_menu' else [('Cada 6 horas' if es else 'Every 6 hours','ping_360'),('Una vez al día' if es else 'Once a day','ping_1440'),('Volver' if es else 'Back','settings')])
+        return button_menu(env,instance,own,state,choices,'Intervalo del aviso' if es else 'Ping interval',
+                           'El aviso se envía solo mientras el servicio está activo.' if es else 'Pings are sent only while the service is running.',reference,dry_run)
+    if action=='settings' or action.startswith('ping_'):
+        command='postforge settings' if action=='settings' else 'postforge ping '+action.split('_')[1]
+        reply(env,instance,own,own,settings_request(command,es,dry_run),state,dry_run)
+        return settings_buttons(env,instance,own,state,reference,dry_run)
+    if action=='back':
+        if reference:return plan_buttons(env,instance,own,state,reference,dry_run)
+        reply(env,instance,own,own,REPLY_MARK+'\n'+('Ajustes cerrados. Puedes enviar un nuevo pedido de publicación normalmente.' if es else 'Settings closed. You can send a posting request normally.'),state,dry_run)
+
+
 SETTINGS_COMMAND = re.compile(r"^postforge\s+(?:(?:settings|ajustes)|ping(?:\s+(?:off|apagado|[0-9]{1,4}))?)$", re.IGNORECASE)
 
 
@@ -497,6 +592,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
     preference_reply = settings_request(instruction, ui_language() == "Spanish", dry_run)
     if preference_reply is not None:
         reply(env, name, number, number, preference_reply, state, dry_run)
+        settings_buttons(env,name,number,state,dry_run=dry_run)
         return True
     tz = plan_post.ZoneInfo(env.get("PM_TIMEZONE", "America/Guayaquil")) if plan_post.ZoneInfo \
         else timezone(timedelta(hours=-5))
@@ -539,6 +635,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
         reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
                                                 confirmation_id=improvement[1]), state, dry_run)
         reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
+        plan_buttons(env,name,number,state,confirmation['id'],dry_run)
         return True
     tag_change = TAG_PLAN.fullmatch(normalized_instruction)
     if tag_change:
@@ -556,6 +653,7 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
         reply(env, name, number, number, summary(result, confirmation["lang"], has_caption=True,
                                                 confirmation_id=tag_change[1]), state, dry_run)
         reply(env, name, number, number, clean_caption(result["caption"]), state, dry_run)
+        plan_buttons(env,name,number,state,confirmation['id'],dry_run)
         return True
     plan_approval = APPROVE_PLAN.fullmatch(normalized_instruction)
     if plan_approval:
@@ -635,10 +733,9 @@ def act(env, ident, row, instruction, media_rows, folder, state, dry_run, heard=
         text = hint(str(exc), lang, heard)
         log("could not plan: %s" % exc)
     reply(env, name, number, number, text, state, dry_run)
-    if confirmation_id:
-        reply(env, name, number, number, approval_command(confirmation_id, p["lang"]), state, dry_run)
     if caption:
         reply(env, name, number, number, caption, state, dry_run)
+    if confirmation_id:plan_buttons(env,name,number,state,confirmation_id,dry_run)
     return True
 
 
@@ -657,6 +754,14 @@ def one_pass(env, state, dry_run):
         for row in fresh:
             if row["ts"] > now_ts - SETTLE:
                 continue  # wait a pass for the rest of an album
+            control = wa_interactive.response(row.get('message'))
+            if control:
+                try:
+                    button_action(env,ident,row,control,folder,state,dry_run)
+                except Exception:
+                    reply(env,name,number,number,REPLY_MARK+'\n'+('No se pudo completar la acción. Revisa el último plan y Postiz antes de reintentar.' if ui_language()=='Spanish' else 'The action could not finish. Review the latest plan and Postiz before retrying.'),state,dry_run)
+                finished.append(row['id'])
+                continue
             text = text_of(row).strip()
             if text.startswith((REPLY_MARK, "🤖 Publish Machine")):
                 finished.append(row["id"])
