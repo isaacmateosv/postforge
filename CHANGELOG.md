@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.29]
+
+- Include channel profile pictures when rebasing Postiz media origins so avatars keep working after tunnel or domain changes. Preserve external profile-image URLs and channel credentials.
+
+
 ## [2.0.0-rc.28]
 
 - Refresh the displayed public URL and OAuth callbacks together after external URL changes, on window focus and while the network panel is visible.

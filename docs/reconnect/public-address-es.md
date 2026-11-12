@@ -67,3 +67,6 @@ Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El cont
 
 
 La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Sincronizar URL actual** antes de copiar o abrir Postiz.
+
+
+Al cambiar la URL pública también se actualizan las fotos de perfil de los canales alojadas localmente. Si el calendario ya estaba abierto, recárgalo después de la migración para obtener los enlaces nuevos. Esta corrección no requiere reconectar los canales.

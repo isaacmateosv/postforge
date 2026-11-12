@@ -67,3 +67,6 @@ Click the current public URL or **Copy link** to copy it. The control briefly tu
 
 
 The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Synchronize current URL** before copying or opening Postiz.
+
+
+Public URL migration also updates locally hosted channel profile pictures. If your calendar was already open, reload it after a migration to fetch the new avatar URLs; channel reconnection is not required for this repair.
