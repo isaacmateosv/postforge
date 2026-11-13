@@ -1,10 +1,14 @@
 # PostForge — Work Progress & Resume State
 
-## Current development state · 2026-11-12
+## Current development state · 2026-11-13
 
-rc.41 disables bytecode writes in signed app resources; actual launch checks caught Python caches invalidating the app resource seal. Verify the signature after relaunch before calling the final update ready.
+**Final verified release: v2.0.0-rc.41.** Release publication and native macOS/Windows/Linux CI all passed; GitHub contains all three platform ZIPs/checksums plus the Apple Silicon macOS Rust .pkg/checksum. The local app was upgraded through the real in-app Download & install path from rc.40 to rc.41, with backend/service refresh and relaunch. `codesign --verify --deep --strict` passed after launch; no bundled .pyc files were created. Tunnel container identity and private .env/gateway configuration hashes were unchanged. Postiz and WhatsApp recovered; the Telegram host receiver was confirmed running. No publishing jobs were queued or active for the test. Source working tests: 161 Python script, 21 service and 31 JavaScript checks passed. Fresh-host inspection and disposable-database restore rehearsal passed; no live destination data replacement is claimed.
 
-The actual rc.37 → rc.39 updater test downloaded and refreshed services while preserving the tunnel, but its one-shot final health gate rejected a transient condition. The app was retained at rc.37 and prior code was restored. rc.40 adds bounded retries and per-condition diagnostics; do not claim the full swap/relaunch until that retest passes.
+
+
+rc.41 disables bytecode writes in signed app resources; actual launch checks caught Python caches invalidating the app resource seal. The final signature verification passed after the rc.41 relaunch, as recorded above.
+
+The actual rc.37 → rc.39 updater test downloaded and refreshed services while preserving the tunnel, but its one-shot final health gate rejected a transient condition. The app was retained at rc.37 and prior code was restored. rc.40 adds bounded retries and per-condition diagnostics; The later rc.40/41 actual updater tests passed; the startup diagnostics recorded two temporary Postiz HTTP 502 responses, then health recovery.
 
 rc.38 preserves the running temporary tunnel during service refresh, permits exact-caption operation without Ollama, and corrects platform assumptions in the new CI fixtures. The first complete installer release is rc.39; rc.37/38 publication was blocked by test-fixture failures on other platforms.
 
