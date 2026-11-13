@@ -2,6 +2,8 @@
 
 ## Current development state · 2026-11-12
 
+rc.41 disables bytecode writes in signed app resources; actual launch checks caught Python caches invalidating the app resource seal. Verify the signature after relaunch before calling the final update ready.
+
 The actual rc.37 → rc.39 updater test downloaded and refreshed services while preserving the tunnel, but its one-shot final health gate rejected a transient condition. The app was retained at rc.37 and prior code was restored. rc.40 adds bounded retries and per-condition diagnostics; do not claim the full swap/relaunch until that retest passes.
 
 rc.38 preserves the running temporary tunnel during service refresh, permits exact-caption operation without Ollama, and corrects platform assumptions in the new CI fixtures. The first complete installer release is rc.39; rc.37/38 publication was blocked by test-fixture failures on other platforms.
@@ -22,7 +24,7 @@ The rc.33 work adds optional WhatsApp reply buttons for plan review, caption rev
 
 The rc.34 follow-up replaces the remaining Unix-only WhatsApp intake lock with the existing cross-platform helper after Windows CI caught its import failure.
 
-Validation: 160 Python script tests, 21 service/Telegram tests and 31 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
+Validation: 161 Python script tests, 21 service/Telegram tests and 31 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
 
 The guides in `docs/help/` (English and Ecuadorian Spanish), README and CHANGELOG describe the current workflow. The remainder of this file is an archived development ledger, retained for historical context.
 

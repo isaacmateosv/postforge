@@ -60,6 +60,23 @@ class RuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'symbolic link'):runtime.apply(package,target)
             self.assertEqual(private.read_text(),'keep')
 
+    def test_bootstrap_does_not_write_bytecode_into_signed_resources(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp).resolve();package=self.fixture(folder);target=folder/'fresh'
+            original=Path(__file__).parent
+            manifest=json.loads((package/runtime.MANIFEST).read_text())
+            for name in ('scripts/runtime_install.py','scripts/desktop_updates.py','scripts/lib/file_lock.py'):
+                source=original/name.removeprefix('scripts/')
+                destination=package/name;destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(source.read_bytes())
+                manifest['files'][name]={'sha256':runtime.digest(destination),'mode':0o644}
+            (package/runtime.MANIFEST).write_text(json.dumps(manifest))
+            for _ in range(2):
+                subprocess.run([sys.executable,str(package/'scripts/runtime_install.py'),'--source',str(package),'--target',str(target),'--upgrade-if-needed'],check=True,capture_output=True)
+            self.assertFalse(list(package.rglob('*.pyc')))
+            self.assertFalse(list(target.rglob('*.pyc')))
+
     def test_active_status_delivery_blocks_code_update(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp).resolve();package=self.fixture(folder);target=folder/'fresh';runtime.apply(package,target)
