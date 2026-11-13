@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.36]
+
+- Open Help directly with the quick guide, accessible Quick/Technical buttons, visible loading and inline retryable errors. Ignore stale responses when switching guides or closing Help.
+
 ## [2.0.0-rc.35]
 
 - Expose Create backup and Restore backup directly in Settings and the assistant; clearly distinguish backup files from advanced installation-folder recovery.
