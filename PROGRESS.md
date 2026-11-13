@@ -2,6 +2,8 @@
 
 ## Current development state · 2026-11-12
 
+The rc.35 backup UX correction addresses a real import-navigation failure: Advanced selected installation folders, Restore was hidden in a mode selector, mode changes left an old Complete result visible, and Enter did not start inspection. Settings now exposes Create/Restore directly, the assistant has explicit action buttons and its picker/stage reset follows the selected action. Regression tests exercise selection, Enter, visible failure recovery and the no-restore-before-confirmation boundary. A real encrypted round-trip plus disposable Postgres restore rehearsal passed with 88 tables, 224 rows and 72 media files (1,313,912,104 bytes), including gateway and Telegram settings. No live restore was applied.
+
 The supported desktop client is the Rust/Tauri app in `desktop/`. The Swift tray and Publish Machine app instructions below are historical; do not launch or reinstall those clients. Use `VERSION`, the current source, local installed bundle metadata and GitHub Actions to establish current publication/installation state.
 
 The rc.32 work adds persistent next-step actions, successful cover-preview feedback, cancellable completion navigation, monitor-aware sizing, sectioned tray menus and clearer on-demand token renewal. Authelia provisioning now defaults to 30 minutes of inactivity, preserving MFA and the two-hour session maximum; encrypted migrations retain configured session preferences.
@@ -12,7 +14,7 @@ The rc.33 work adds optional WhatsApp reply buttons for plan review, caption rev
 
 The rc.34 follow-up replaces the remaining Unix-only WhatsApp intake lock with the existing cross-platform helper after Windows CI caught its import failure.
 
-Validation: 148 Python script tests, 21 service/Telegram tests and 20 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
+Validation: 148 Python script tests, 21 service/Telegram tests and 25 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
 
 The guides in `docs/help/` (English and Ecuadorian Spanish), README and CHANGELOG describe the current workflow. The remainder of this file is an archived development ledger, retained for historical context.
 

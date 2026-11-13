@@ -225,8 +225,8 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn backup_location(app: tauri::AppHandle, restore: bool) -> Result<Option<String>,String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let result=if restore {app.dialog().file().add_filter("PostForge private backup", &["pfbackup"]).blocking_pick_file()}
-                   else {app.dialog().file().blocking_pick_folder()};
+        let result=if restore {app.dialog().file().set_title("Choose PostForge backup / Elige un respaldo de PostForge").add_filter("PostForge private backup", &["pfbackup"]).blocking_pick_file()}
+                   else {app.dialog().file().set_title("Choose backup destination / Elige la carpeta de destino").blocking_pick_folder()};
         Ok(result.and_then(|file|file.into_path().ok()).map(|path|path.to_string_lossy().into_owned()))
     }).await.map_err(|_|"File selection stopped".to_string())?
 }

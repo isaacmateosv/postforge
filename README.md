@@ -308,3 +308,5 @@ login do not make an integration official. Use platform integrations only where 
 ### Public access providers
 
 Use **Settings → Public access** or **Public URL & Tunnel** in the Rust menu bar to switch between temporary TryCloudflare, a named Cloudflare tunnel with your own domain, and saved ngrok. Gateway authentication stays enabled. URL changes synchronize Postiz and its media origins, but developer-console OAuth callbacks require manual updates. Temporary URLs change on connector restart and are intended for testing. Provider preferences and secrets are included in encrypted migrations. [English setup](docs/reconnect/public-address.md) · [Guía en español](docs/reconnect/public-address-es.md).
+
+To import a `.pfbackup`, use **Settings → App & data → Restore backup → Choose backup file**, then inspect it with its passphrase. The advanced installation-folder chooser is only for locating an existing installation. Backups include retained videos and can be large. See the in-app bilingual Help for the destination-host restore checklist.

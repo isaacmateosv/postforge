@@ -224,3 +224,9 @@ Gateway sign-in now defaults to **30 minutes without requests**, with a **two-ho
 When you prepare a plan in your self-chat, PostForge sends its copyable caption and a compact action card. **Review approval** shows exactly what will happen; **Confirm plan** creates the social drafts and approves WhatsApp Status when selected. It does not automatically publish social drafts. **Try another caption** changes the copy, and **More options** offers preview cancellation or Settings. Discarding a preview also requires confirmation and leaves saved Postiz posts alone.
 
 Open ping settings with `postforge settings` or the explicit **Settings** button. Interval buttons change only the Telegram activity-ping preference; **Back** returns to your plan. A normal caption never opens settings. Typed commands remain available if a client cannot display the card. Outdated, expired or already-used buttons cannot approve a changed plan; use the latest review instead.
+
+### Restore a `.pfbackup` file
+
+On the destination computer, open **Settings → App & data → Restore backup**. You can also choose **Restore backup** inside **Backup & Move** from the tray. Click **Choose backup file**, select the `.pfbackup` file, enter the passphrase and press Enter or **Inspect backup**. Inspection leaves live data unchanged. Then re-enter the passphrase and follow the explicit restore confirmation. Stop the previous publishing host before restoring; do not replace the source installation merely to check its backup. **Advanced → Installation folder** locates an existing installed project folder; it does not import backup files.
+
+The backup includes all retained uploaded media. Videos can make it several gigabytes; that alone does not indicate failure. Switching between Create and Restore clears the previous result so an old “Complete” message cannot be mistaken for a new inspection result. A backup passphrase cannot be recovered.
