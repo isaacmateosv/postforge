@@ -44,7 +44,7 @@ class SelectReleaseTests(unittest.TestCase):
         self.assertEqual(self.pick('2.0.0', [release('v2.0.1'), release('v2.0.3'), release('v2.0.2')]), 'v2.0.3')
 
     def test_release_without_this_platform_asset_is_skipped(self):
-        self.assertIsNone(self.pick('2.0.0', [release('v2.0.1', assets=['PostForge-Desktop-2.0.1-linux-x86_64.zip'])]))
+        self.assertIsNone(self.pick('2.0.0', [release('v2.0.1', assets=['PostForge-Desktop-2.0.1-otherplatform-othercpu.zip'])]))
 
     def test_same_or_older_is_not_offered(self):
         self.assertIsNone(self.pick('2.0.1', [release('v2.0.1'), release('v2.0.0')]))

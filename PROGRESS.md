@@ -2,7 +2,7 @@
 
 ## Current development state · 2026-11-12
 
-rc.38 preserves the running temporary tunnel during service refresh, permits exact-caption operation without Ollama, and corrects platform assumptions in the new CI fixtures. The first complete installer release is rc.38.
+rc.38 preserves the running temporary tunnel during service refresh, permits exact-caption operation without Ollama, and corrects platform assumptions in the new CI fixtures. The first complete installer release is rc.39; rc.37/38 publication was blocked by test-fixture failures on other platforms.
 
 rc.37 fixes the fresh-destination ZIP packaging gap: public backend code now travels with the app and bootstraps privately. A real empty-host import inspection passed via the actual bridge and detached worker with no .env or checkout (88 tables, 224 rows, 72 media files, gateway and Telegram state). A macOS Rust product .pkg is now built with localized requirements instructions and tool-presence warnings. In-app readiness checks are bounded and read-only. Manual Updates shares/queues startup checks without vanishing; running-app version is authoritative. Runtime updates preserve private paths, save changed public code and refresh services. Services may need recovery if refresh fails; no successful live destination cutover is claimed here.
 
