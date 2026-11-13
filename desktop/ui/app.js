@@ -960,7 +960,23 @@ async function fromSettings(action) {
   }
   return action();
 }
-function backupOpen() { openDialog("backup-dialog"); }
+function backupSetMode(mode) {
+  if (state.backupBusy) return;
+  $("backup-mode").value=mode;
+  backupClearInspection();state.backupPath=null;
+  ["backup-path","backup-stage","backup-result","backup-password","backup-confirm"].forEach(id=>{$(id).textContent="";if("value" in $(id)) $(id).value="";});
+  $("backup-stage").dataset.error="false";$("backup-progress").hidden=true;$("backup-progress").value=0;
+  const exporting=mode==="export";
+  $("backup-confirm-row").hidden=!exporting;
+  $("backup-pick").textContent=exporting ? text("Choose destination folder","Elegir carpeta de destino") : text("Choose backup file","Elegir archivo de respaldo");
+  $("backup-start").textContent=exporting ? text("Create backup","Crear respaldo") : text("Inspect backup","Revisar respaldo");
+  $("backup-instructions").textContent=exporting ? text("Choose a folder. The encrypted file includes all retained media, so videos can make it large.","Elige una carpeta. El archivo cifrado incluye todos los archivos conservados; los videos pueden hacerlo grande.") : text("Choose your .pfbackup file and enter its passphrase. Inspecting it does not replace data or stop services. Restore on the destination computer after inspection.","Elige tu archivo .pfbackup e ingresa su contraseña. Revisarlo no reemplaza datos ni detiene servicios. Restáuralo en el equipo de destino después de la revisión.");
+  for (const name of ["export","inspect"]) $("backup-"+name+"-mode").setAttribute("aria-pressed",String(name===mode));
+}
+function backupOpen(mode) {
+  if (!state.backupBusy && (mode || !$("backup-instructions").textContent)) backupSetMode(mode || "export");
+  openDialog("backup-dialog");
+}
 function backupClearInspection() {
   state.backupInspection=null;
   ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=true);
@@ -981,8 +997,9 @@ async function backupRun(action) {
     if (!await modal(text("Restore local data?","¿Restaurar los datos locales?"),text("Local publishing services will stop. Verify restored channels before starting them again. Telegram stays paused.","Los servicios locales de publicación se detendrán. Verifica los canales restaurados antes de iniciarlos otra vez. Telegram queda en pausa."),text("Restore","Restaurar"))) return;
     Object.assign(payload,{confirmed:true,fingerprint:state.backupInspection.fingerprint,replace:$("backup-replace").checked});
   }
-  state.backupBusy=true;updateTray();$("backup-progress").hidden=false;
-  document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore").forEach(node=>node.disabled=true);
+  state.backupBusy=true;updateTray();$("backup-progress").hidden=false;$("backup-progress").value=0;
+  $("backup-stage").dataset.error="false";$("backup-stage").textContent=text("Starting…","Iniciando…");$("backup-result").textContent="";
+  document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore,#backup-export-mode,#backup-inspect-mode").forEach(node=>node.disabled=true);
   try {
     const job=await engine("backup_start",payload);
     $("backup-password").value="";$("backup-confirm").value="";
@@ -1006,15 +1023,28 @@ async function backupRun(action) {
     } else {
       backupClearInspection();$("backup-result").textContent=text("Restored. Services remain stopped. Before starting: verify the public URL, gateway login, channels and schedules. Check WhatsApp linking. Enable Telegram only after the previous host is stopped.","Restaurado. Los servicios siguen detenidos. Antes de iniciarlos, verifica la URL pública, el acceso seguro, los canales y los horarios. Revisa la vinculación de WhatsApp. Activa Telegram solo cuando el equipo anterior esté detenido.")+(data.rollback ? "\n"+text("Rollback backup: ","Respaldo de recuperación: ")+data.rollback : "");
     }
-  } catch(error) {$("backup-stage").textContent=friendlyError(error);}
-  finally {state.backupBusy=false;updateTray();document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore").forEach(node=>node.disabled=false);}
+  } catch(error) {$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
+  finally {state.backupBusy=false;updateTray();document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore,#backup-export-mode,#backup-inspect-mode").forEach(node=>node.disabled=false);}
 }
-bind("backup-open",()=>fromSettings(backupOpen));
+bind("backup-open",()=>fromSettings(()=>backupOpen("export")));
+bind("backup-import-open",()=>fromSettings(()=>backupOpen("inspect")));
+bind("backup-export-mode",()=>backupSetMode("export"));
+bind("backup-inspect-mode",()=>backupSetMode("inspect"));
 bind("updates-open",()=>fromSettings(()=>checkUpdates(true)));
 bind("backup-close",backupClose);
 $("backup-dialog").addEventListener("cancel",()=>{$("backup-password").value="";$("backup-confirm").value="";backupClearInspection();});
-$("backup-mode").onchange=()=>{backupClearInspection();state.backupPath=null;$("backup-path").textContent="";$("backup-confirm-row").hidden=$("backup-mode").value!=="export";$("backup-start").textContent=$("backup-mode").value==="export" ? text("Create backup","Crear respaldo") : text("Inspect backup","Revisar respaldo");};
-bind("backup-pick",async()=>{const path=await invoke("backup_location",{restore:$("backup-mode").value!=="export"});if(path){state.backupPath=path;$("backup-path").textContent=path;backupClearInspection();}});
+bind("backup-pick",async()=>{
+  try {
+    const path=await invoke("backup_location",{restore:$("backup-mode").value!=="export"});
+    if(path){state.backupPath=path;$("backup-path").textContent=path;backupClearInspection();$("backup-result").textContent="";$("backup-progress").hidden=true;$("backup-stage").dataset.error="false";$("backup-stage").textContent=text("File selected. Enter the passphrase and continue.","Archivo seleccionado. Ingresa la contraseña y continúa.");$("backup-password").focus();}
+  } catch(error) {$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
+});
+for (const id of ["backup-password","backup-confirm"]) $(id).addEventListener("keydown",event=>{
+  if(event.key!=="Enter" || event.isComposing || state.backupBusy) return;
+  event.preventDefault();
+  if($("backup-mode").value==="export" && id==="backup-password") $("backup-confirm").focus();
+  else backupRun($("backup-mode").value);
+});
 bind("backup-start",()=>backupRun($("backup-mode").value));
 bind("backup-restore",()=>backupRun("restore"));
 if (window.__TAURI__?.event) {

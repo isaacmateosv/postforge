@@ -221,3 +221,10 @@ header,footer,main,nav,#baking-visual { max-width:1280px; }
 @media(max-height:740px) { #workflow-next-detail { display:none; }#workflow-actions { padding-top:10px; padding-bottom:10px; }.success-mark { margin-bottom:16px; } }
 #receipt-progress { min-width:40px; }
 @media(max-width:850px) { #workflow-actions .actions { flex-wrap:wrap; justify-content:flex-end; } }
+
+.backup-modes { display:flex; gap:12px; margin:20px 0 12px; }
+.backup-modes button { flex:1; min-height:44px; }
+.backup-modes button[aria-pressed=true] { background:var(--blue); color:white; border-color:var(--blue); }
+#backup-instructions { line-height:1.6; margin-bottom:20px; }
+#backup-stage:empty, #backup-result:empty { display:none; }
+#backup-stage[data-error=true] { color:var(--red, #ffb4ab); }

@@ -51,7 +51,9 @@ Keep the gateway file with the rest of this backup.
 
 On the destination Mac, install the included PostForge package if present,
 or get the matching version from https://github.com/isaacmateosv/postforge/releases.
-Open Docker Desktop, then use PostForge > Backup & Move > Restore.
+Open Docker Desktop. This legacy folder format is imported with the terminal
+command below. The app Restore backup picker accepts a single .pfbackup file;
+create that format with Backup & Move on the source computer if you prefer UI restore.
 Terminal: ~/postforge/scripts/migrate.sh import <this folder> --skip-installer
 
 Telegram bot token, private owner, language, heartbeat and enabled preference travel

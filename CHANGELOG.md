@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.35]
+
+- Expose Create backup and Restore backup directly in Settings and the assistant; clearly distinguish backup files from advanced installation-folder recovery.
+- Reset old completion output on mode/file changes, label the restore picker correctly and focus the passphrase after selection. Enter now inspects a backup; export moves to passphrase confirmation first.
+- Display picker/inspection failures in the assistant and reset progress for each request. Keep inspection separate from confirmed data replacement.
+- Document retained-media backup size and the complete English/Ecuadorian Spanish restore workflow; add regression coverage for the interactive backup flow.
+
 ## [2.0.0-rc.34]
 
 - Use the shared cross-platform process lock for WhatsApp intake so Windows can load and run the worker; preserve exclusive ownership and release the lock on exit.
