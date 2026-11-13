@@ -535,8 +535,7 @@ case "${1:-}" in
     . "$DIR/scripts/refresh-services.sh"
     refresh_container_stack
     PM_REFRESH_PRESERVE_CONNECTOR=true "$0" start
-    if ! container_running pm-tunnel || ! wait_for_scheduler 0 ||
-       ! [[ "$(http_code "$POSTIZ_URL/api/")" == 200 && "$(http_code "$EVO_URL/")" == 200 ]]; then
+    if ! wait_refreshed_stack; then
       echo "✖ The refreshed PostForge services did not pass their health checks." >&2
       exit 1
     fi

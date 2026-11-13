@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.40]
+
+- Retry transient service-startup health failures after an update and log each health condition. Keep rejecting persistent failures and retaining the installed app on failure.
+
 ## [2.0.0-rc.39]
 
 - Make the incompatible-platform updater fixture independent of the CI host platform.

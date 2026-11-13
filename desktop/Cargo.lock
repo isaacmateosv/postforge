@@ -2716,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "postforge-desktop"
-version = "2.0.0-rc.39"
+version = "2.0.0-rc.40"
 dependencies = [
  "serde",
  "serde_json",
