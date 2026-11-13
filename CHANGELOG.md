@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.0-rc.38]
+
+- Preserve the running temporary tunnel while refreshing service containers during updates, avoiding an unintended hostname change.
+- Allow exact-caption publishing without installing Ollama; keep model setup specific to generated captions.
+- Correct native-path and architecture assumptions in cross-platform update/runtime test fixtures.
+
 ## [2.0.0-rc.37]
 
 - Bundle the public Python/service runtime with every desktop build and bootstrap a private installation on fresh computers, allowing backup inspection without a checkout or .env. Read Help directly from bundled resources.

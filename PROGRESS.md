@@ -2,6 +2,8 @@
 
 ## Current development state · 2026-11-12
 
+rc.38 preserves the running temporary tunnel during service refresh, permits exact-caption operation without Ollama, and corrects platform assumptions in the new CI fixtures. The first complete installer release is rc.38.
+
 rc.37 fixes the fresh-destination ZIP packaging gap: public backend code now travels with the app and bootstraps privately. A real empty-host import inspection passed via the actual bridge and detached worker with no .env or checkout (88 tables, 224 rows, 72 media files, gateway and Telegram state). A macOS Rust product .pkg is now built with localized requirements instructions and tool-presence warnings. In-app readiness checks are bounded and read-only. Manual Updates shares/queues startup checks without vanishing; running-app version is authoritative. Runtime updates preserve private paths, save changed public code and refresh services. Services may need recovery if refresh fails; no successful live destination cutover is claimed here.
 
 The rc.36 Help follow-up opens documentation directly, shows loading/errors inside the Help dialog and rejects stale responses across guide switches.
@@ -18,7 +20,7 @@ The rc.33 work adds optional WhatsApp reply buttons for plan review, caption rev
 
 The rc.34 follow-up replaces the remaining Unix-only WhatsApp intake lock with the existing cross-platform helper after Windows CI caught its import failure.
 
-Validation: 158 Python script tests, 21 service/Telegram tests and 31 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
+Validation: 159 Python script tests, 21 service/Telegram tests and 31 JavaScript tests pass. Native macOS release packaging passes. Cover image/frame selection and persistent action navigation were checked in the actual app using disposable media without creating or scheduling posts. Validate new release assets in Actions before declaring publication complete. The current public hostname lives in `.env`, never in this progress file. A forgotten Quick Tunnel was recovered and all origins synchronized; never rotate a tunnel while posts are queued or sending. OAuth callbacks must use the current hostname for future reconnects.
 
 The guides in `docs/help/` (English and Ecuadorian Spanish), README and CHANGELOG describe the current workflow. The remainder of this file is an archived development ledger, retained for historical context.
 
