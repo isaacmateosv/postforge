@@ -123,6 +123,11 @@ class DownloadTests(unittest.TestCase):
             with self.assertRaises(pmlib.PMError):
                 installer.download()
 
+    def test_running_app_version_overrides_newer_project_version(self):
+        with self.with_version('9.0.0'), patch.object(installer,'_open',fake_opener(release(tag='v2.0.0-rc.37',prerelease=True))):
+            result=installer.download(installed='2.0.0-rc.36')
+        self.assertEqual(result['version'],'2.0.0-rc.37')
+
     def test_https_guard_rejects_http(self):
         with self.assertRaises(pmlib.PMError):
             installer._open('http://downloads.example/file.zip', 'application/octet-stream')

@@ -58,7 +58,9 @@ jobs:
         with:
           node-version: "22"
       - name: Dialog accessibility and confirmation regression tests
-        run: node --test desktop/test/dialogs.test.cjs desktop/test/signed-media.test.cjs desktop/test/network-links.test.cjs desktop/test/completion-timer.test.cjs desktop/test/media-feedback.test.cjs desktop/test/whatsapp-buttons.test.cjs desktop/test/backup-flow.test.cjs desktop/test/help-flow.test.cjs
+        run: node --test desktop/test/dialogs.test.cjs desktop/test/signed-media.test.cjs desktop/test/network-links.test.cjs desktop/test/completion-timer.test.cjs desktop/test/media-feedback.test.cjs desktop/test/whatsapp-buttons.test.cjs desktop/test/backup-flow.test.cjs desktop/test/help-flow.test.cjs desktop/test/updates-flow.test.cjs
+      - name: Runtime, requirements and updater regression tests
+        run: python -m unittest discover -s scripts -p test_runtime_install.py && python -m unittest discover -s scripts -p test_requirements_check.py && python -m unittest discover -s scripts -p "test_desktop_update*.py"
       - name: Compile native client
         run: cargo build --release --locked --manifest-path desktop/Cargo.toml
       - name: Package native artifact and notices

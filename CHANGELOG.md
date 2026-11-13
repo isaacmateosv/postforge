@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.37]
+
+- Bundle the public Python/service runtime with every desktop build and bootstrap a private installation on fresh computers, allowing backup inspection without a checkout or .env. Read Help directly from bundled resources.
+- Publish a macOS Rust `.pkg` with English/Spanish requirements instructions, missing-tool warnings and official download links. Add an in-app requirements check that distinguishes missing tools from stopped Docker.
+- Keep manual Updates visible during concurrent startup checks, with loading, retry and installation feedback. Compare releases against the running desktop version.
+- Carry matching runtime code through macOS updates, retain changed-code recovery copies, preserve private data and refresh configured services. Block active Status delivery and refuse workspace downgrades.
+- Verify real backup inspection through a detached worker in an empty destination installation, including gateway and Telegram settings, in addition to disposable-database restore rehearsal.
+
 ## [2.0.0-rc.36]
 
 - Open Help directly with the quick guide, accessible Quick/Technical buttons, visible loading and inline retryable errors. Ignore stale responses when switching guides or closing Help.

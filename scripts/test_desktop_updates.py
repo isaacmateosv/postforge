@@ -57,6 +57,14 @@ class SelectReleaseTests(unittest.TestCase):
 
 
 class CheckTests(unittest.TestCase):
+    def test_app_version_does_not_follow_the_project_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'VERSION').write_text('9.0.0')
+            reply=io.BytesIO(json.dumps([release('v2.0.0-rc.37',prerelease=True)]).encode())
+            with patch.object(updates,'ROOT',root),patch.object(updates.urllib.request,'urlopen',return_value=reply):
+                result=updates.check(installed='2.0.0-rc.36')
+        self.assertTrue(result['available']);self.assertEqual(result['installed'],'2.0.0-rc.36')
+
     def run_check(self, installed, releases):
         temporary = Path(tempfile.mkdtemp())
         (temporary / 'VERSION').write_text(installed)

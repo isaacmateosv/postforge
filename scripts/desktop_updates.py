@@ -64,8 +64,9 @@ def select_release(releases, installed):
             best, best_key=release, key
     return best
 
-def check(components=False):
-    installed=(ROOT/'VERSION').read_text().strip()
+def check(components=False, installed=None):
+    installed=installed or (ROOT/'VERSION').read_text().strip()
+    if version(installed) is None:raise ValueError('Invalid installed app version.')
     result={'installed':installed,'checked':False,'available':False}
     try:
         request=urllib.request.Request(RELEASES+'?per_page=40',headers={'User-Agent':'PostForge-desktop','Accept':'application/vnd.github+json'})

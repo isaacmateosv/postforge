@@ -33,7 +33,7 @@ all selected destinations, including WhatsApp Status, at the reviewed time.
 for the current preview. The Swift controller is retained as legacy source for
 compatibility and reference, rather than a second app to run alongside Rust.
 Installation paths stay inside advanced recovery; WhatsApp pairs by QR in the window. Some system integrations are still being ported; this is a beta, not a feature-complete
-replacement release. The legacy macOS installer below targets the Swift controller.
+replacement release. Current desktop releases include a Rust macOS `.pkg` and platform ZIPs with their public backend code bundled.
 
 ## Contents
 
@@ -187,7 +187,9 @@ operational constraints. See [NOTICE.md](NOTICE.md) and [AUTHORS.md](AUTHORS.md)
 
 ## Quick start
 
-Download the latest **PostForge-<version>.pkg** and its checksum from [GitHub Releases](https://github.com/isaacmateosv/postforge/releases/latest). The installer supports macOS 13+ on Apple silicon and Intel. It preserves private data on upgrades. The app is ad-hoc signed; the installer is unsigned and not Apple notarized. See [SETUP.md](SETUP.md) for first-open instructions.
+On macOS, download **PostForge-Desktop-<version>-darwin-arm64.pkg** and its checksum from [GitHub Releases](https://github.com/isaacmateosv/postforge/releases). Use a release matching your architecture; current macOS CI artifacts target Apple Silicon. Quit older copies, install, then open **/Applications/PostForge Desktop.app**. The installer checks tool presence and provides official download links. **Settings → Check requirements** checks actual versions and whether Docker is running. Python 3.9+ and OpenSSL are needed for backup inspection; Docker with Compose for restore; FFmpeg/ffprobe for video; Ollama is optional for generated captions.
+
+The `.pkg` and desktop ZIPs include the public Python/service runtime. On a fresh machine, PostForge creates a private installation in the user application-data directory. A source checkout is not required. It does not start publishing or invent credentials. ZIP users must place the app in a writable Applications folder before updating. The app is ad-hoc signed; the macOS installer is unsigned and not notarized.
 
 
 ```bash
@@ -207,21 +209,11 @@ from release packages.
 
 ### Easy migration
 
-In the PostForge app, open **Backup & Move…** (menu bar → Settings & Tools → Maintenance, the app menu, or the
-button at the bottom of the New Post window). Choose a folder, enter a passphrase of at least 12 characters, and press
-**Export Backup**. PostForge creates a private `PostForge-migration-…` folder with the encrypted credentials, the Postiz
-data, and a matching installer if one is already available locally. The export verifies the Postiz archive
-in a temporary database. Copy the folder privately to the new Mac, install PostForge from the included package
-or [GitHub Releases](https://github.com/isaacmateosv/postforge/releases), then use **Backup & Move → Restore**. From a terminal the same flow is:
+On the source computer, choose **Settings → Create backup** and save the single encrypted `.pfbackup` file. Copy it privately to the destination. Install the current desktop release there, open **Check requirements**, then **Settings → Restore backup → Choose backup file**. Enter the passphrase and inspect it. Inspection is read-only. Re-enter the passphrase and explicitly confirm restoration only after the old publishing host is stopped. Replacing existing destination data requires a separate checkbox and creates a rollback backup first.
 
-```bash
-./scripts/migrate.sh export            # old Mac (asks for the passphrase in the terminal)
-./scripts/migrate.sh import ~/Desktop/PostForge-migration-YYYYMMDD-HHMM --skip-installer   # new Mac, after installing the .pkg
-```
+The file includes Postiz records, retained media, encrypted credentials, gateway/MFA state and Telegram settings. Videos can make it several gigabytes. Restored services remain stopped and Telegram remains paused; verify the public URL, channel sessions and schedules before resuming. WhatsApp linking and Temporal scheduler reconciliation are separate destination checks. Never restore over the source installation merely to test a backup.
 
-Link WhatsApp again by QR and verify pending posts after moving. The handoff excludes WhatsApp sessions and
-Temporal scheduler state. Keep the folder private because the Postiz archive contains channel tokens.
-The passphrase protects the credentials file and is required to restore it.
+Advanced installation-folder recovery locates existing installed code; it does not select `.pfbackup` files. The legacy `scripts/migrate.sh` folder format remains a terminal-only alternative and cannot be selected in the single-file picker.
 
 ## Validation and stability
 

@@ -1,3 +1,5 @@
+> **Current Rust desktop installation (rc.37+):** download the matching `PostForge-Desktop-*.pkg` on macOS or the platform ZIP. The app includes its public backend and prepares private user storage. The installer provides dependency instructions; open Settings → Check requirements for readiness. To migrate, choose Restore backup and inspect the `.pfbackup` on the destination before confirming replacement. The older Swift/terminal procedures below are retained for existing installations; they are not required to select a backup in the Rust app.
+
 # PostForge: simple setup on a new Mac
 
 This is the complete final-user guide for installing PostForge on another

@@ -1,5 +1,14 @@
 # Inicio rápido de PostForge
 
+## Instalar o migrar a un equipo nuevo
+
+En macOS usa el `.pkg` actual de Rust; en otros sistemas, el ZIP correspondiente. El paquete incluye el código público de sus servicios y crea automáticamente una instalación privada. No necesitas una carpeta de proyecto. El instalador avisa qué herramientas faltan y enlaza sus fuentes oficiales. En la app, **Ajustes → Revisar requisitos** distingue herramientas ausentes de Docker instalado pero detenido. Python 3.9+ y OpenSSL permiten revisar respaldos; Docker + Compose se necesitan para restaurar; FFmpeg + ffprobe, para publicar videos. Ollama es opcional para generar textos y sus modelos se descargan por separado del respaldo.
+
+En el equipo de destino elige **Ajustes → Restaurar respaldo**, selecciona el archivo `.pfbackup`, ingresa su contraseña y revísalo. No uses el selector avanzado de carpeta de instalación. Después de revisarlo, vuelve a ingresar la contraseña y confirma que el equipo anterior esté detenido antes de restaurar. La revisión no modifica datos actuales. Cierra las copias anteriores de la app y abre la recién instalada desde Aplicaciones.
+
+**Actualizaciones** abre una ventana de progreso persistente incluso si ya está ejecutándose la consulta de inicio. Muestra la versión de la app en ejecución, no la de la carpeta del proyecto. En macOS las actualizaciones incluyen el código público correspondiente y actualizan los servicios configurados; espera a que terminen las publicaciones activas. En Windows/Linux se prepara el archivo verificado para reemplazar la app manualmente.
+
+
 Este es el flujo actual del escritorio v2. Las instrucciones anteriores de Swift quedan abajo como referencia; usa solo el cliente Rust durante las pruebas de v2.
 
 ## Escritorio en Rust y Telegram guiado
@@ -35,7 +44,7 @@ distingue entre borrar borradores y cancelar publicaciones programadas. Muestra
 las cantidades antes de confirmar. Lo que ya se publicó permanece en línea.
 
 La app encuentra automáticamente su instalación local; no necesitas elegir
-carpetas para usarla. **Ajustes → Avanzado · recuperación y migración** sirve
+carpetas para usarla. **Ajustes → Avanzado · carpeta de instalación** sirve
 solo para localizar una instalación recuperada o migrada. No se muestra la
 ruta en el inicio.
 

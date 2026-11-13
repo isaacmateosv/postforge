@@ -429,3 +429,8 @@ The public `/robots.txt` permits only `/postforge-media/` crawling and disallows
 
 
 The rc.35 assistant separates Create and Restore, uses folder/file pickers respectively, clears stale completion output when changing mode or input and accepts Enter to inspect. Inspection never dispatches restore; restore still requires a fingerprint and explicit old-host confirmation. The advanced installation-folder chooser is separate from backup import.
+
+
+### Self-contained installation / Instalación completa · rc.37
+
+Runtime installation is now part of desktop packaging. `runtime_install.py` uses a path allowlist and per-file SHA-256 manifest; no .env, private gateway, runtime queues, databases or uploaded media are package members. Fresh bootstrap does not configure/start services. Updates snapshot changed code, preserve private files, block active Status delivery and roll public code back if service refresh fails; services may need recovery after a refresh failure. Newer developer workspaces are not downgraded. Help is readable from packaged resources even without a usable backend. The requirements report performs bounded local checks without installing software. The macOS product installer has English/Spanish welcome resources, tool-presence warnings and official download links; actual version/service checks run in the user session.

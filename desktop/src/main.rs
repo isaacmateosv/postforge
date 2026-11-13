@@ -14,6 +14,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 struct Workspace(Mutex<PathBuf>);
+struct StartupIssue(Mutex<Option<String>>);
 
 fn valid_workspace(path: &Path) -> bool {
     path.join("scripts/desktop_bridge.py").is_file() && path.join("VERSION").is_file()
@@ -27,14 +28,18 @@ fn python() -> (&'static str, Vec<&'static str>) {
     }
 }
 
-fn run_engine(project: PathBuf, operation: String, payload: Value) -> Result<Value, String> {
+fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result<Value, String> {
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
+    }
+    if operation=="updates" || operation=="update_download" {
+        if !payload.is_object() {payload=serde_json::json!({});}
+        payload["installed_version"]=Value::String(env!("CARGO_PKG_VERSION").into());
     }
     let (executable, flags) = python();
     let mut command = Command::new(executable);
@@ -82,6 +87,18 @@ async fn engine(app:tauri::AppHandle, state: tauri::State<'_, Workspace>, operat
         payload["path"]=Value::String(path.to_string_lossy().into_owned());
     }
     let root = state.0.lock().map_err(|_| "Workspace is busy.")?.clone();
+    if operation=="help" {
+        if let Ok(resources)=app.path().resource_dir() {
+            let language=if payload["language"]=="es" {"es"} else {"en"};
+            let level=if payload["technical"]==true {"technical"} else {"quick"};
+            if let Ok(markdown)=std::fs::read_to_string(resources.join("Help").join(format!("{level}-{language}.md"))) {return Ok(serde_json::json!({"markdown":markdown}));}
+        }
+    }
+    let issue=app.state::<StartupIssue>().0.lock().map_err(|_|"Setup is busy.")?.clone();
+    if let Some(message)=issue {
+        if operation=="requirements" {return Ok(serde_json::json!({"items":[{"name":"Python 3.9+ / local runtime","key":"python","installed":false,"ready":false,"url":"https://www.python.org/downloads/macos/"}],"ready_for_inspection":false,"ready_for_restore":false,"configured":false,"runtime_error":message}));}
+        return Err(message);
+    }
     tauri::async_runtime::spawn_blocking(move || run_engine(root, operation, payload))
         .await.map_err(|_| "The planner task stopped.".to_string())?
 }
@@ -152,6 +169,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
         .ok_or("Install the packaged app to update from here. / Instala la app empaquetada para actualizar desde aquí.")?;
 
     let root = app.state::<Workspace>().0.lock().map_err(|_| "Workspace is busy.")?.clone();
+    let install_root=root.clone();
     let download = tauri::async_runtime::spawn_blocking(move || run_engine(root, "update_download".into(), Value::Null))
         .await.map_err(|_| "The update task stopped. / La actualización se detuvo.".to_string())??;
     let zip = download["zip"].as_str().ok_or("The update could not be prepared. / No se pudo preparar la actualización.")?;
@@ -160,6 +178,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     let script = format!(
         "#!/bin/bash\n\
          set -e\n\
+         umask 077\n\
          ZIP={zip}\n\
          APP={app}\n\
          PID={pid}\n\
@@ -168,6 +187,10 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
          NEW=\"$STAGE/PostForge Desktop.app\"\n\
          [ -d \"$NEW\" ] || {{ /bin/rm -rf \"$STAGE\"; exit 1; }}\n\
          for _ in $(/usr/bin/seq 1 150); do /bin/kill -0 \"$PID\" 2>/dev/null || break; /bin/sleep 0.1; done\n\
+         if /bin/kill -0 \"$PID\" 2>/dev/null; then /usr/bin/open \"$APP\"; exit 1; fi\n\
+         export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\
+         RUNTIME=\"$NEW/Contents/Resources/Runtime\"\n\
+         if ! /usr/bin/env python3 \"$RUNTIME/scripts/runtime_install.py\" --source \"$RUNTIME\" --target {root} --refresh > {update_log} 2>&1; then /usr/bin/open \"$APP\"; exit 1; fi\n\
          BACKUP=\"$APP.old-$$\"\n\
          /bin/mv \"$APP\" \"$BACKUP\"\n\
          if /usr/bin/ditto \"$NEW\" \"$APP\"; then\n\
@@ -181,6 +204,8 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
         zip = shell_quote(zip),
         app = shell_quote(&bundle.to_string_lossy()),
         pid = std::process::id(),
+        root = shell_quote(&install_root.to_string_lossy()),
+        update_log = shell_quote(&install_root.join("run/update-install.log").to_string_lossy()),
     );
     std::fs::write(&helper, script).map_err(|_| "Could not stage the update. / No se pudo preparar la actualización.")?;
     std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755))
@@ -220,6 +245,20 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     let folder = Path::new(zip).parent().map(|path| path.to_string_lossy().into_owned()).unwrap_or_else(|| zip.to_string());
     let _ = app.opener().open_path(&folder, None::<&str>);
     Err("The verified update was downloaded and its folder opened. Close PostForge, then replace it with the new build. / Se descargó la actualización verificada y se abrió su carpeta. Cierra PostForge y reemplázalo con la nueva versión.".into())
+}
+
+#[tauri::command]
+async fn open_requirement(app:tauri::AppHandle,key:String)->Result<(),String> {
+    use tauri_plugin_opener::OpenerExt;
+    let url=match key.as_str() {
+        "python"=>"https://www.python.org/downloads/macos/",
+        "docker"=>"https://docs.docker.com/desktop/setup/install/mac-install/",
+        "ffmpeg"=>"https://ffmpeg.org/download.html",
+        "ollama"=>"https://ollama.com/download/mac",
+        "openssl"=>"https://www.openssl.org/",
+        _=>return Err("Unknown requirement.".into()),
+    };
+    app.opener().open_url(url,None::<&str>).map_err(|_|"Could not open the official download page.".into())
 }
 
 #[tauri::command]
@@ -266,7 +305,23 @@ fn main() {
             let saved = app.path().app_config_dir().ok()
                 .and_then(|directory| std::fs::read_to_string(directory.join("workspace")).ok())
                 .map(PathBuf::from).filter(|path| valid_workspace(path));
-            app.manage(Workspace(Mutex::new(saved.unwrap_or(fallback))));
+            let mut root=saved.unwrap_or(fallback);
+            if !valid_workspace(&root) {root=app.path().app_data_dir()?.join("installation");}
+            let mut startup_issue=None;
+            if let Some(runtime)=app.path().resource_dir().ok().map(|p|p.join("Runtime")).filter(|p|p.is_dir()).or_else(||std::env::current_exe().ok().and_then(|p|p.parent().map(|p|p.join("Runtime"))).filter(|p|p.is_dir())) {
+                // Bootstrap a fresh host, or finish an upgrade initiated by an older client.
+                // Never downgrade an actively developed workspace.
+                let (executable,flags)=python();
+                let bootstrap=Command::new(executable).args(flags).arg(runtime.join("scripts/runtime_install.py"))
+                    .arg("--source").arg(&runtime).arg("--target").arg(&root).arg("--upgrade-if-needed").arg("--refresh")
+                    .env("PATH",format!("/opt/homebrew/bin:/usr/local/bin:{}",std::env::var("PATH").unwrap_or_default()))
+                    .output();
+                if !matches!(&bootstrap,Ok(output) if output.status.success()) {
+                    startup_issue=Some("Local setup could not complete. Install Python 3.9+ and review system requirements, then reopen PostForge. If this was an update, finish active publishing and check the service logs. / No se pudo completar la instalación local. Instala Python 3.9+, revisa los requisitos y vuelve a abrir PostForge. Si era una actualización, termina las publicaciones activas y revisa los registros de servicios.".to_string());
+                }
+            }
+            app.manage(Workspace(Mutex::new(root)));
+            app.manage(StartupIssue(Mutex::new(startup_issue)));
             app.manage(media_ui::SelectedFiles::default());
             tray_ui::install(app.handle())?;
             size_starting_window(app.handle())?;
@@ -283,7 +338,7 @@ fn main() {
 
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
-        .invoke_handler(tauri::generate_handler![copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
+        .invoke_handler(tauri::generate_handler![open_requirement, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
         .build(tauri::generate_context!())
         .expect("PostForge desktop could not start")
         .run(|app,event| {

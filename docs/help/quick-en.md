@@ -1,5 +1,14 @@
 # PostForge Quick Start
 
+## Install or migrate on a new computer
+
+Use the current Rust `.pkg` on macOS, or the matching ZIP for your operating system. The package includes the public backend; it creates a private installation automatically. No project folder is required. The installer warns about missing tools and links to official sources. In the app, **Settings → Check requirements** distinguishes missing tools from Docker installed but stopped. Python 3.9+ and OpenSSL allow backup inspection; Docker + Compose are needed to restore; FFmpeg + ffprobe for video publishing. Ollama is optional for generated captions and its model downloads are separate from your backup.
+
+On the destination, choose **Settings → Restore backup**, select the `.pfbackup`, enter its passphrase and inspect. Do not use the advanced installation-folder chooser. After inspection, enter the passphrase again and confirm the old host is stopped before actual restore. No live data changes during inspection. Quit older app copies and open the newly installed app from Applications.
+
+**Updates** opens a persistent progress window even when a startup check is already running. It reports the running desktop's version rather than the project folder's version. macOS updates include matching public runtime code and refresh configured services; wait for active posting to finish. Windows/Linux stage the verified archive for a deliberate manual replacement.
+
+
 This is the current v2 desktop workflow. The older Swift instructions are retained below for reference; run only the Rust client during v2 testing.
 
 ## Rust desktop and guided Telegram
@@ -30,7 +39,7 @@ whether to remove drafts or cancel scheduled posts, then shows counts before
 confirmation. Published posts remain online.
 
 The local backend is discovered automatically; folder selection is not part
-of normal use. **Settings → Advanced · recovery and migration** is only for
+of normal use. **Settings → Advanced · installation folder** is only for
 locating a recovered or migrated installation. No path clutters the dashboard.
 
 Open **Telegram** in the app header. Each installation uses its own dedicated

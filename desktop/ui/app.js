@@ -930,34 +930,77 @@ function updateTray() {
   invoke("tray_state", { language:state.language, drafts:state.dashboard?.drafts || 0,
     queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!state.backupBusy)+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length, update:!!state.updateAvailable }).catch(() => {});
 }
-async function checkUpdates(manual=false) {
-  if (state.updateChecking) return;
-  state.updateChecking=true;
+async function requirementsOpen(automatic=false) {
   try {
-    if (manual) notice(text("Checking app and service updates", "Buscando actualizaciones de la app y los servicios"),true);
-    const result=await engine("updates",{components:manual});
+    if(!automatic) {openDialog("requirements-dialog");$("requirements-feedback").textContent=text("Checking installed tools…","Revisando las herramientas instaladas…");}
+    const result=await engine("requirements");
+    if(automatic && (result.configured || document.querySelector("dialog[open]"))) return;
+    if(automatic) openDialog("requirements-dialog");
+    $("requirements-list").replaceChildren();
+    for(const item of result.items) {
+      const row=document.createElement("p");
+      const status=item.ready ? "✓ " : item.stopped ? text("Start Docker · ","Inicia Docker · ") : item.optional ? text("Optional · ","Opcional · ") : text("Missing · ","Falta · ");
+      const label=document.createElement("strong");label.textContent=status+item.name;
+      const link=document.createElement("a");link.textContent=text(" Official download / instructions"," Descarga oficial / instrucciones");link.href=item.url;link.target="_blank";link.rel="noreferrer noopener";link.onclick=event=>{event.preventDefault();invoke("open_requirement",{key:item.key}).catch(error=>{$("requirements-feedback").textContent=friendlyError(error);});};
+      row.append(label,link);$("requirements-list").append(row);
+    }
+    $("requirements-feedback").textContent=result.ready_for_restore ? text("Ready to inspect and restore your backup.","Listo para revisar y restaurar tu respaldo.") : result.ready_for_inspection ? text("You can inspect a backup. Complete the requirements below before restoring.","Puedes revisar un respaldo. Completa los requisitos de abajo antes de restaurar.") : text("Complete Python/OpenSSL setup before opening a backup.","Completa la instalación de Python/OpenSSL antes de abrir un respaldo.");
+    if(result.runtime_error) $("requirements-feedback").textContent=friendlyError(result.runtime_error);
+    $("requirements-restore").disabled=!result.ready_for_inspection;
+  } catch(error) {if(!automatic) $("requirements-feedback").textContent=friendlyError(error);else notice(friendlyError(error));}
+}
+bind("requirements-open",()=>fromSettings(()=>requirementsOpen()));bind("requirements-retry",()=>requirementsOpen());
+bind("requirements-close",()=>$("requirements-dialog").close());
+bind("requirements-restore",async()=>{$("requirements-dialog").close();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));backupOpen("inspect");});
+requirementsOpen(true);
+let updateCheckTask=null,updateDialogRequest=0;
+async function updateResult(components) {
+  if(updateCheckTask) {
+    const active=updateCheckTask;
+    if(!components || active.components) return active.promise;
+    try {await active.promise;} catch(_) {}
+    return updateResult(components);
+  }
+  const task={components};updateCheckTask=task;state.updateChecking=true;updateTray();
+  task.promise=Promise.resolve().then(()=>engine("updates",{components})).finally(()=>{
+    if(updateCheckTask===task){updateCheckTask=null;state.updateChecking=false;updateTray();}
+  });
+  return task.promise;
+}
+async function checkUpdates(manual=false) {
+  const request=manual ? ++updateDialogRequest : 0;
+  if(manual) {
+    openDialog("updates-dialog");$("updates-feedback").textContent=text("Checking the app and services…","Buscando actualizaciones de la app y los servicios…");
+    $("updates-progress").hidden=false;$("updates-install").hidden=true;$("updates-retry").disabled=true;
+  }
+  try {
+    const result=await updateResult(manual);
     state.updateAvailable=result.available || !!(result.services?.updates_available || result.services?.evolution?.update_available);
     $("updates-open").textContent=state.updateAvailable ? text("Updates Available","Actualizaciones disponibles") : text("Check for Updates","Buscar actualizaciones");
-    if (manual) {
-      const message=text("Installed: ","Instalada: ")+result.installed+"\n"+
-        (!result.checked ? text("The release check could not finish. Try again later.","No se pudo completar la consulta. Vuelve a intentarlo más tarde.") :
-         result.available ? text("A compatible desktop update is available.","Hay una actualización de escritorio compatible.") :
-         text("No newer compatible desktop release was found.","No se encontró una versión de escritorio compatible más reciente."))+
-        (result.services ? "\n"+text("Service check: ","Servicios: ")+((result.services.updates_available || result.services.evolution?.update_available) ? text("updates available.","hay actualizaciones.") : (result.services.check_complete && result.services.evolution) ? text("current.","actualizados.") : text("some checks could not finish.","algunas consultas no se completaron.")) : "");
-      notice();
-      if (result.available) {
-        if (await modal(text("Updates", "Actualizaciones"),message,text("Download & install","Descargar e instalar"))) {
-          notice(text("Downloading and verifying the update. PostForge will restart to finish.","Descargando y verificando la actualización. PostForge se reiniciará para terminar."),true);
-          try { await invoke("install_update"); }
-          catch (error) { notice(friendlyError(error)); }
-        }
-      } else {
-        await modal(text("Updates", "Actualizaciones"),message,text("Done","Listo"));
-      }
+    if(manual && request===updateDialogRequest && $("updates-dialog").open) {
+      $("updates-feedback").textContent=text("Desktop installed: ","App instalada: ")+result.installed+"\n"+
+        (!result.checked ? text("The check could not finish. Try again.","La consulta no pudo completarse. Vuelve a intentar.") : result.available ? text("Available: ","Disponible: ")+result.latest : text("Your desktop app is up to date.","Tu app está actualizada."))+
+        (result.services ? "\n"+text("Services: ","Servicios: ")+((result.services.updates_available || result.services.evolution?.update_available) ? text("updates available.","hay actualizaciones disponibles.") : result.services.check_complete ? text("current.","actualizados.") : text("some checks could not finish.","algunas consultas no pudieron completarse.")) : "");
+      $("updates-install").hidden=!result.available;
     }
-  } catch (error) { if (manual) notice(friendlyError(error)); }
-  finally {state.updateChecking=false;updateTray();}
+  } catch(error) {
+    if(manual && request===updateDialogRequest && $("updates-dialog").open) $("updates-feedback").textContent=friendlyError(error);
+  } finally {
+    if(manual && request===updateDialogRequest){$("updates-progress").hidden=true;$("updates-retry").disabled=false;}
+    updateTray();
+  }
 }
+async function installAvailableUpdate() {
+  if(state.updateInstalling)return;
+  state.updateInstalling=true;$("updates-install").disabled=true;$("updates-retry").disabled=true;$("updates-progress").hidden=false;
+  $("updates-feedback").textContent=text("Downloading and verifying. PostForge will restart and refresh its services. Wait until publishing has finished before updating.","Descargando y verificando. PostForge se reiniciará y actualizará sus servicios. Espera a que termine cualquier publicación antes de actualizar.");
+  try {await invoke("install_update");}
+  catch(error){$("updates-feedback").textContent=friendlyError(error);}
+  finally {state.updateInstalling=false;$("updates-install").disabled=false;$("updates-retry").disabled=false;$("updates-progress").hidden=true;}
+}
+bind("updates-retry",()=>checkUpdates(true));bind("updates-install",installAvailableUpdate);
+bind("updates-close",()=>{$("updates-dialog").close();++updateDialogRequest;});
+$("updates-dialog").addEventListener("cancel",()=>{++updateDialogRequest;});
 // Let WebKit finish removing the old modal from the top layer before opening
 // another. Otherwise the new dialog can remain absent from the accessibility tree.
 async function fromSettings(action) {
