@@ -228,3 +228,6 @@ header,footer,main,nav,#baking-visual { max-width:1280px; }
 #backup-instructions { line-height:1.6; margin-bottom:20px; }
 #backup-stage:empty, #backup-result:empty { display:none; }
 #backup-stage[data-error=true] { color:var(--red, #ffb4ab); }
+
+#help-dialog { max-width:900px; }
+#help-body .help-document { max-height:65vh; padding:8px 16px 16px 4px; line-height:1.65; }

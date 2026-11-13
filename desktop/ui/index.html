@@ -241,6 +241,14 @@
   <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
 </dialog>
 
+<dialog hidden role="dialog" id="help-dialog" aria-labelledby="help-title">
+<h2 id="help-title" data-en="PostForge Help" data-es="Ayuda de PostForge"></h2>
+<div class="backup-modes" role="group" aria-label="Guides"><button id="help-quick" aria-pressed="true" data-en="Quick guide" data-es="Guía rápida"></button><button id="help-technical" aria-pressed="false" data-en="Technical guide" data-es="Guía técnica"></button></div>
+<p id="help-feedback" role="status"></p><button id="help-retry" hidden data-en="Try again" data-es="Volver a intentar"></button>
+<div id="help-body" aria-busy="false"></div>
+<div class="actions end"><button id="help-close" data-en="Close" data-es="Cerrar"></button></div>
+</dialog>
+
 <dialog hidden role="dialog" id="backup-dialog" aria-labelledby="backup-title">
 <h2 id="backup-title" data-en="Backup & Move" data-es="Respaldo y traslado"></h2>
 <p data-en="Your posts, media, credentials and gateway travel together in one encrypted file. Keep its passphrase somewhere safe." data-es="Las publicaciones, archivos, credenciales y el acceso seguro viajan juntos en un archivo cifrado. Guarda su contraseña en un lugar seguro."></p>

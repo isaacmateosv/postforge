@@ -670,21 +670,25 @@ async function telegramAction(action) {
   finally { buttons.forEach(node => node.disabled = false); }
 }
 
-async function help() {
-  const choices = document.createElement("select");
-  for (const [value, label] of [["quick", text("Quick guide", "Guía rápida")],
-                                 ["technical", text("Technical guide", "Guía técnica")]]) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    choices.append(option);
-  }
-  const picker=document.createElement("div");picker.className="help-picker";
-  const label=document.createElement("label");label.textContent=text("Choose a guide","Elige una guía");choices.id="help-guide-choice";label.htmlFor=choices.id;
-  const explanation=document.createElement("p");explanation.textContent=text("A short walkthrough to get started, or detailed setup and troubleshooting.","Una guía breve para empezar o los detalles de configuración y solución de problemas.");
-  picker.append(label,choices,explanation);
-  if (!await modal(text("PostForge Help", "Ayuda de PostForge"), picker,text("Open guide","Abrir guía"))) return;
-  const result = await engine("help", { language: state.language, technical: choices.value === "technical" });
+let helpRequest=0;
+async function help(technical=state.helpTechnical || false) {
+  state.helpTechnical=technical;
+  const request=++helpRequest;
+  openDialog("help-dialog");
+  $("help-feedback").textContent=text("Opening guide…","Abriendo guía…");$("help-retry").hidden=true;
+  $("help-body").replaceChildren();$("help-body").setAttribute("aria-busy","true");
+  $("help-quick").setAttribute("aria-pressed",String(!technical));$("help-technical").setAttribute("aria-pressed",String(technical));
+  try {
+    const result=await engine("help",{language:state.language,technical});
+    if(request!==helpRequest || !$("help-dialog").open) return;
+    $("help-body").append(renderHelpDocument(result.markdown));
+    $("help-feedback").textContent="";
+  } catch(error) {
+    if(request!==helpRequest || !$("help-dialog").open) return;
+    $("help-feedback").textContent=text("Could not open the guide. ","No se pudo abrir la guía. ")+friendlyError(error);$("help-retry").hidden=false;
+  } finally { if(request===helpRequest) $("help-body").setAttribute("aria-busy","false"); }
+}
+function renderHelpDocument(markdown) {
   const content = document.createElement("div");
   content.className = "help-document";
   let code = false;
@@ -700,7 +704,7 @@ async function help() {
       paragraph = [];
     }
   };
-  for (const line of result.markdown.split("\n")) {
+  for (const line of markdown.split("\n")) {
     if (line.startsWith(String.fromCharCode(96).repeat(3))) {
       flush(); list = null; code = !code;
       if (code) { pre = document.createElement("pre"); content.append(pre); }
@@ -727,8 +731,11 @@ async function help() {
     } else { list = null; }
   }
   flush();
-  await modal(text("PostForge Help", "Ayuda de PostForge"), content, text("Close", "Cerrar"));
+  return content;
 }
+bind("help-quick",()=>help(false));bind("help-technical",()=>help(true));
+bind("help-retry",()=>help());bind("help-close",()=>{$("help-dialog").close();++helpRequest;});
+$("help-dialog").addEventListener("cancel",()=>{++helpRequest;});
 
 async function loadOptions() {
   try {
