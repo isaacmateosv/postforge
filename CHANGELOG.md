@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.39]
+
+- Make the incompatible-platform updater fixture independent of the CI host platform.
+
 ## [2.0.0-rc.38]
 
 - Preserve the running temporary tunnel while refreshing service containers during updates, avoiding an unintended hostname change.
