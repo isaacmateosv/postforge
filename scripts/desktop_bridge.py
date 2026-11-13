@@ -17,6 +17,9 @@ import manage_posts
 
 
 def dispatch(operation, payload):
+    if operation=="requirements":
+        import requirements_check
+        return requirements_check.check()
     if operation in ("media_inspect", "media_frame"):
         import media_preview
         return media_preview.inspect(payload["path"]) if operation=="media_inspect" else media_preview.frame(payload["path"],payload.get("second",0))
@@ -25,10 +28,10 @@ def dispatch(operation, payload):
         return backup_assistant.start(payload) if operation == "backup_start" else backup_assistant.status(payload["id"])
     if operation == "updates":
         import desktop_updates
-        return desktop_updates.check(payload.get("components") is True)
+        return desktop_updates.check(payload.get("components") is True,installed=payload.get("installed_version"))
     if operation == "update_download":
         import desktop_update_install
-        return desktop_update_install.download()
+        return desktop_update_install.download(installed=payload.get("installed_version"))
     if operation in ("whatsapp_audience", "whatsapp_audience_save"):
         import whatsapp_audience
         return whatsapp_audience.status() if operation=="whatsapp_audience" else whatsapp_audience.save(payload)

@@ -187,6 +187,7 @@
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
 <div class="settings-row"><label for="language" data-en="Language" data-es="Idioma"></label><select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></div>
 <div class="settings-row"><div><strong data-en="Public access" data-es="Acceso público"></strong><small data-en="Tunnel provider, URL rotation and your own domain" data-es="Proveedor del túnel, rotación de URL y dominio propio"></small></div><button id="network-open" data-en="Configure network" data-es="Configurar red"></button></div>
+<div class="settings-row"><div><strong data-en="System requirements" data-es="Requisitos del sistema"></strong><small data-en="Check installed tools and download sources" data-es="Revisa las herramientas y dónde descargarlas"></small></div><button id="requirements-open" data-en="Check requirements" data-es="Revisar requisitos"></button></div>
 <div class="settings-section"><h3 data-en="App & data" data-es="App y datos"></h3>
 <div class="settings-row"><div><strong data-en="Updates" data-es="Actualizaciones"></strong><small data-en="Check the app and local services" data-es="Revisa la app y los servicios locales"></small></div><button id="updates-open" data-en="Check for updates" data-es="Buscar actualizaciones"></button></div>
 <div class="settings-row"><div><strong data-en="Backup & Move" data-es="Respaldo y traslado"></strong><small data-en="Export or restore an encrypted backup" data-es="Exporta o restaura un respaldo cifrado"></small></div><div class="actions"><button id="backup-open" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-import-open" data-en="Restore backup" data-es="Restaurar respaldo"></button></div></div>
@@ -239,6 +240,20 @@
   <p class="hint" data-en="Settings, including the secret token, are stored in the private .env and included in encrypted credentials backups. Restores keep Telegram paused until you confirm the old host is stopped. Keep group privacy enabled; no public webhook or inline mode is required." data-es="Los ajustes, incluido el token secreto, se guardan en el .env privado y viajan en los respaldos cifrados de credenciales. Al restaurar, Telegram queda en pausa hasta confirmar que el equipo anterior está detenido. Mantén activa la privacidad de grupos; no necesitas webhook público ni modo inline."></p>
   </div>
   <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
+</dialog>
+
+<dialog hidden role="dialog" id="requirements-dialog" aria-labelledby="requirements-title">
+<h2 id="requirements-title" data-en="Setup requirements" data-es="Requisitos de instalación"></h2>
+<p id="requirements-feedback" role="status"></p><div id="requirements-list"></div>
+<p class="hint" data-en="Inspection needs Python and OpenSSL. Restoring needs Docker running with Compose. Publishing video needs FFmpeg and ffprobe. Ollama is optional for generated captions. No dependencies are installed automatically." data-es="La revisión necesita Python y OpenSSL. Para restaurar, Docker debe estar ejecutándose con Compose. Publicar videos necesita FFmpeg y ffprobe. Ollama es opcional para generar textos. No se instalan dependencias automáticamente."></p>
+<div class="actions between"><button id="requirements-close" data-en="Close" data-es="Cerrar"></button><button id="requirements-retry" data-en="Check again" data-es="Revisar otra vez"></button><button id="requirements-restore" data-en="Open backup restore" data-es="Abrir restauración de respaldo"></button></div>
+</dialog>
+
+<dialog hidden role="dialog" id="updates-dialog" aria-labelledby="updates-title">
+<h2 id="updates-title" data-en="Updates" data-es="Actualizaciones"></h2>
+<progress id="updates-progress" hidden></progress><p id="updates-feedback" role="status"></p>
+<p class="hint" data-en="Installing updates restarts the desktop and refreshes configured services. Finish active publishing first. Your credentials, media and data are retained." data-es="La instalación reinicia la app y actualiza los servicios configurados. Primero termina cualquier publicación activa. Se conservan tus credenciales, archivos y datos."></p>
+<div class="actions between"><button id="updates-close" data-en="Close" data-es="Cerrar"></button><button id="updates-retry" data-en="Check again" data-es="Revisar otra vez"></button><button id="updates-install" class="primary" hidden data-en="Download &amp; install" data-es="Descargar e instalar"></button></div>
 </dialog>
 
 <dialog hidden role="dialog" id="help-dialog" aria-labelledby="help-title">

@@ -444,3 +444,8 @@ El archivo público `/robots.txt` permite rastrear únicamente `/postforge-media
 
 
 El asistente rc.35 separa Crear y Restaurar, usa selectores de carpeta y archivo respectivamente, limpia resultados anteriores al cambiar de modo o archivo y acepta Enter para revisar. La revisión nunca inicia la restauración; esta sigue exigiendo una huella del archivo y la confirmación explícita de que el equipo anterior está detenido. El selector avanzado de carpeta de instalación es independiente de la importación de respaldos.
+
+
+### Self-contained installation / Instalación completa · rc.37
+
+La instalación del código de servicios forma parte del paquete de escritorio. `runtime_install.py` usa una lista permitida de rutas y un manifiesto SHA-256 por archivo; el paquete no contiene .env, acceso seguro privado, colas, bases de datos ni archivos subidos. La preparación inicial no configura ni inicia servicios. Las actualizaciones respaldan el código que cambian, conservan archivos privados, bloquean envíos activos de Estados y recuperan el código anterior si falla la actualización de servicios; los servicios pueden necesitar recuperación después de una falla. No se reemplaza una carpeta de desarrollo con una versión anterior. Ayuda se lee desde los recursos incluidos aun sin servicios locales disponibles. La revisión de requisitos usa consultas locales con límites de tiempo y no instala herramientas. El instalador de macOS tiene introducción en inglés/español, avisos de herramientas ausentes y enlaces oficiales; las versiones y los servicios se revisan en la sesión del usuario.

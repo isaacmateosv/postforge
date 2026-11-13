@@ -107,6 +107,9 @@ def main():
             shutil.copyfile(ROOT / name, resources / name)
         (resources / "THIRD_PARTY_NOTICES.txt").write_text(third_party(cargo), encoding="utf-8")
         shutil.copytree(ROOT / "docs/help", resources / "Help")
+        sys.path.insert(0,str(ROOT / "scripts"))
+        import runtime_install
+        runtime_install.build(ROOT,resources / "Runtime")
         if sys.platform == "darwin":
             subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
             subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)
@@ -120,6 +123,14 @@ def main():
                 for file in sorted(app.rglob("*")):
                     if file.is_file():
                         archive.write(file, file.relative_to(stage))
+        if sys.platform == "darwin":
+            package_root=stage / "installer-root"
+            applications=package_root / "Applications";applications.mkdir(parents=True)
+            shutil.copytree(app,applications / app.name)
+            package=output / ("PostForge-Desktop-"+version+"-darwin-"+architecture+".pkg")
+            import installer
+            installer.build(package_root,package,version,architecture,stage)
+            package.with_suffix(".pkg.sha256").write_text(hashlib.sha256(package.read_bytes()).hexdigest()+"  "+package.name+"\n")
         digest = hashlib.sha256(target.read_bytes()).hexdigest()
         target.with_suffix(target.suffix + ".sha256").write_text(digest + "  " + target.name + "\n")
         print(target)

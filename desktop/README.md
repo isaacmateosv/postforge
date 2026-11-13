@@ -30,10 +30,10 @@ A partial or uncertain submission is held for calendar review.
 
 ## Host prerequisites
 
-The client discovers its installed local backend automatically. Normal use does
+The client includes its public backend and creates a private installation on a fresh host automatically. Normal use does
 not ask for a project folder or show installation paths. **Settings → Advanced ·
-recovery and migration** locates a recovered/migrated installation when needed.
-The backend, .env and data belong to one installation; the app does not move
+installation folder** locates a recovered/migrated installation when needed.
+The macOS `.pkg` checks tool presence and provides official download links; Settings → Check requirements checks versions and service readiness. The backend, .env and data belong to one installation; the app does not move
 live Docker bind mounts when locating it. The developer environment override
 POSTFORGE_PROJECT_DIR is also supported.
 
@@ -76,7 +76,7 @@ connections, encrypted Backup & Move, update checks, settings, Help and About.
 Closing the window hides it; Quit exits the client and leaves services running.
 Updates install from inside the app: it checks releases, and on your confirmation
 downloads the matching build, verifies its SHA-256, replaces the installed app in
-place and relaunches — no browser download or manual replacement. It never
+place and relaunches. The update carries matching runtime code, keeps private data outside its manifest, refreshes configured services, and retains prior code for recovery. Active WhatsApp delivery blocks the refresh. Startup never downgrades a newer developer workspace. It never
 replaces the client without that confirmation. Siri and OS-login autostart still
 require further platform integration. On Windows and Linux this beta stages the
 verified download and opens its folder for a manual swap, since a running client

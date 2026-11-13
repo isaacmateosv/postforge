@@ -45,8 +45,9 @@ def _bundle_name():
     return 'PostForge Desktop'
 
 
-def download():
-    installed = (ROOT / 'VERSION').read_text().strip()
+def download(installed=None):
+    installed = installed or (ROOT / 'VERSION').read_text().strip()
+    if desktop_updates.version(installed) is None:raise pmlib.PMError('Invalid installed app version.')
     with _open(RELEASES + '?per_page=40', 'application/vnd.github+json') as response:
         releases = json.load(response)
     release = desktop_updates.select_release(releases, installed)
@@ -78,7 +79,7 @@ def download():
                     raise pmlib.PMError('The update is larger than expected and was stopped. / La actualización es más grande de lo previsto y se detuvo.')
                 digest.update(chunk)
                 output.write(chunk)
-    except pmlib.PMError:
+    except Exception:
         archive.unlink(missing_ok=True)
         directory.rmdir()
         raise
