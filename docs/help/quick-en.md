@@ -241,3 +241,5 @@ On the destination computer, open **Settings → App & data → Restore backup**
 The backup includes all retained uploaded media. Videos can make it several gigabytes; that alone does not indicate failure. Switching between Create and Restore clears the previous result so an old “Complete” message cannot be mistaken for a new inspection result. A backup passphrase cannot be recovered.
 
 Help opens its quick guide immediately. Choose Technical guide for setup details. Loading and retryable errors appear inside Help; no separate Open guide confirmation is required.
+
+Service refresh during an update preserves the running temporary tunnel. Changing tunnel provider, credentials or its image is a separate network operation. Ollama is optional: exact-caption publishing can start without it.

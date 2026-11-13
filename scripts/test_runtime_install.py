@@ -12,7 +12,7 @@ class RuntimeTests(unittest.TestCase):
         for name,text in {'VERSION':version,'scripts/desktop_bridge.py':'# public bridge','scripts/runtime_install.py':'# public installer','postforge.sh':'#!/bin/bash\ntrue\n','scripts/lib/file_lock.py':'# locking'}.items():
             p=source/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
         (source/'.env').write_text('PRIVATE=secret')
-        package=folder/'package';runtime.build(source,package,paths=[str(p.relative_to(source)) for p in source.rglob('*') if p.is_file()])
+        package=folder/'package';runtime.build(source,package,paths=[p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()])
         return package
 
     def test_fresh_install_and_update_preserve_private_data(self):

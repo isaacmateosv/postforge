@@ -253,3 +253,5 @@ En el equipo de destino, abre **Ajustes → App y datos → Restaurar respaldo**
 El respaldo incluye todos los archivos subidos que aún se conservan. Los videos pueden ocupar varios gigabytes; ese tamaño por sí solo no indica una falla. Cambiar entre Crear y Restaurar limpia el resultado anterior para que un mensaje viejo de “Completado” no se confunda con el resultado de una nueva revisión. La contraseña del respaldo no se puede recuperar.
 
 Ayuda abre la guía rápida de inmediato. Elige Guía técnica para los detalles de configuración. La carga y los errores con opción de reintento aparecen dentro de Ayuda; no necesitas confirmar Abrir guía por separado.
+
+La actualización de servicios conserva el túnel temporal que está ejecutándose. Cambiar de proveedor, credenciales o imagen del túnel es una operación de red independiente. Ollama es opcional: puedes iniciar el servicio para publicar textos exactos sin instalarlo.

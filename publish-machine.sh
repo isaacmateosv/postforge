@@ -374,6 +374,8 @@ case "${1:-}" in
     echo "[1/6] Checking Docker Desktop..."
     ensure_docker
 
+    # Caption generation is optional; exact-caption publishing does not need Ollama.
+    if command -v ollama >/dev/null 2>&1; then
     # 2. Verify Native Ollama is alive
     if ! pgrep -x "ollama" > /dev/null; then
       echo "[2/6] Starting Ollama host daemon in background..."
@@ -395,11 +397,19 @@ case "${1:-}" in
       ollama pull "$MODEL"
     fi
 
+    else
+      echo "[2-3/6] Ollama is not installed; generated captions are unavailable. Exact captions remain supported."
+    fi
+
     # 4. Spin up Docker containers. Both apps patch themselves as they boot: Postiz its cookie
     #    domain (patches/postiz/run.sh), Evolution its status receipts (patches/evolution/).
     echo "[4/6] Starting container stack (hard memory limits active)..."
     if [ -f "$DIR/data/gateway/configuration.yml" ]; then python3 "$DIR/scripts/network_settings.py" --prepare; fi
-    docker compose up -d --remove-orphans
+    if [ "${PM_REFRESH_PRESERVE_CONNECTOR:-false}" = "true" ]; then
+      docker compose up -d --no-recreate --remove-orphans
+    else
+      docker compose up -d --remove-orphans
+    fi
 
     # 5. Wait for the services to answer
     echo "[5/6] Waiting for services..."
@@ -521,8 +531,10 @@ case "${1:-}" in
     docker compose pull --policy missing
     mark_lifecycle stopping
     stop_wa_door
-    docker compose down --remove-orphans
-    "$0" start
+    python3 "$DIR/scripts/host_agent.py" stop
+    . "$DIR/scripts/refresh-services.sh"
+    refresh_container_stack
+    PM_REFRESH_PRESERVE_CONNECTOR=true "$0" start
     if ! container_running pm-tunnel || ! wait_for_scheduler 0 ||
        ! [[ "$(http_code "$POSTIZ_URL/api/")" == 200 && "$(http_code "$EVO_URL/")" == 200 ]]; then
       echo "✖ The refreshed PostForge services did not pass their health checks." >&2

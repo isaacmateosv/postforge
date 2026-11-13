@@ -22,9 +22,7 @@ def release(tag, prerelease=False, draft=False, assets=None):
 
 class SelectReleaseTests(unittest.TestCase):
     def pick(self, installed, releases):
-        with patch.object(updates.platform, 'machine', return_value='arm64'), \
-                patch.object(updates.sys, 'platform', 'darwin'):
-            chosen = updates.select_release(releases, installed)
+        chosen=updates.select_release(releases,installed)
         return chosen and chosen['tag_name']
 
     def test_stable_install_ignores_prereleases(self):
@@ -70,9 +68,7 @@ class CheckTests(unittest.TestCase):
         (temporary / 'VERSION').write_text(installed)
         reply = io.BytesIO(json.dumps(releases).encode())
         with patch.object(updates, 'ROOT', temporary), \
-                patch.object(updates.urllib.request, 'urlopen', return_value=reply), \
-                patch.object(updates.platform, 'machine', return_value='arm64'), \
-                patch.object(updates.sys, 'platform', 'darwin'):
+                patch.object(updates.urllib.request, 'urlopen', return_value=reply):
             return updates.check()
 
     def test_never_offers_legacy_packages(self):
