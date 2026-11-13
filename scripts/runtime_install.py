@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 
+# Runtime resources are sealed in the signed desktop bundle. Never write caches there.
+sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parent/'lib'))
 import file_lock
 

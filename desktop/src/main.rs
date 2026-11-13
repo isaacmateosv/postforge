@@ -190,7 +190,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
          if /bin/kill -0 \"$PID\" 2>/dev/null; then /usr/bin/open \"$APP\"; exit 1; fi\n\
          export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\
          RUNTIME=\"$NEW/Contents/Resources/Runtime\"\n\
-         if ! /usr/bin/env python3 \"$RUNTIME/scripts/runtime_install.py\" --source \"$RUNTIME\" --target {root} --refresh > {update_log} 2>&1; then /usr/bin/open \"$APP\"; exit 1; fi\n\
+         if ! /usr/bin/env python3 -B \"$RUNTIME/scripts/runtime_install.py\" --source \"$RUNTIME\" --target {root} --refresh > {update_log} 2>&1; then /usr/bin/open \"$APP\"; exit 1; fi\n\
          BACKUP=\"$APP.old-$$\"\n\
          /bin/mv \"$APP\" \"$BACKUP\"\n\
          if /usr/bin/ditto \"$NEW\" \"$APP\"; then\n\
@@ -312,7 +312,7 @@ fn main() {
                 // Bootstrap a fresh host, or finish an upgrade initiated by an older client.
                 // Never downgrade an actively developed workspace.
                 let (executable,flags)=python();
-                let bootstrap=Command::new(executable).args(flags).arg(runtime.join("scripts/runtime_install.py"))
+                let bootstrap=Command::new(executable).args(flags).arg("-B").arg(runtime.join("scripts/runtime_install.py"))
                     .arg("--source").arg(&runtime).arg("--target").arg(&root).arg("--upgrade-if-needed").arg("--refresh")
                     .env("PATH",format!("/opt/homebrew/bin:/usr/local/bin:{}",std::env::var("PATH").unwrap_or_default()))
                     .output();

@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.41]
+
+- Disable Python bytecode writes inside bundled runtime resources, preserving the app signature across bootstrap, updates and relaunches.
+
 ## [2.0.0-rc.40]
 
 - Retry transient service-startup health failures after an update and log each health condition. Keep rejecting persistent failures and retaining the installed app on failure.
