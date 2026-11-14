@@ -18,6 +18,18 @@ class NetworkTests(unittest.TestCase):
                     self.assertEqual(net.status(check=True,force=True)['reachable'],expected)
                     self.assertEqual(probe.call_count,2)
 
+    def test_public_media_preflight_rejects_mismatch_or_outage_without_writes(self):
+        import plan_post
+        for status in ({'url':'https://configured.example','needs_sync':True,'reachable':True},
+                       {'url':'https://configured.example','needs_sync':False,'reachable':False},
+                       {'url':'https://other.example','needs_sync':False,'reachable':True}):
+            with patch.object(net,'status',return_value=status) as probe:
+                with self.assertRaisesRegex(plan_post.PMError,'No posts were created'):
+                    plan_post.verify_public_media_origin({'FRONTEND_URL':'https://configured.example'})
+                probe.assert_called_once_with(check=True,force=True)
+        with patch.object(net,'status',return_value={'url':'https://configured.example','needs_sync':False,'reachable':True}):
+            plan_post.verify_public_media_origin({'FRONTEND_URL':'https://configured.example'})
+
     def test_crawler_policy_allows_signed_media_not_private_pages(self):
         from urllib.robotparser import RobotFileParser
         body=(Path(__file__).resolve().parent.parent/'v2/gateway/Caddyfile').read_text().split('respond `',1)[1].split('` 200',1)[0]
@@ -73,6 +85,17 @@ class NetworkTests(unittest.TestCase):
             self.assertEqual((root/'.env').read_text(),original)
             self.assertEqual((root/'data/gateway/configuration.yml').read_text(),gateway)
             self.assertEqual((root/'docker-compose.override.yml').read_text(),override);media.assert_not_called()
+
+    def test_quick_sync_and_rollback_never_rotate_the_live_connector(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);self.fixture(root)
+            path=root/'.env';path.write_text(net.merge(path.read_text(),{'PM_TUNNEL_PROVIDER':'trycloudflare'}))
+            with patch.object(net,'ROOT',root),patch.object(net.pmlib,'load_env',return_value={}),patch.object(net,'guard_idle',return_value='org'),patch.object(net.tunnel,'probe',return_value=b'ok'),patch.object(net.tunnel,'compose') as compose,patch.object(net,'quick_url',return_value='https://live-test.trycloudflare.com'),patch.object(net.tunnel,'apply_services') as apply_services,patch.object(net.tunnel,'wait_until_ready',side_effect=RuntimeError('temporary outage')):
+                with self.assertRaises(net.pmlib.PMError):net.apply({'provider':'trycloudflare','confirm':True})
+            self.assertTrue(apply_services.call_args.kwargs['preserve_connector'])
+            connectors=[call.args for call in compose.call_args_list if call.args[-1:] == ('ngrok',)]
+            self.assertTrue(connectors)
+            self.assertTrue(all('--no-recreate' in args and '--force-recreate' not in args for args in connectors))
 
     def test_new_named_domain_requires_a_token_and_confirmation(self):
         with self.assertRaises(ValueError):net.apply({'provider':'trycloudflare'})

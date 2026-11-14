@@ -142,7 +142,8 @@ class Operations(unittest.TestCase):
                  patch.object(pmlib, "Postiz") as client, \
                  patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
                  patch.object(pmlib, "is_short", return_value=False), \
-                 patch.object(media_links, "serves_media", return_value=False):
+                 patch.object(media_links, "serves_media", return_value=False), \
+                 patch.object(plan_post, "verify_public_media_origin") as preflight:
                 client.return_value.integrations.return_value = [
                     {"id": "facebook-test", "identifier": "facebook", "name": "Synthetic account"}]
                 client.return_value.upload.return_value = {
@@ -150,6 +151,12 @@ class Operations(unittest.TestCase):
                     "path": env["FRONTEND_URL"] + "/uploads/2026/11/06/synthetic_media_only_123456.mp4"}
                 with self.assertRaisesRegex(pmlib.PMError, "No posts were created"):
                     plan_post.run(env, p, False, schedule=True)
+                client.return_value.create_draft.assert_not_called()
+                client.return_value.upload.reset_mock()
+                preflight.side_effect = pmlib.PMError("Public media access is not ready. No posts were created.")
+                with self.assertRaisesRegex(pmlib.PMError, "No posts were created"):
+                    plan_post.run(env, p, False, schedule=True)
+                client.return_value.upload.assert_not_called()
                 client.return_value.create_draft.assert_not_called()
 
     def test_long_story_uses_separate_clips_and_keeps_full_feed_video(self):
@@ -538,7 +545,7 @@ class Operations(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "previous settings and services were restored"):
                     tunnel.switch(env, "new.example.org")
                 self.assertEqual(env.read_bytes(), previous)
-                self.assertEqual(compose.call_count, 3)
+                self.assertEqual(compose.call_count, 5)
                 self.assertEqual(ready.call_args.args[1], "https://old.example.org")
             with patch.object(tunnel, "probe", return_value=b"Postiz"), patch.object(tunnel, "compose"), \
                  patch.object(tunnel, "wait_until_ready"):

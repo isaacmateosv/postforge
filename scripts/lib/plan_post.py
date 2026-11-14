@@ -471,6 +471,16 @@ def video_warnings(networks, durations, lang, short=False):
     return warnings
 
 
+def verify_public_media_origin(env):
+    """Check the current protected origin before uploading a posting batch."""
+    scripts=os.path.join(pmlib.ROOT,'scripts')
+    if scripts not in sys.path:sys.path.insert(0,scripts)
+    import network_settings
+    status=network_settings.status(check=True,force=True)
+    if status.get('url')!=env.get('FRONTEND_URL') or status.get('needs_sync') or not status.get('reachable'):
+        raise PMError('Public media access is not ready. No posts were created. Open Public URL & tunnel, check access and synchronize the detected URL instead of rotating again. / El acceso público a los archivos no está listo. No se creó ninguna publicación. Abre URL pública y túnel, revisa el acceso y sincroniza la URL detectada en lugar de volver a rotarla.')
+
+
 def run(env, p, dry_run, schedule=False):
     result = {"when_local": p["when"].strftime("%a %d %b %Y %H:%M"), "when_utc": p["when"].astimezone(timezone.utc).isoformat(),
               "networks": p["networks"], "lang": p["lang"], "notes": list(p["notes"]), "warnings": [], "drafts": [],
@@ -586,6 +596,8 @@ def run(env, p, dry_run, schedule=False):
             os.path.join(pmlib.ROOT, "data", "gateway", "configuration.yml"))
         media_key = media_links.load_key(os.path.join(pmlib.ROOT, "data", "gateway", "media-signing.key")) if gated_media else None
         media_blocked = gated_media and not media_key
+        if has_social_posts and media_key and not dry_run:
+            verify_public_media_origin(env)
         if has_social_posts and media_key:
             result["notes"].append(
                 "Los enlaces de descarga vencen 48 horas después de la hora planificada. Si mueves la publicación más allá, vuelve a preparar sus borradores."
@@ -728,7 +740,7 @@ def run(env, p, dry_run, schedule=False):
                 def signed_items(items):
                     output = [dict(item, path=media_links.signed_url(media_key, env["FRONTEND_URL"], item["path"], expiry)) for item in items]
                     if not all(media_links.serves_media(item["path"]) for item in output):
-                        raise PMError("Secure media delivery could not be verified. No posts were created.")
+                        raise PMError("Secure media delivery could not be verified. No posts were created. Check public access, synchronize a changed URL, and prepare a fresh review. / No se pudo verificar la entrega segura de archivos. No se creó ninguna publicación. Revisa el acceso público, sincroniza la URL si cambió y prepara una revisión nueva.")
                     return output
                 media = signed_items(media)
                 story_media = signed_items(story_media)

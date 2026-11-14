@@ -255,3 +255,7 @@ El respaldo incluye todos los archivos subidos que aún se conservan. Los videos
 Ayuda abre la guía rápida de inmediato. Elige Guía técnica para los detalles de configuración. La carga y los errores con opción de reintento aparecen dentro de Ayuda; no necesitas confirmar Abrir guía por separado.
 
 La actualización de servicios conserva el túnel temporal que está ejecutándose. Cambiar de proveedor, credenciales o imagen del túnel es una operación de red independiente. Ollama es opcional: puedes iniciar el servicio para publicar textos exactos sin instalarlo.
+
+### Si falla el acceso público antes de publicar
+
+Las conexiones verdes confirman las sesiones de las cuentas, no la entrega pública de archivos. Abre **Ajustes → URL pública y túnel → Revisar acceso**. Si se detectó otra dirección, elige **Sincronizar URL actual**, en lugar de rotarla varias veces. Después de cambiar la URL, copia tus ediciones del texto y prepara una revisión nueva con una hora futura. Revisa el historial antes de reintentar para evitar duplicados.

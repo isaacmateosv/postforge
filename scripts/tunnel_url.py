@@ -145,11 +145,15 @@ def check_gateway_config(path, host):
         raise RuntimeError("The effective tunnel and gateway configuration does not protect Postiz.")
 
 
-def apply_services(path, gated, host):
+def apply_services(path, gated, host, *, preserve_connector=False):
     if gated:
         check_gateway_config(path, host)
         compose(path, "up", "-d", "--no-deps", "--force-recreate", "postforge-auth", "postforge-gateway")
-    compose(path, "up", "-d", "--no-deps", "postiz", "ngrok")
+    compose(path, "up", "-d", "--no-deps", "postiz")
+    if preserve_connector:
+        compose(path, "up", "-d", "--no-deps", "--no-recreate", "ngrok")
+    else:
+        compose(path, "up", "-d", "--no-deps", "ngrok")
 
 
 def switch(path, value):

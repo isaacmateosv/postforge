@@ -243,3 +243,7 @@ The backup includes all retained uploaded media. Videos can make it several giga
 Help opens its quick guide immediately. Choose Technical guide for setup details. Loading and retryable errors appear inside Help; no separate Open guide confirmation is required.
 
 Service refresh during an update preserves the running temporary tunnel. Changing tunnel provider, credentials or its image is a separate network operation. Ollama is optional: exact-caption publishing can start without it.
+
+### If public access fails before publishing
+
+Green channel connections confirm account sessions, not public file delivery. Open **Settings → Public URL & tunnel → Check access**. If a new address was detected, choose **Synchronize current URL**, rather than repeatedly rotating it. After a URL change, copy any caption edits and prepare a fresh review with a future time. Check history before retrying to avoid duplicates.
