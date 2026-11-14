@@ -176,7 +176,7 @@ def apply(payload):
             # Quick URLs change on process restart. Keep that same process alive
             # throughout origin synchronization; restarting it here loses the URL.
             changed=provider!=(config['PM_TUNNEL_PROVIDER'] or 'ngrok')
-            args=['up','-d','--no-deps']+(['--force-recreate'] if changed or payload.get('rotate') else [])+['ngrok']
+            args=['up','-d','--no-deps']+(['--force-recreate'] if changed or payload.get('rotate') else ['--no-recreate'])+['ngrok']
             tunnel.compose(path,*args)
             if provider=='trycloudflare':
                 deadline=time.monotonic()+65
@@ -189,7 +189,7 @@ def apply(payload):
             atomic_write(path,merge(tunnel.updated_config(path.read_text(),host,target),{'POSTFORGE_GATEWAY_HOST':host}))
             from v2.gateway_setup import update_hostname
             atomic_write(gateway,json.dumps(update_hostname(json.loads(previous_gateway),host),indent=2)+'\n')
-            tunnel.apply_services(path,True,host)
+            tunnel.apply_services(path,True,host,preserve_connector=provider=='trycloudflare')
             tunnel.wait_until_ready(local,target,expected,gated=True)
             rebase_media(env,org,config['FRONTEND_URL'],target);rebased=True
             # Keep one recent private recovery set; no provider secrets enter responses.
@@ -204,7 +204,9 @@ def apply(payload):
                 if rebased:rebase_media(env,org,target,config['FRONTEND_URL'])
                 atomic_write(path,original);atomic_write(gateway,previous_gateway)
                 tunnel.private_write(override,previous_override.encode(),work)
-                tunnel.compose(path,'up','-d','--no-deps','--force-recreate','postforge-auth','postforge-gateway','postiz','ngrok')
+                tunnel.compose(path,'up','-d','--no-deps','--force-recreate','postforge-auth','postforge-gateway','postiz')
+                same_quick=provider=='trycloudflare' and config['PM_TUNNEL_PROVIDER']=='trycloudflare'
+                tunnel.compose(path,'up','-d','--no-deps','--no-recreate' if same_quick else '--force-recreate','ngrok')
             except BaseException:
                 raise pmlib.PMError('Network switch failed and needs recovery. Private originals: '+str(recovery)+' / El cambio de red falló y requiere recuperación. Originales privados: '+str(recovery)) from None
             raise pmlib.PMError('Network switch failed; the previous configuration was restored. '+str(failure).split(' / ')[0][:250]+' / El cambio de red falló; se restauraron los ajustes anteriores. Comprueba el acceso público y aplica la URL de nuevo si cambió.') from None

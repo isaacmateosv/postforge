@@ -434,3 +434,9 @@ The rc.35 assistant separates Create and Restore, uses folder/file pickers respe
 ### Self-contained installation / Instalación completa · rc.37
 
 Runtime installation is now part of desktop packaging. `runtime_install.py` uses a path allowlist and per-file SHA-256 manifest; no .env, private gateway, runtime queues, databases or uploaded media are package members. Fresh bootstrap does not configure/start services. Updates snapshot changed code, preserve private files, block active Status delivery and roll public code back if service refresh fails; services may need recovery after a refresh failure. Newer developer workspaces are not downgraded. Help is readable from packaged resources even without a usable backend. The requirements report performs bounded local checks without installing software. The macOS product installer has English/Spanish welcome resources, tool-presence warnings and official download links; actual version/service checks run in the user session.
+
+## Public access checks before posting
+
+Green channel indicators describe the social account sessions; public media delivery is checked separately before uploading a batch. If the temporary connector changes its address, open **Public URL & tunnel → Synchronize current URL**. Use **Check access** to verify the gateway. Rotate only when you intentionally need another address. A failed synchronization preserves the running temporary connector during recovery.
+
+A URL change keeps your caption visible but invalidates the previous review. Copy any manual edits, prepare a fresh review, and select a future publication time. Signed media links from the old review cannot be reused. Synchronization updates local gateway and Postiz settings; update provider OAuth callbacks manually before reconnecting accounts. Never retry an uncertain batch without checking its history first.
