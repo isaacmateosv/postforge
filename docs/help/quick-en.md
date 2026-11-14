@@ -247,3 +247,9 @@ Service refresh during an update preserves the running temporary tunnel. Changin
 ### If public access fails before publishing
 
 Green channel connections confirm account sessions, not public file delivery. Open **Settings → Public URL & tunnel → Check access**. If a new address was detected, choose **Synchronize current URL**, rather than repeatedly rotating it. After a URL change, copy any caption edits and prepare a fresh review with a future time. Check history before retrying to avoid duplicates.
+
+### WhatsApp direct scheduling and TikTok upload mode
+
+**Schedule directly** approves the reviewed WhatsApp Status for delivery at its selected time, alongside the selected Postiz channels. Wait for its dashboard progress; do not resubmit while it is sending. Creating drafts alone still requires separate approval.
+
+TikTok **Inbox Upload** transfers the video for you to finish in TikTok. Its video endpoint has no caption or cover fields; paste the prepared caption and choose the cover in TikTok. **Direct Post** supports a caption and a cover frame timestamp, with `video.publish` authorization. Public direct posting requires an audited TikTok API client. An uploaded cover image is not a video-cover field in that API. See [TikTok’s official reference](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post).

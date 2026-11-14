@@ -154,7 +154,7 @@ def _delivery_progress(identifier,part,total,completed):
 
 def _ready(item):
     return (item.get("status") == "pending" and item.get("approved")
-            and item.get("approval_source") in ("explicit-whatsapp-command", "desktop-review", "telegram-review") and _due(item))
+            and item.get("approval_source") in ("explicit-whatsapp-command", "desktop-review", "telegram-review", "reviewed-direct-schedule") and _due(item))
 
 
 def _claim(item_id):

@@ -440,3 +440,9 @@ Runtime installation is now part of desktop packaging. `runtime_install.py` uses
 Green channel indicators describe the social account sessions; public media delivery is checked separately before uploading a batch. If the temporary connector changes its address, open **Public URL & tunnel → Synchronize current URL**. Use **Check access** to verify the gateway. Rotate only when you intentionally need another address. A failed synchronization preserves the running temporary connector during recovery.
 
 A URL change keeps your caption visible but invalidates the previous review. Copy any manual edits, prepare a fresh review, and select a future publication time. Signed media links from the old review cannot be reused. Synchronization updates local gateway and Postiz settings; update provider OAuth callbacks manually before reconnecting accounts. Never retry an uncertain batch without checking its history first.
+
+### WhatsApp direct scheduling and TikTok upload mode
+
+**Schedule directly** approves the reviewed WhatsApp Status for delivery at its selected time, alongside the selected Postiz channels. Wait for its dashboard progress; do not resubmit while it is sending. Creating drafts alone still requires separate approval.
+
+TikTok **Inbox Upload** transfers the video for you to finish in TikTok. Its video endpoint has no caption or cover fields; paste the prepared caption and choose the cover in TikTok. **Direct Post** supports a caption and a cover frame timestamp, with `video.publish` authorization. Public direct posting requires an audited TikTok API client. An uploaded cover image is not a video-cover field in that API. See [TikTok’s official reference](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post).
