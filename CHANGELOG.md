@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0-rc.43]
+
+- Include the required release notes for the tunnel recovery fix and pass the full release validation.
+
+## [2.0.0-rc.42]
+
+- Preserve the running temporary connector during URL synchronization and rollback, avoiding accidental hostname churn.
+- Check public gateway availability before uploading social media batches and provide actionable bilingual failure messages.
+- Preserve caption history across network changes, block stale reviews, and report successful verification only after a successful follow-up check.
+- Update English and Ecuadorian Spanish troubleshooting guides.
+
 ## [2.0.0-rc.41]
 
 - Disable Python bytecode writes inside bundled runtime resources, preserving the app signature across bootstrap, updates and relaunches.
