@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0-rc.44]
+
+- Recognize explicit Schedule directly approval in the WhatsApp Status delivery worker. Process due items once, while leaving unapproved, unknown-source and future items untouched.
+
 ## [2.0.0-rc.43]
 
 - Include the required release notes for the tunnel recovery fix and pass the full release validation.

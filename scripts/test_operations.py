@@ -655,6 +655,25 @@ class Operations(unittest.TestCase):
             self.assertEqual(env.read_bytes(), original)
             self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
+    def test_direct_schedule_worker_sends_approved_due_status_once(self):
+        import whatsapp_pending
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(whatsapp_pending, "QUEUE_FILE", str(Path(folder) / "queue.json")), \
+             patch.object(whatsapp_pending, "_send_item") as send:
+            base = {"status":"pending", "when":"2026-01-01T00:00:00Z"}
+            whatsapp_pending._write([
+                dict(base,id="scheduled",approved=True,approval_source="reviewed-direct-schedule"),
+                dict(base,id="unapproved",approved=False,approval_source="reviewed-direct-schedule"),
+                dict(base,id="unknown",approved=True,approval_source="unknown"),
+                dict(base,id="future",approved=True,approval_source="reviewed-direct-schedule",when="2999-01-01T00:00:00Z")])
+            whatsapp_pending.process({})
+            whatsapp_pending.process({})
+            self.assertEqual(send.call_count,1)
+            self.assertEqual(send.call_args.args[0]["id"],"scheduled")
+            items=whatsapp_pending._read()
+            self.assertEqual(items[0]["status"],"sent")
+            self.assertTrue(all(item["status"]=="pending" for item in items[1:]))
+
     def test_whatsapp_uncertain_delivery_is_not_retried(self):
         import whatsapp_pending
 

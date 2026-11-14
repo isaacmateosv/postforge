@@ -259,3 +259,9 @@ La actualización de servicios conserva el túnel temporal que está ejecutándo
 ### Si falla el acceso público antes de publicar
 
 Las conexiones verdes confirman las sesiones de las cuentas, no la entrega pública de archivos. Abre **Ajustes → URL pública y túnel → Revisar acceso**. Si se detectó otra dirección, elige **Sincronizar URL actual**, en lugar de rotarla varias veces. Después de cambiar la URL, copia tus ediciones del texto y prepara una revisión nueva con una hora futura. Revisa el historial antes de reintentar para evitar duplicados.
+
+### Programación directa de WhatsApp y modo de carga de TikTok
+
+**Programar directamente** aprueba el Estado de WhatsApp revisado para enviarlo a la hora elegida, junto con los canales seleccionados en Postiz. Espera el progreso en el panel; no lo vuelvas a enviar mientras se esté publicando. Crear borradores sigue requiriendo una aprobación posterior.
+
+**Carga a la bandeja de entrada** de TikTok transfiere el video para que termines la publicación en TikTok. Ese endpoint de video no tiene campos de texto ni portada; pega el texto preparado y elige la portada en TikTok. **Publicación directa** admite texto y un instante del video como portada, con autorización `video.publish`. La publicación directa pública requiere un cliente API auditado por TikTok. Esa API no tiene un campo para usar una imagen externa como portada de un video. Consulta la [referencia oficial de TikTok](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post).
