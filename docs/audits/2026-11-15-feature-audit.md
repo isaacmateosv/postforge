@@ -1,6 +1,6 @@
 # PostForge feature and UX audit · 2026-11-15
 
-Status: in progress. Baseline: rc.45, commit 7f2cb04. This is an engineering evidence ledger, not a claim that every platform has been tested on hardware.
+Status: engineering audit completed; **rc.49 published and installed locally**. Baseline was rc.45, commit 7f2cb04. Final post-upgrade visual inspection is pending because the Mac locked during relaunch. This is an evidence ledger, not a claim that every platform has been tested on hardware.
 
 ## Scope and verification boundaries
 
@@ -8,24 +8,22 @@ Review each user-facing feature against the active Rust client, shared Python ru
 
 ## Feature matrix
 
-| Area | Evidence / current review | Follow-up |
+| Area | Final evidence | Remaining boundary |
 |---|---|---|
-| Installation and requirements | Bundled runtime and PKG exist; platform download sources and fresh setup need review | Pending |
-| Dashboard and service lifecycle | Dashboard available; Rust UI lacks legacy start/stop/idle controls | Audit lifecycle and restore useful access |
-| Composer, exact text and media | Structured three-step flow, time and supported media validation | Exercise focus, keyboard, undo and reset |
-| Caption versions and YouTube titles | Shared reviewed family and separate title support | Verify edits, history and partial failures |
-| Covers and media previews | Image and timestamp previews; platform capability rules | Exercise changing/clearing media and stale responses |
-| Delivery and approval | Reviewed direct schedule source fixed rc.44 | Correct TikTok Inbox wording; test approval boundaries |
-| WhatsApp | QR, audiences, receipts, split delivery and buttons | Verify long-send, offline and review UX |
-| Telegram | Private owner-only guided posting/settings/heartbeats | Check group explanation, restart/migration and retry behavior |
-| Links and account reconnection | rc.45 contextual guide, isolated browser test, per-connector callbacks | Check stale responses and local-only behavior |
-| Backup and migration | Detached jobs, real earlier inspection and disposable DB restore | Review close/reopen, progress recovery and fresh destination |
-| Updates and component versions | All-platform releases, matching macOS runtime refresh | Check actionable service updates and progress/errors |
-| Retention and storage | CLI policies exist; legacy setting missing in Rust window/tray | Restore accessible preference; verify pending media protection |
-| Help, language and accessibility | Offline guides and localized UI; stale descriptions remain | Update all active docs, focus and responsive screens |
-| Tray and shortcuts | Rust tray active; legacy system integration claims conflict | Check controls, Cmd/Ctrl+N and actual Siri support |
-| Uninstall | Existing script still targets older app paths | Repair current Rust cleanup using isolated fixtures |
-| Packaging and public release | rc.45 packages and CI green | Final tested release after audit fixes |
+| Installation / requirements | Real packaged-runtime bootstrap, platform links, Mac PKG contents | Fresh physical Windows/Linux installation |
+| Dashboard / lifecycle | Live read-only checks, guarded start/stop tests, native build | Automatic Rust idle/wake policy remains unported |
+| Composer / keyboard / reset | Full synthetic EN/es-EC flow, responsive checks, reset/edit guards | Final rc.49 visual inspection after unlocking |
+| Captions / titles | Local Ollama sample, fact guard, metadata/version tests, independent title controls | Human review of generated facts and tone |
+| Media / covers | Real FFmpeg portrait/landscape/frame tests, bounded previews | Platform thumbnail/reel rendering |
+| Delivery / retries | Reviewed-family replay, uncertainty hold, explicit approval tests | Real posts deliberately not submitted |
+| WhatsApp | Session/audience/split/receipt/callback tests; live connected | Per-phone display and actual view receipts |
+| Telegram | Owner/callback/heartbeat/migration tests; live running | Groups deliberately unsupported |
+| Network / OAuth | Existing connector synchronized without rotation; five channels renewed/connected | Future DNS and developer-console changes |
+| Backup / migration | Recovery UI tests; encryption/inspection/restore guards; 64 MiB streaming envelope test | Representative physical destination restore |
+| Updates / components | Actual rc.41 → rc.49 in-app upgrade; matching runtime and healthy refresh | Physical Windows manual swap / portable refresh |
+| Retention / removal | Protected references, shared lease, staging fixes, disposable uninstall | No live purge/uninstall performed |
+| Help / languages / tray | Offline renderer/guide tests, native build, structured tray, 18-point Mac icon behavior | Post-upgrade visual tray/Help check blocked by lock screen |
+| Release | All four rc.49 workflows green; eight assets; installed signature valid | Mac package remains ad-hoc/non-notarized |
 
 ## Baseline checks
 
@@ -44,7 +42,18 @@ Review each user-facing feature against the active Rust client, shared Python ru
 
 ## Morning handoff
 
-To be completed after fixes and validation: release, local install state, tested flows, remaining user-only / hardware checks, and any operational limitations.
+Use **[v2.0.0-rc.49](https://github.com/isaacmateosv/postforge/releases/tag/v2.0.0-rc.49)**. It includes all audit corrections; rc.46 failed Windows validation, while rc.47/48 are retained intermediate candidates.
+
+- **Installed:** `~/Applications/PostForge Desktop.app` and the private runtime both report rc.49. The actual in-app updater downloaded, verified, replaced and relaunched from rc.41. Strict code-signature verification passes; signed Runtime resources contain zero bytecode files.
+- **Private state:** saved fingerprints of `.env` and existing gateway configuration files match after the update. Social authorization was renewed through the normal read-only Check & renew action, without posting.
+- **Live health:** Postiz online; WhatsApp connected; Telegram running; public URL reachable and synchronized; all five social channels report connected. Zero drafts, queued posts or active Status sends at the final observation.
+- **Validation:** 189 backend + 21 v2/service + 60 JavaScript tests, local Rust build, package/digest checks, actual bootstrap/upgrade, and all-platform CI. A 64 MiB envelope round-trip used approximately 2 MiB Python traced peak memory. UI fixtures exercised both languages and compact window sizes.
+- **Locked-screen limit:** the Mac locked during the final relaunch, and automatic unlock failed. No lock bypass was attempted. Final native rc.49 visual inspection (Help, tray and composer) must happen after unlocking; the earlier native rc.41 update/reopen check and new-source synthetic UI passed.
+- **Next user check:** unlock, open the installed app, inspect About/Help, preview one media plan, and review its caption/time/cover before deliberately posting. A physical destination restore and Windows/Linux device acceptance remain separate checks.
+
+No real social content was published, no user media/drafts were cleared, no live database restore/uninstall was performed, and no Google AI was called. The live URL repair adopted the already-running connector and did not request a new hostname.
+
+Current capability gaps are explicit: full fresh-business UI provisioning, automatic Rust idle/wake, dedicated Siri integration, authorized Telegram groups and a portable graphical uninstaller remain future work. Use explicit service stop for heavy editing and keep the host awake when scheduled work must publish. This remains a release candidate.
 
 ## First audit pass · implemented, not yet released
 
@@ -132,3 +141,14 @@ Native pre-upgrade check: the installed rc.41 opens a visible progress dialog, c
 Release rc.48 passed all three platform builds and published eight assets. Before installing locally, the remaining fresh-host review identified a runtime portability issue not exercised by compilation: a configured Windows update invoked host Bash. Added a fixed Python refresh path for Windows under the parent installer maintenance lease. It leaves stopped/Docker-unavailable deployments stopped, reloads active receivers against the updated code, recreates non-tunnel services and preserves the connector. Tests cover command routing without Bash, private-file preservation, lease presence, stopped-stack preservation and active receiver/container refresh. The Windows manual client-swap limitation remains; this fixes the backend refresh afterward. Final candidate is **rc.49**. No earlier tag was moved or release removed.
 
 The 64 MiB encryption envelope round-trip matched SHA-256 after decrypting, with approximately 2 MiB Python traced peak memory. This verifies streaming encryption/authentication, not an actual large destination database restore. Idle observation found zero loaded Ollama models; the live stack still consumed roughly 1.5 GiB across its containers, with Postiz the largest component. Explicit service stop is available; automatic Rust idle/wake policy remains a known gap.
+
+## Final release and installed evidence
+
+Release commit: `fa2860a` (documentation-only handoff may follow on main). All rc.49 workflows completed successfully:
+
+- [Publish desktop release](https://github.com/isaacmateosv/postforge/actions/runs/43709330881)
+- [Rust desktop client](https://github.com/isaacmateosv/postforge/actions/runs/43709329080)
+- [Validate and package · branch](https://github.com/isaacmateosv/postforge/actions/runs/43709329053)
+- [Validate and package · tag](https://github.com/isaacmateosv/postforge/actions/runs/43709330826)
+
+Eight assets are uploaded: Mac ARM64 PKG/ZIP, Linux x86_64 ZIP, Windows x86_64 ZIP and four checksums. The installed app matches the final version, its EN/es-EC Help files match the release source, full legal notices are present, and the matching configured service refresh passed after transient startup HTTP 502 responses. The existing connector survived the refresh. Final read-only renewal completed with all five channels connected and no incomplete checks. No preview server remains listening on the temporary audit port.

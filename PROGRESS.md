@@ -1,4 +1,4 @@
-> Overnight rc.46 audit: source validation passed (185 backend, 21 v2, 59 desktop tests; local Rust build). Package/public release and installed-client acceptance are being completed. Current evidence and known capability gaps: [feature audit](docs/audits/2026-11-15-feature-audit.md). No real posts, live restore, tunnel rotation or user-data cleanup were performed as audit tests.
+> **Overnight audit handoff · rc.49:** published and installed through the real rc.41 → rc.49 in-app updater. Matching runtime, code signature, private configuration fingerprints and service refresh verified. All five channels connected after read-only renewal; public link synchronized; no pending work. Validation: 189 backend, 21 v2 and 60 desktop tests; all platform/release workflows passed. Final native visual check is pending because the Mac locked during relaunch. [Full audit and limits](docs/audits/2026-11-15-feature-audit.md).
 
 # PostForge — Work Progress & Resume State
 
