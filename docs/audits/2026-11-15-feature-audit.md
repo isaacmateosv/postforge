@@ -112,3 +112,9 @@ The native developer override now takes precedence over saved recovered-workspac
 | Desktop / tray / help | Native build, standard template icon/sections, local responsive/EN/es-EC check | Final native reopen/help/update acceptance below |
 
 Known capability gaps are now explicit in README/SETUP/help: no full fresh-business UI wizard; no Rust automatic OS wake/one-hour idle shutdown; dedicated legacy Siri shortcut integration not ported; no authorized Telegram groups; no portable GUI uninstaller; Windows/Linux in-place update remains a verified manual swap; Mac artifacts are ad-hoc signed, not notarized. These are not represented as working features. OS Open App shortcuts remain available. Release 2 is still a release candidate.
+
+## Cross-platform release gate
+
+The rc.46 Windows job correctly stopped publication: a new preference test asserted POSIX `0600` mode bits on Windows, where Python reports different native permission semantics. Fixed the assertion to check POSIX bits only on Unix while retaining all content/secret-preservation tests on Windows. Publishing continues as **rc.47**, preserving rc.46's tag rather than moving release history. No rc.46 GitHub release was published.
+
+Native pre-upgrade check: the installed rc.41 opens a visible progress dialog, completes its manual check and correctly reports installed rc.41 / available rc.45 while the new release is still building. Closing the window and pressing Cmd+N reopens New Post successfully. No content was entered or sent. A live pre-existing temporary-hostname/configuration mismatch was detected and is being diagnosed separately from social account authorization.

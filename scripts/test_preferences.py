@@ -17,7 +17,8 @@ class PreferencesTests(unittest.TestCase):
             result=preferences.save({'retention_days':90,'final_tag':'Example','model':'example:model','PRIVATE_SECRET':'overwrite'})
             self.assertEqual(result['final_tag'],'#Example');self.assertTrue(result['model_ready'])
             self.assertIn('PRIVATE_SECRET=keep-private',path.read_text());self.assertNotIn('PRIVATE_SECRET',result)
-            self.assertEqual(media.read_bytes(),b'kept');self.assertEqual(path.stat().st_mode&0o777,0o600)
+            self.assertEqual(media.read_bytes(),b'kept')
+            if os.name != 'nt':self.assertEqual(path.stat().st_mode&0o777,0o600)
     def test_invalid_defaults_never_change_configuration(self):
         with tempfile.TemporaryDirectory() as folder,patch.object(preferences,'ROOT',Path(folder)):
             path=self.fixture(folder);before=path.read_bytes()

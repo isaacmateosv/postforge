@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.47]
+
+- Complete the rc.46 audit release with a Windows-compatible permission assertion: Unix mode bits are checked on Unix; Windows uses its native file-access semantics. All preference content, validation and secret-preservation tests still run on every platform.
+- rc.46 was not published because its Windows validation rejected Unix-only permission expectations. The full workflow, backup, service-control and documentation improvements below are included.
+
 ## [2.0.0-rc.46]
 
 - Audit the active Rust workflow, backup recovery, update safety, non-secret defaults and cross-platform requirements; see the feature audit ledger for validation and remaining acceptance checks.
