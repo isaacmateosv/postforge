@@ -1,5 +1,34 @@
 # Public access: TryCloudflare and your own domain
 
+## Which link or login do I need?
+
+| What you see | What to do |
+|---|---|
+| Postiz link is ready | Choose **Open Postiz** or **Copy link**. Keep using the current link. |
+| A new temporary link was found | Choose **Use detected link**. Wait for verification; do not request yet another address. |
+| Public link cannot be reached | Confirm Docker and internet access, then **Check again**. This is not a social-account login failure. |
+| A social account shows automatic renewal | Use **Connections → Check & renew**. Do not disconnect it merely because its short-lived token expired. |
+| One social account says reconnect required | Use its **Reconnect this account** button. Follow the guide for that connector only. |
+
+The **gateway login** protects access to the installation. The **Postiz login** opens your publishing workspace. Those browser logins are different from authorizing each social account. A new hostname can ask for the first two logins again without invalidating all social sessions.
+
+When a social account actually requires reconnection, check the public link first. If the address changed, copy its matching callback into that provider’s developer app, then open Postiz and reconnect the existing channel. Do not delete and re-add a healthy channel. Instagram through Facebook Login and Instagram Standalone use different callbacks; the selected account’s guide shows the matching one. Callback URLs are settings to copy, not login pages to visit.
+
+Domain/provider changes and requesting a different random link live under **Advanced · domain and tunnel settings**. Rotation is not a token-renewal command. To avoid random addresses, configure a named tunnel with your own domain. Encrypted migration keeps that profile; a temporary hostname is not portable. After any origin change, keep caption edits and prepare a fresh review before submission.
+
+```text
+Postiz link ready? ── no ──→ Check again / use detected link
+       │ yes
+       ↓
+Open Postiz → gateway login → Postiz login → calendar
+       │
+Account marked for reconnection? ── no ──→ continue normally
+       │ yes
+       ↓
+Check matching developer callback → reconnect existing channel → check status
+```
+
+
 PostForge keeps the authentication gateway in front of Postiz, regardless of tunnel provider. The public uploads library stays protected. Social platforms receive expiring, file-scoped signed links rather than a public library URL.
 
 ```mermaid
@@ -14,15 +43,15 @@ flowchart LR
 
 ## In the app or menu bar
 
-Open **Settings → Public access → Configure network**, or **Public URL & Tunnel** in the menu bar. **Check access** verifies the public gateway separately from social-channel login health. A running container alone does not prove the public URL is available. The dashboard warns when the endpoint cannot be reached or the temporary URL needs synchronization.
+Open **Settings → Public access → Manage Postiz link**, or **Postiz Link & Access** in the menu bar. **Check again** verifies the public gateway separately from social-channel login health. A running container alone does not prove the public URL is available. The dashboard warns when the endpoint cannot be reached or the temporary URL needs synchronization.
 
 The switch requires an idle social queue. Finish or cancel scheduled posts first. PostForge preserves a private recovery copy, updates the Postiz origin and gateway hostname/cookie settings, recreates the affected services, verifies the public gateway and scheduler, and rebases Postiz media-library and post-media links. It does not rewrite captions or publish/repost anything. A failed switch restores the previous configuration; an already exhausted old provider can remain unavailable after rollback.
 
 ## TryCloudflare · temporary
 
-Choose **TryCloudflare** and **Apply configuration**. No Cloudflare account, domain or tunnel token is required. **Rotate temporary URL** deliberately restarts the connector and requests another hostname. PostForge keeps that connector running while synchronizing Postiz and the gateway so it does not immediately lose the newly generated URL.
+Under **Advanced · domain and tunnel settings**, choose **TryCloudflare** and **Save access settings**. No Cloudflare account, domain or tunnel token is required. **Request a different temporary link** deliberately restarts the connector and requests another hostname. PostForge keeps that connector running while synchronizing Postiz and the gateway so it does not immediately lose the newly generated URL.
 
-**The hostname changes when the connector process restarts**, including after Docker restarts or some updates. Open the network settings and use **Apply configuration** to synchronize a newly detected hostname. Review the dashboard warning before posting. Do not keep a bookmark pointing to an old temporary URL; use Open Postiz from the app or tray.
+**The hostname changes when the connector process restarts**, including after Docker restarts or some updates. Open the network settings and use **Use detected link** to synchronize a newly detected hostname. Review the dashboard warning before posting. Do not keep a bookmark pointing to an old temporary URL; use Open Postiz from the app or tray.
 
 Quick Tunnels are for testing, have no uptime guarantee, have a 200 in-flight request limit, and do not support Server-Sent Events. PostForge does not describe them as an unlimited production video service. This is a temporary deployment option while you prepare a stable hostname.
 
@@ -66,7 +95,7 @@ Sources: [Cloudflare Quick Tunnels and limitations](https://developers.cloudflar
 Click the current public URL or **Copy link** to copy it. The control briefly turns green and confirms **Link copied**. OAuth callback URLs are clickable copy controls too; use Tab and Enter/Space with the keyboard.
 
 
-The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Synchronize current URL** before copying or opening Postiz.
+The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Use detected link** before copying or opening Postiz.
 
 
 Public URL migration also updates locally hosted channel profile pictures. If your calendar was already open, reload it after a migration to fetch the new avatar URLs; channel reconnection is not required for this repair.

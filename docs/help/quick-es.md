@@ -1,5 +1,34 @@
 # Inicio rápido de PostForge
 
+## ¿Qué enlace o inicio de sesión necesito?
+
+| Lo que aparece | Qué hacer |
+|---|---|
+| El enlace de Postiz está listo | Elige **Abrir Postiz** o **Copiar enlace**. Sigue usando el enlace actual. |
+| Se encontró un enlace temporal nuevo | Pulsa **Usar enlace detectado**. Espera la verificación; no pidas otra dirección. |
+| No se puede acceder al enlace público | Confirma que Docker esté en ejecución y que tengas internet; luego pulsa **Comprobar otra vez**. Esto no es un error de sesión de una red social. |
+| Una cuenta indica renovación automática | Usa **Conexiones → Revisar y renovar**. No la desconectes solo porque venció su token temporal. |
+| Una cuenta indica que debes reconectar | Usa su botón **Reconectar esta cuenta**. Sigue la guía de ese conector únicamente. |
+
+El **inicio de sesión del gateway** protege el acceso a la instalación. El **inicio de sesión de Postiz** abre tu espacio de publicación. Esos accesos del navegador son distintos de la autorización de cada red social. Un dominio nuevo puede pedir los dos primeros accesos otra vez sin invalidar todas las sesiones de tus redes.
+
+Cuando una cuenta realmente necesite reconexión, comprueba primero el enlace público. Si cambió la dirección, copia la redirección correspondiente en la app de desarrollador del proveedor; luego abre Postiz y reconecta el canal existente. No elimines y vuelvas a añadir un canal que funciona. Instagram mediante Facebook Login e Instagram Standalone usan redirecciones distintas; la guía de la cuenta seleccionada muestra la correcta. Las URL de redirección son ajustes para copiar, no páginas para iniciar sesión.
+
+Los cambios de dominio o proveedor y la opción de pedir otro enlace aleatorio están en **Avanzado · dominio y túnel**. Rotar el enlace no renueva tokens. Para evitar direcciones aleatorias, configura un túnel con nombre y dominio propio. La migración cifrada conserva ese perfil; un dominio temporal no es portátil. Después de cambiar de origen, conserva tus ediciones del texto y prepara una revisión nueva antes de enviar.
+
+```text
+¿Enlace de Postiz listo? ── no ──→ Comprobar / usar enlace detectado
+       │ sí
+       ↓
+Abrir Postiz → acceso del gateway → acceso de Postiz → calendario
+       │
+¿Una cuenta requiere reconexión? ── no ──→ continuar normalmente
+       │ sí
+       ↓
+Revisar su redirección → reconectar el canal existente → comprobar estado
+```
+
+
 ## Instalar o migrar a un equipo nuevo
 
 En macOS usa el `.pkg` actual de Rust; en otros sistemas, el ZIP correspondiente. El paquete incluye el código público de sus servicios y crea automáticamente una instalación privada. No necesitas una carpeta de proyecto. El instalador avisa qué herramientas faltan y enlaza sus fuentes oficiales. En la app, **Ajustes → Revisar requisitos** distingue herramientas ausentes de Docker instalado pero detenido. Python 3.9+ y OpenSSL permiten revisar respaldos; Docker + Compose se necesitan para restaurar; FFmpeg + ffprobe, para publicar videos. Ollama es opcional para generar textos y sus modelos se descargan por separado del respaldo.
@@ -205,15 +234,15 @@ En **WhatsApp → Audiencia**, elige todos los contactos o números seleccionado
 La descripción de YouTube termina con la etiqueta del negocio; si está vacía, se usa `#shorts`. No se añade una etiqueta automática al título. La descripción es independiente del límite de 100 caracteres del título.
 
 
-## URL pública y túnel
+## Enlace y acceso a Postiz
 
-Abre **Ajustes → Acceso público** o **URL pública y túnel** en la barra de menús. Elige TryCloudflare temporal, tu dominio con un túnel de Cloudflare con nombre o ngrok guardado. Comprueba el acceso antes de publicar. Rotar o reiniciar un conector temporal cambia el dominio: aplica la URL detectada y actualiza las redirecciones OAuth antes de reconectar los canales. El dominio y el token se conservan al volver al modo temporal. Los ajustes viajan en Respaldo y migración de forma cifrada; verifica la URL del destino antes de reanudar las publicaciones. Consulta la Ayuda técnica para ver el procedimiento completo.
+Abre **Ajustes → Acceso público** o **Enlace y acceso a Postiz** en la barra de menús. Elige TryCloudflare temporal, tu dominio con un túnel de Cloudflare con nombre o ngrok guardado. Comprueba el acceso antes de publicar. Rotar o reiniciar un conector temporal cambia el dominio: aplica la URL detectada y actualiza las redirecciones OAuth antes de reconectar los canales. El dominio y el token se conservan al volver al modo temporal. Los ajustes viajan en Respaldo y migración de forma cifrada; verifica la URL del destino antes de reanudar las publicaciones. Consulta la Ayuda técnica para ver el procedimiento completo.
 
 
 Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El control cambia brevemente a verde y confirma **Enlace copiado**. Las URL de redirección OAuth también se copian al hacer clic; con el teclado, usa Tab y Enter o Espacio.
 
 
-La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Sincronizar URL actual** antes de copiar o abrir Postiz.
+La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Usar enlace detectado** antes de copiar o abrir Postiz.
 
 
 Un token de acceso vencido que tiene una credencial de actualización guardada se muestra como **Se renueva al volver a usarse**, no como una tarea de renovación en cola. Pulsa **Conexiones → Revisar y renovar** para intentarlo mediante consultas de estadísticas de solo lectura. Solo se consultan canales con tokens vencidos que admiten renovación. PostForge vuelve a leer el estado guardado; no marca el canal como conectado únicamente por recibir HTTP 200. Reconecta solo si la renovación falla. Esta acción no publica nada y las comprobaciones en segundo plano no envían solicitudes de renovación.
@@ -258,7 +287,7 @@ La actualización de servicios conserva el túnel temporal que está ejecutándo
 
 ### Si falla el acceso público antes de publicar
 
-Las conexiones verdes confirman las sesiones de las cuentas, no la entrega pública de archivos. Abre **Ajustes → URL pública y túnel → Revisar acceso**. Si se detectó otra dirección, elige **Sincronizar URL actual**, en lugar de rotarla varias veces. Después de cambiar la URL, copia tus ediciones del texto y prepara una revisión nueva con una hora futura. Revisa el historial antes de reintentar para evitar duplicados.
+Las conexiones verdes confirman las sesiones de las cuentas, no la entrega pública de archivos. Abre **Ajustes → Enlace y acceso a Postiz → Revisar acceso**. Si se detectó otra dirección, elige **Usar enlace detectado**, en lugar de rotarla varias veces. Después de cambiar la URL, copia tus ediciones del texto y prepara una revisión nueva con una hora futura. Revisa el historial antes de reintentar para evitar duplicados.
 
 ### Programación directa de WhatsApp y modo de carga de TikTok
 

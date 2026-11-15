@@ -1,5 +1,34 @@
 # PostForge Quick Start
 
+## Which link or login do I need?
+
+| What you see | What to do |
+|---|---|
+| Postiz link is ready | Choose **Open Postiz** or **Copy link**. Keep using the current link. |
+| A new temporary link was found | Choose **Use detected link**. Wait for verification; do not request yet another address. |
+| Public link cannot be reached | Confirm Docker and internet access, then **Check again**. This is not a social-account login failure. |
+| A social account shows automatic renewal | Use **Connections → Check & renew**. Do not disconnect it merely because its short-lived token expired. |
+| One social account says reconnect required | Use its **Reconnect this account** button. Follow the guide for that connector only. |
+
+The **gateway login** protects access to the installation. The **Postiz login** opens your publishing workspace. Those browser logins are different from authorizing each social account. A new hostname can ask for the first two logins again without invalidating all social sessions.
+
+When a social account actually requires reconnection, check the public link first. If the address changed, copy its matching callback into that provider’s developer app, then open Postiz and reconnect the existing channel. Do not delete and re-add a healthy channel. Instagram through Facebook Login and Instagram Standalone use different callbacks; the selected account’s guide shows the matching one. Callback URLs are settings to copy, not login pages to visit.
+
+Domain/provider changes and requesting a different random link live under **Advanced · domain and tunnel settings**. Rotation is not a token-renewal command. To avoid random addresses, configure a named tunnel with your own domain. Encrypted migration keeps that profile; a temporary hostname is not portable. After any origin change, keep caption edits and prepare a fresh review before submission.
+
+```text
+Postiz link ready? ── no ──→ Check again / use detected link
+       │ yes
+       ↓
+Open Postiz → gateway login → Postiz login → calendar
+       │
+Account marked for reconnection? ── no ──→ continue normally
+       │ yes
+       ↓
+Check matching developer callback → reconnect existing channel → check status
+```
+
+
 ## Install or migrate on a new computer
 
 Use the current Rust `.pkg` on macOS, or the matching ZIP for your operating system. The package includes the public backend; it creates a private installation automatically. No project folder is required. The installer warns about missing tools and links to official sources. In the app, **Settings → Check requirements** distinguishes missing tools from Docker installed but stopped. Python 3.9+ and OpenSSL allow backup inspection; Docker + Compose are needed to restore; FFmpeg + ffprobe for video publishing. Ollama is optional for generated captions and its model downloads are separate from your backup.
@@ -195,13 +224,13 @@ YouTube descriptions end with your business hashtag, or `#shorts` if it is empty
 
 ## Public URL and tunnel
 
-Open **Settings → Public access** or **Public URL & Tunnel** in the menu bar. Choose temporary TryCloudflare, your own domain through a named Cloudflare tunnel, or saved ngrok. Check access before posting. Rotating or restarting a temporary connector changes its hostname: apply the detected URL and update provider OAuth callbacks before reconnecting channels. Domain and token settings remain saved when returning to temporary mode. All provider settings travel in encrypted Backup & Move; verify the destination URL before restarting publishing. See Technical Help for the complete procedure.
+Open **Settings → Public access** or **Postiz Link & Access** in the menu bar. Choose temporary TryCloudflare, your own domain through a named Cloudflare tunnel, or saved ngrok. Check access before posting. Rotating or restarting a temporary connector changes its hostname: apply the detected URL and update provider OAuth callbacks before reconnecting channels. Domain and token settings remain saved when returning to temporary mode. All provider settings travel in encrypted Backup & Move; verify the destination URL before restarting publishing. See Technical Help for the complete procedure.
 
 
 Click the current public URL or **Copy link** to copy it. The control briefly turns green and confirms **Link copied**. OAuth callback URLs are clickable copy controls too; use Tab and Enter/Space with the keyboard.
 
 
-The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Synchronize current URL** before copying or opening Postiz.
+The network window refreshes when you return to it and while it is visible. URL and callback copy actions check the current configuration first. If a temporary connector has changed hostnames and needs synchronization, stale links are disabled and the detected address is shown. Choose **Use detected link** before copying or opening Postiz.
 
 
 An expired access token with a saved refresh credential is shown as **Renews on next use**, not a queued renewal job. Choose **Connections → Check & renew** to attempt renewal now through read-only channel analytics. Only expired, renewable channels are checked. PostForge rereads the saved result; it does not mark a channel healthy just because the request returned HTTP 200. Reconnect only if renewal fails. This action does not publish posts, and background status polling does not trigger refresh requests.
@@ -246,7 +275,7 @@ Service refresh during an update preserves the running temporary tunnel. Changin
 
 ### If public access fails before publishing
 
-Green channel connections confirm account sessions, not public file delivery. Open **Settings → Public URL & tunnel → Check access**. If a new address was detected, choose **Synchronize current URL**, rather than repeatedly rotating it. After a URL change, copy any caption edits and prepare a fresh review with a future time. Check history before retrying to avoid duplicates.
+Green channel connections confirm account sessions, not public file delivery. Open **Settings → Postiz link & access → Check access**. If a new address was detected, choose **Use detected link**, rather than repeatedly rotating it. After a URL change, copy any caption edits and prepare a fresh review with a future time. Check history before retrying to avoid duplicates.
 
 ### WhatsApp direct scheduling and TikTok upload mode
 

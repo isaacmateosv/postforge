@@ -231,3 +231,22 @@ header,footer,main,nav,#baking-visual { max-width:1280px; }
 
 #help-dialog { max-width:900px; }
 #help-body .help-document { max-height:65vh; padding:8px 16px 16px 4px; line-height:1.65; }
+
+/* One recommended action for access, with disruptive controls kept in Advanced. */
+#network-dialog { max-width:720px; }
+#network-result { margin:20px 0 10px; font-weight:600; }
+#network-result[data-state=ready],#connection-summary[data-state=ready] { background:#253a30; border-color:#527d65; color:#b6e5c7; }
+#network-next { line-height:1.65; font-size:13px; margin-bottom:22px; }
+#network-detected { overflow-wrap:anywhere; }
+#network-repair-actions { margin:4px 0 22px; }
+.access-guide { margin:18px 0; border-top:1px solid var(--border); padding-top:18px; }
+.access-guide > summary { cursor:pointer; font-weight:500; padding:4px 0; }
+.access-guide > p,.access-guide > label,.access-guide > details { margin-top:16px; }
+.access-steps { padding-left:24px; margin:18px 0; }
+.access-steps li { padding-left:10px; margin:0 0 16px; line-height:1.65; color:var(--muted); }
+#network-advanced .settings-field { margin-top:20px; }
+.network-recovery { margin-top:24px; padding-top:18px; border-top:1px solid var(--border); }
+.network-recovery button { font-size:12px; }
+.network-footer { gap:10px; }
+.connection-row > button { grid-column:1/-1; justify-self:start; margin-top:8px; }
+#connection-summary { font-size:13px; line-height:1.65; margin-bottom:18px; }

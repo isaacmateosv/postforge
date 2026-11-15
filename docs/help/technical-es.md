@@ -1,5 +1,34 @@
 # Guía técnica de PostForge
 
+## ¿Qué enlace o inicio de sesión necesito?
+
+| Lo que aparece | Qué hacer |
+|---|---|
+| El enlace de Postiz está listo | Elige **Abrir Postiz** o **Copiar enlace**. Sigue usando el enlace actual. |
+| Se encontró un enlace temporal nuevo | Pulsa **Usar enlace detectado**. Espera la verificación; no pidas otra dirección. |
+| No se puede acceder al enlace público | Confirma que Docker esté en ejecución y que tengas internet; luego pulsa **Comprobar otra vez**. Esto no es un error de sesión de una red social. |
+| Una cuenta indica renovación automática | Usa **Conexiones → Revisar y renovar**. No la desconectes solo porque venció su token temporal. |
+| Una cuenta indica que debes reconectar | Usa su botón **Reconectar esta cuenta**. Sigue la guía de ese conector únicamente. |
+
+El **inicio de sesión del gateway** protege el acceso a la instalación. El **inicio de sesión de Postiz** abre tu espacio de publicación. Esos accesos del navegador son distintos de la autorización de cada red social. Un dominio nuevo puede pedir los dos primeros accesos otra vez sin invalidar todas las sesiones de tus redes.
+
+Cuando una cuenta realmente necesite reconexión, comprueba primero el enlace público. Si cambió la dirección, copia la redirección correspondiente en la app de desarrollador del proveedor; luego abre Postiz y reconecta el canal existente. No elimines y vuelvas a añadir un canal que funciona. Instagram mediante Facebook Login e Instagram Standalone usan redirecciones distintas; la guía de la cuenta seleccionada muestra la correcta. Las URL de redirección son ajustes para copiar, no páginas para iniciar sesión.
+
+Los cambios de dominio o proveedor y la opción de pedir otro enlace aleatorio están en **Avanzado · dominio y túnel**. Rotar el enlace no renueva tokens. Para evitar direcciones aleatorias, configura un túnel con nombre y dominio propio. La migración cifrada conserva ese perfil; un dominio temporal no es portátil. Después de cambiar de origen, conserva tus ediciones del texto y prepara una revisión nueva antes de enviar.
+
+```text
+¿Enlace de Postiz listo? ── no ──→ Comprobar / usar enlace detectado
+       │ sí
+       ↓
+Abrir Postiz → acceso del gateway → acceso de Postiz → calendario
+       │
+¿Una cuenta requiere reconexión? ── no ──→ continuar normalmente
+       │ sí
+       ↓
+Revisar su redirección → reconectar el canal existente → comprobar estado
+```
+
+
 El desarrollo actual de v2 usa el cliente de escritorio Rust. Las secciones anteriores del controlador del Mac describen el comportamiento de Swift y no implican que esas funciones ya estén en Rust. Consulta Implementación de Rust y Telegram para conocer el alcance actual de la beta.
 
 PostForge controla desde macOS una instalación local de publicación. Prepara planes y borradores. Postiz y Temporal gestionan las publicaciones aprobadas. Evolution y Baileys vinculan la sesión de WhatsApp del operador.
@@ -364,15 +393,15 @@ flowchart LR
 
 ## En la app o la barra de menús
 
-Abre **Ajustes → Acceso público → Configurar red** o **URL pública y túnel** en la barra de menús. **Comprobar acceso** verifica el gateway público por separado de las sesiones de las redes. Que el contenedor esté encendido no garantiza que la URL funcione. Inicio muestra una advertencia si el acceso falla o la URL temporal necesita sincronizarse.
+Abre **Ajustes → Acceso público → Administrar enlace de Postiz** o **Enlace y acceso a Postiz** en la barra de menús. **Comprobar otra vez** verifica el gateway público por separado de las sesiones de las redes. Que el contenedor esté encendido no garantiza que la URL funcione. Inicio muestra una advertencia si el acceso falla o la URL temporal necesita sincronizarse.
 
 Para cambiar, primero completa o cancela las publicaciones programadas. PostForge guarda una copia privada de recuperación, actualiza el origen de Postiz, el dominio y las cookies del gateway, recrea los servicios afectados, verifica el acceso y el planificador, y actualiza los enlaces de archivos en Postiz. No modifica los textos ni publica o reenvía nada. Si falla, restaura la configuración anterior; un proveedor anterior sin cuota puede seguir sin funcionar después de esa restauración.
 
 ## TryCloudflare · temporal
 
-Selecciona **TryCloudflare** y **Aplicar configuración**. No necesitas cuenta de Cloudflare, dominio ni token. **Rotar URL temporal** reinicia el conector para obtener otro dominio. PostForge mantiene ese proceso encendido mientras sincroniza Postiz y el gateway, para no perder enseguida la URL recién generada.
+En **Avanzado · dominio y túnel**, selecciona **TryCloudflare** y **Guardar ajustes de acceso**. No necesitas cuenta de Cloudflare, dominio ni token. **Pedir otro enlace temporal** reinicia el conector para obtener otro dominio. PostForge mantiene ese proceso encendido mientras sincroniza Postiz y el gateway, para no perder enseguida la URL recién generada.
 
-**El dominio cambia al reiniciar el proceso del conector**, incluso al reiniciar Docker o durante ciertas actualizaciones. Entra a los ajustes de red y pulsa **Aplicar configuración** para sincronizar el dominio nuevo detectado. Revisa la advertencia en Inicio antes de publicar. Usa Abrir Postiz en la app o la barra de menús, en lugar de guardar una URL temporal vieja como favorito.
+**El dominio cambia al reiniciar el proceso del conector**, incluso al reiniciar Docker o durante ciertas actualizaciones. Entra a los ajustes de red y pulsa **Usar enlace detectado** para sincronizar el dominio nuevo detectado. Revisa la advertencia en Inicio antes de publicar. Usa Abrir Postiz en la app o la barra de menús, en lugar de guardar una URL temporal vieja como favorito.
 
 Los Quick Tunnels son para pruebas: no tienen garantía de disponibilidad, admiten hasta 200 solicitudes simultáneas y no soportan Server-Sent Events. PostForge no los presenta como un servicio ilimitado para videos de producción. Esta opción es temporal mientras preparas un dominio estable.
 
@@ -416,7 +445,7 @@ Fuentes: [Quick Tunnels y sus límites](https://developers.cloudflare.com/tunnel
 Haz clic en la URL pública actual o en **Copiar enlace** para copiarla. El control cambia brevemente a verde y confirma **Enlace copiado**. Las URL de redirección OAuth también se copian al hacer clic; con el teclado, usa Tab y Enter o Espacio.
 
 
-La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Sincronizar URL actual** antes de copiar o abrir Postiz.
+La ventana de red se actualiza al volver a ella y mientras está visible. Antes de copiar la URL o una redirección, se consulta la configuración actual. Si el conector temporal cambió de dominio y necesita sincronizarse, se deshabilitan los enlaces anteriores y se muestra la dirección detectada. Pulsa **Usar enlace detectado** antes de copiar o abrir Postiz.
 
 
 Al cambiar la URL pública también se actualizan las fotos de perfil de los canales alojadas localmente. Si el calendario ya estaba abierto, recárgalo después de la migración para obtener los enlaces nuevos. Esta corrección no requiere reconectar los canales.
@@ -452,7 +481,7 @@ La instalación del código de servicios forma parte del paquete de escritorio. 
 
 ## Comprobaciones de acceso público antes de publicar
 
-Los indicadores verdes de los canales describen las sesiones de las cuentas; la entrega pública de archivos se comprueba por separado antes de subir un lote. Si el conector temporal cambia de dirección, abre **URL pública y túnel → Sincronizar URL actual**. Usa **Revisar acceso** para verificar el gateway. Rota la URL solo cuando necesites otra dirección. Si falla la sincronización, la recuperación conserva el conector temporal en ejecución.
+Los indicadores verdes de los canales describen las sesiones de las cuentas; la entrega pública de archivos se comprueba por separado antes de subir un lote. Si el conector temporal cambia de dirección, abre **Enlace y acceso a Postiz → Usar enlace detectado**. Usa **Comprobar otra vez** para verificar el gateway. Rota la URL solo cuando necesites otra dirección. Si falla la sincronización, la recuperación conserva el conector temporal en ejecución.
 
 Al cambiar la URL, tu texto sigue visible, pero la revisión anterior deja de ser válida. Copia tus ediciones manuales, prepara una revisión nueva y elige una hora futura. Los enlaces firmados de la revisión anterior no se pueden reutilizar. La sincronización actualiza los ajustes locales del gateway y Postiz; actualiza manualmente las redirecciones OAuth de cada proveedor antes de reconectar cuentas. Antes de reintentar un lote cuyo resultado no esté claro, revisa su historial.
 

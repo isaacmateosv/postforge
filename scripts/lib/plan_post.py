@@ -478,7 +478,7 @@ def verify_public_media_origin(env):
     import network_settings
     status=network_settings.status(check=True,force=True)
     if status.get('url')!=env.get('FRONTEND_URL') or status.get('needs_sync') or not status.get('reachable'):
-        raise PMError('Public media access is not ready. No posts were created. Open Public URL & tunnel, check access and synchronize the detected URL instead of rotating again. / El acceso público a los archivos no está listo. No se creó ninguna publicación. Abre URL pública y túnel, revisa el acceso y sincroniza la URL detectada en lugar de volver a rotarla.')
+        raise PMError('Public media access is not ready. No posts were created. Open Postiz link & access, check again and use the detected link instead of requesting another one. / El acceso público a los archivos no está listo. No se creó ninguna publicación. Abre Enlace y acceso a Postiz, comprueba otra vez y usa el enlace detectado en lugar de pedir otro.')
 
 
 def run(env, p, dry_run, schedule=False):

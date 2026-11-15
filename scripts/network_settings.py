@@ -213,7 +213,7 @@ def apply(payload):
 
 
 def callbacks(url):
-    return [{'network':name,'url':url+'/integrations/social/'+name} for name in ('youtube','facebook','instagram','threads','tiktok')]
+    return [{'network':name,'url':url+'/integrations/social/'+name} for name in ('youtube','facebook','instagram','instagram-standalone','threads','tiktok')]
 
 if __name__=='__main__':
     import argparse

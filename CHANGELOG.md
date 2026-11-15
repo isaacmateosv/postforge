@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.45]
+
+- Separate everyday Postiz access, changed-link recovery and social-account reconnection, with a state-specific next action in English and Ecuadorian Spanish.
+- Move disruptive random URL rotation and provider changes into Advanced. Verify the current public link before opening Postiz from the app or tray.
+- Add account-specific reconnect guidance, distinguish Instagram login connector callbacks, and avoid prompting reconnection for ordinary automatic token renewal.
+- Add direct tray access to social connection health and update the quick, technical and public-address guides.
+
 ## [2.0.0-rc.44]
 
 - Recognize explicit Schedule directly approval in the WhatsApp Status delivery worker. Process due items once, while leaving unapproved, unknown-source and future items untouched.

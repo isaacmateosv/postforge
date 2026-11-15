@@ -39,6 +39,11 @@ class NetworkTests(unittest.TestCase):
             self.assertFalse(robots.can_fetch(agent,'https://synthetic.example/uploads/video.mp4'))
             self.assertFalse(robots.can_fetch(agent,'https://synthetic.example/launches'))
 
+    def test_callbacks_distinguish_instagram_login_connectors(self):
+        callbacks={item['network']:item['url'] for item in net.callbacks('https://example.test')}
+        self.assertEqual(callbacks['instagram'],'https://example.test/integrations/social/instagram')
+        self.assertEqual(callbacks['instagram-standalone'],'https://example.test/integrations/social/instagram-standalone')
+
     def test_provider_specs_keep_gateway_and_private_token(self):
         for provider in net.PROVIDERS:
             spec=json.loads(net.provider_block(provider).split(': ',1)[1])
