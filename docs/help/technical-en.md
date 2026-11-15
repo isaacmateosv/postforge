@@ -135,7 +135,7 @@ Restore leaves services stopped, publishing paused and Telegram on migration hol
 
 ## Updates, packaging and removal
 
-Startup and six-hour update checks follow the installed app’s stable/prerelease channel. Manual checks inspect Docker/Evolution too. ZIP checksums and platform/architecture are verified before installation. macOS replaces the signed bundle and refreshes the matching public runtime/configured services while retaining private files. Active backup/publishing blocks installation. Windows/Linux reveal the verified archive for manual replacement rather than overwriting a running executable.
+Startup and six-hour update checks follow the installed app’s stable/prerelease channel. Manual checks inspect Docker/Evolution too. ZIP checksums and platform/architecture are verified before installation. macOS replaces the signed bundle and refreshes the matching public runtime/configured services while retaining private files. Active backup/publishing blocks installation. Windows/Linux reveal the verified archive for manual replacement rather than overwriting a running executable. On the next Windows launch, matching runtime/service refresh uses Python rather than requiring Bash; stopped stacks remain stopped.
 
 Evolution Manager is part of the pinned Evolution deployment, not a separately updated desktop app. A newer upstream version is shown as compatibility work; the updater does not blindly install untested container tags. A failed check is incomplete, not “up to date.”
 

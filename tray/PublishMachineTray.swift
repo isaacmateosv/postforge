@@ -58,7 +58,7 @@ struct LastStatus: Decodable {
     let received: Int
     let viewed: Int
     let text: String
-    let viewerNames: [String]?  // up to 15, the bakery phone left out
+    let viewerNames: [String]?  // up to 15, the linked operator phone left out
 }
 
 /// A channel that needs reconnecting, or will soon (Facebook and Instagram can't renew themselves).
@@ -1579,7 +1579,7 @@ final class NewPostWindow: NSObject, NSTextViewDelegate {
         }
         let names = ["instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube"]
         var lines = [(dryRun ? "Plan (nothing created yet) for " : "Drafts created for ")
-                     + (json["when_local"] as? String ?? "") + " (bakery time)"]
+                     + (json["when_local"] as? String ?? "") + " (local time)"]
         for target in json["targets"] as? [[String: Any]] ?? [] {
             let network = target["network"] as? String ?? ""
             let short = network == "youtube" && (json["short"] as? Bool ?? false) ? " (Short)" : ""

@@ -83,3 +83,13 @@ class RuntimeTests(unittest.TestCase):
             (target/'run/whatsapp-pending.json').write_text(json.dumps([{'status':'sending'}]));(target/'VERSION').write_text('old')
             with self.assertRaisesRegex(ValueError,'Wait for WhatsApp'):runtime.apply(package,target,refresh=True)
             self.assertEqual((target/'VERSION').read_text(),'old')
+
+    def test_windows_refresh_uses_python_instead_of_requiring_bash(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp).resolve();package=self.fixture(folder);target=folder/'fresh';runtime.apply(package,target);(target/'.env').write_text('PRIVATE=kept')
+            with patch.object(runtime.sys,'platform','win32'),patch.object(runtime.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=b'Updated')) as command:
+                runtime.apply(package,target,refresh=True)
+            args=command.call_args.args[0]
+            self.assertEqual(args[-1],'--refresh-under-installer-lock');self.assertNotIn('bash',args)
+            self.assertEqual((target/'.env').read_text(),'PRIVATE=kept')

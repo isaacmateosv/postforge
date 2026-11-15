@@ -135,7 +135,7 @@ La restauración deja servicios detenidos, publicación pausada y Telegram en es
 
 ## Actualizaciones, paquetes y desinstalación
 
-La consulta al iniciar y cada seis horas sigue el canal estable o de prueba de la app instalada. La consulta manual incluye Docker/Evolution. Se verifican sumas, plataforma y arquitectura. macOS reemplaza la app firmada y actualiza el código y servicios correspondientes sin cambiar archivos privados. Las publicaciones o respaldos activos bloquean la instalación. Windows/Linux abren el archivo verificado para reemplazarlo manualmente, sin sobrescribir un ejecutable activo.
+La consulta al iniciar y cada seis horas sigue el canal estable o de prueba de la app instalada. La consulta manual incluye Docker/Evolution. Se verifican sumas, plataforma y arquitectura. macOS reemplaza la app firmada y actualiza el código y servicios correspondientes sin cambiar archivos privados. Las publicaciones o respaldos activos bloquean la instalación. Windows/Linux abren el archivo verificado para reemplazarlo manualmente, sin sobrescribir un ejecutable activo. Al abrir de nuevo en Windows, el código y los servicios se actualizan con Python, sin exigir Bash; una instalación detenida permanece detenida.
 
 Evolution Manager forma parte de la versión fijada de Evolution, no es otra app de escritorio. Una versión nueva se muestra como trabajo de compatibilidad; no se instalan etiquetas de contenedor sin probar. Una consulta fallida se muestra incompleta, no como «actualizado».
 

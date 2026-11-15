@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.49]
+
+- Refresh configured Windows services through the bundled Python controller without requiring Bash on the host. Preserve stopped installations, restart active receivers against updated code, recreate non-tunnel containers and retain the running connector under the installer maintenance lease.
+- Includes all rc.46–48 workflow, backup, UI, documentation and native-version audit corrections.
+
 ## [2.0.0-rc.48]
 
 - About reports the running native client version independently of the configured backend and remains available when Postiz is offline. This closes the final installed-versus-source version discrepancy found during native acceptance.

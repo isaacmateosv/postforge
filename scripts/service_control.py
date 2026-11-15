@@ -1,6 +1,8 @@
 # Copyright © 2026 Isaac Mateo Sarzosa Valencia and contributors.
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Fixed, portable lifecycle actions for this installation's Compose stack."""
+import argparse
+from contextlib import nullcontext
 import json
 import os
 import re
@@ -110,11 +112,11 @@ def wait_ready(env):
     raise pmlib.PMError('Services started but the API or scheduler is not ready. Check local service logs before publishing. / Los servicios arrancaron, pero la API o el planificador no están listos. Revisa los registros antes de publicar.')
 
 
-def apply(payload):
+def apply(payload, *, installer_lease=False):
     action=payload.get('action')
     if action not in ('start','stop') or payload.get('confirmed') is not True:raise ValueError('Review and confirm the service action. / Revisa y confirma la acción de servicios.')
     if not (ROOT/'.env').is_file():raise ValueError('Configure this installation or restore a backup first. / Primero configura esta instalación o restaura un respaldo.')
-    with operation_guard.maintenance(ROOT):
+    with nullcontext() if installer_lease else operation_guard.maintenance(ROOT):
         operation_guard.assert_idle(ROOT)
         env=pmlib.load_env();progress(action,'Checking local services / Revisando servicios locales',5)
         try:
@@ -125,6 +127,10 @@ def apply(payload):
                 if queued or approved:raise ValueError('Finish or cancel scheduled posts and approved Status before stopping. / Completa o cancela las publicaciones programadas y los Estados aprobados antes de detener los servicios.')
             with pmlib.Job('service-'+action,'Start publishing services' if action=='start' else 'Stop publishing services'):
                 if action=='start':
+                    # Also reload workers after an update deferred while Docker was off.
+                    stop_receiver()
+                    import host_agent
+                    host_agent.stop()
                     progress(action,'Starting configured containers / Iniciando contenedores configurados',25)
                     if (ROOT/'data/gateway/configuration.yml').is_file():
                         from network_settings import restore_provider
@@ -135,7 +141,7 @@ def apply(payload):
                     profiles=set(filter(None,env.get('COMPOSE_PROFILES','').split(',')))
                     services=[name for name,spec in declared.items() if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*',name) and name not in ('ngrok','postforge-telegram') and (not spec.get('profiles') or profiles.intersection(spec['profiles']))]
                     if not services:raise ValueError('No configured services found. / No se encontraron servicios configurados.')
-                    first=command(['docker','compose','up','-d','--remove-orphans',*services],600)
+                    first=command(['docker','compose','up','-d','--remove-orphans',*(['--force-recreate'] if installer_lease else []),*services],600)
                     connector=command(['docker','compose','up','-d','--no-deps','--no-recreate','ngrok'],120)
                     atomic_write(ROOT/'run/service-control.log',first.stdout+first.stderr+connector.stdout+connector.stderr)
                     if first.returncode or connector.returncode:raise pmlib.PMError('Docker could not start the stack. Review service-control.log. / Docker no pudo iniciar los servicios. Revisa service-control.log.')
@@ -160,3 +166,29 @@ def apply(payload):
             message=str(error) if isinstance(error,(ValueError,pmlib.PMError)) else 'Service control needs review. / Revisa el control de servicios.'
             progress(action,message,0,done=True,error=message);raise
     return status()
+
+
+def refresh_from_installer():
+    """Private child entry point; runtime_install owns the cross-process lease."""
+    try:
+        with file_lock.exclusive(str(ROOT/'run/maintenance.lock'),blocking=False):
+            pass
+    except (BlockingIOError,PermissionError):
+        pass
+    else:
+        raise ValueError('Use the installed runtime updater for service refresh.')
+    current=status()
+    if not current['engine_ready'] or not current['running']:
+        print('Services remain stopped. Updated files will load on the next start.')
+        return
+    apply({'action':'start','confirmed':True},installer_lease=True)
+    print('Configured services and message receivers refreshed; connector preserved.')
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--refresh-under-installer-lock',action='store_true',required=True)
+    parser.parse_args()
+    try:refresh_from_installer()
+    except Exception as error:
+        print(str(error),file=sys.stderr);sys.exit(1)

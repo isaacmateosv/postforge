@@ -24,7 +24,7 @@ class ServiceTests(unittest.TestCase):
             if args[-3:]==['config','--format','json']:
                 return SimpleNamespace(returncode=0,stdout=json.dumps({'services':{'postgres':{},'postiz':{},'ngrok':{},'postforge-telegram':{'profiles':['telegram']},'postforge-web':{'profiles':['web']}}}),stderr='')
             return SimpleNamespace(returncode=0,stdout='',stderr='')
-        with tempfile.TemporaryDirectory() as folder,patch.object(services,'ROOT',self.run_fixture(folder)),patch.object(services.pmlib,'load_env',return_value={}),patch.object(services,'command',side_effect=command),patch.object(services,'wait_ready'),patch.object(services,'start_receiver'),patch.object(services,'ensure_ollama'),patch.object(services,'status',return_value={'running':True}),patch.object(services.pmlib,'Job',return_value=contextlib.nullcontext()),patch('host_agent.start'):
+        with tempfile.TemporaryDirectory() as folder,patch.object(services,'ROOT',self.run_fixture(folder)),patch.object(services.pmlib,'load_env',return_value={}),patch.object(services,'command',side_effect=command),patch.object(services,'wait_ready'),patch.object(services,'start_receiver'),patch.object(services,'ensure_ollama'),patch.object(services,'status',return_value={'running':True}),patch.object(services.pmlib,'Job',return_value=contextlib.nullcontext()),patch('host_agent.start'),patch('host_agent.stop'),patch.object(services,'stop_receiver'):
             services.apply({'action':'start','confirmed':True})
         up=[args for args in calls if args[:3]==['docker','compose','up']]
         self.assertEqual(len(up),2);self.assertNotIn('ngrok',up[0]);self.assertNotIn('postforge-telegram',up[0]);self.assertNotIn('postforge-web',up[0]);self.assertIn('--no-recreate',up[1]);self.assertNotIn('pull',[word for args in calls for word in args])
@@ -46,3 +46,27 @@ class ServiceTests(unittest.TestCase):
             self.assertFalse(desktop_bridge.dispatch('services_progress',{})['running'])
             self.assertTrue(desktop_bridge.dispatch('services_action',{'action':'stop','confirmed':True})['ok'])
             apply.assert_called_once_with({'action':'stop','confirmed':True})
+
+    def test_installer_refresh_requires_parent_lease_and_does_not_start_stopped_services(self):
+        import operation_guard
+        with tempfile.TemporaryDirectory() as folder,patch.object(services,'ROOT',self.run_fixture(folder)),patch.object(services,'status',return_value={'engine_ready':True,'running':False}),patch.object(services,'apply') as apply:
+            (Path(folder)/'run').mkdir(exist_ok=True)
+            with self.assertRaisesRegex(ValueError,'installed runtime updater'):services.refresh_from_installer()
+            with operation_guard.maintenance(folder):services.refresh_from_installer()
+            apply.assert_not_called()
+    def test_installer_refresh_uses_start_only_for_previously_running_stack(self):
+        import operation_guard
+        with tempfile.TemporaryDirectory() as folder,patch.object(services,'ROOT',self.run_fixture(folder)),patch.object(services,'status',return_value={'engine_ready':True,'running':True}),patch.object(services,'apply') as apply:
+            with operation_guard.maintenance(folder):services.refresh_from_installer()
+            apply.assert_called_once_with({'action':'start','confirmed':True},installer_lease=True)
+
+    def test_installer_recreates_services_and_restarts_receivers_but_keeps_connector(self):
+        calls=[]
+        def command(args,timeout=15):
+            calls.append(args)
+            return SimpleNamespace(returncode=0,stdout=json.dumps({'services':{'postiz':{},'ngrok':{}}}) if args[-1]=='json' else '',stderr='')
+        with tempfile.TemporaryDirectory() as folder,patch.object(services,'ROOT',self.run_fixture(folder)),patch.object(services.pmlib,'load_env',return_value={}),patch.object(services,'command',side_effect=command),patch.object(services,'wait_ready'),patch.object(services,'start_receiver') as start,patch.object(services,'stop_receiver') as stop,patch.object(services,'ensure_ollama'),patch.object(services,'status',return_value={'running':True}),patch.object(services.pmlib,'Job',return_value=contextlib.nullcontext()),patch('host_agent.start') as agent_start,patch('host_agent.stop') as agent_stop:
+            services.apply({'action':'start','confirmed':True},installer_lease=True)
+            start.assert_called_once();stop.assert_called_once();agent_start.assert_called_once();agent_stop.assert_called_once()
+        up=[args for args in calls if args[:3]==['docker','compose','up']]
+        self.assertIn('--force-recreate',up[0]);self.assertNotIn('ngrok',up[0]);self.assertIn('--no-recreate',up[1])

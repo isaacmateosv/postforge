@@ -95,7 +95,8 @@ def apply(source,target,refresh=False,only_newer=False):
                     os.chmod(temporary,record['mode']);os.replace(temporary,file)
                 finally:Path(temporary).unlink(missing_ok=True)
             if refresh and (target/'.env').is_file():
-                result=subprocess.run(['bash',str(target/'postforge.sh'),'refresh-installed-services'],cwd=target,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=600)
+                refresh_command=([sys.executable,'-B',str(target/'scripts/service_control.py'),'--refresh-under-installer-lock'] if sys.platform=='win32' else ['bash',str(target/'postforge.sh'),'refresh-installed-services'])
+                result=subprocess.run(refresh_command,cwd=target,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=600)
                 log=run/'runtime-refresh.log';log.write_bytes(result.stdout);log.chmod(0o600)
                 if result.returncode:raise ValueError('Service refresh failed; previous code was restored. Check runtime-refresh.log. / Falló la actualización de servicios; se recuperó el código anterior. Revisa runtime-refresh.log.')
             checkpoint=run/'runtime-installed.json';checkpoint.write_text(json.dumps({'version':manifest['version'],'recovery':str(recovery)}));checkpoint.chmod(0o600)
