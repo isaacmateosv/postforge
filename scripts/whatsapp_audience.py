@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parent/'lib'))
 import pmlib
 import file_lock
+import operation_guard
 from telegram_settings import atomic_write
 ROOT=Path(__file__).resolve().parent.parent
 
@@ -29,7 +30,7 @@ def save(payload):
     numbers=list(dict.fromkeys(numbers))
     if audience=='test' and not numbers:raise pmlib.PMError('Add at least one selected contact. / Añade al menos un contacto seleccionado.')
     import whatsapp_pending
-    with file_lock.exclusive(str(Path(pmlib.RUN_DIR)/'wa-audience.lock')):
+    with file_lock.exclusive(str(Path(pmlib.RUN_DIR)/'wa-audience.lock')), operation_guard.maintenance(ROOT):
         env=pmlib.load_env()
         with whatsapp_pending._queue_lock():
             items=whatsapp_pending._read()

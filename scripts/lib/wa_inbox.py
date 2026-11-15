@@ -866,6 +866,7 @@ def main():
         next_cleanup = 0
         while True:
             try:
+                env=pmlib.load_env()
                 one_pass(env, state, args.dry_run)
             except PMError as exc:
                 log("pass skipped: %s" % exc)

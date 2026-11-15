@@ -35,6 +35,7 @@ from create_draft import NEEDS_MEDIA, ollama_caption  # noqa: E402
 from pmlib import PMError, info  # noqa: E402
 import whatsapp_pending  # noqa: E402
 import media_links  # noqa: E402
+import operation_guard
 
 try:
     from zoneinfo import ZoneInfo
@@ -482,6 +483,11 @@ def verify_public_media_origin(env):
 
 
 def run(env, p, dry_run, schedule=False):
+    with operation_guard.maintenance(pmlib.ROOT):
+        return _run(env,p,dry_run,schedule)
+
+
+def _run(env, p, dry_run, schedule=False):
     result = {"when_local": p["when"].strftime("%a %d %b %Y %H:%M"), "when_utc": p["when"].astimezone(timezone.utc).isoformat(),
               "networks": p["networks"], "lang": p["lang"], "notes": list(p["notes"]), "warnings": [], "drafts": [],
               "dry_run": dry_run, "scheduled": schedule}

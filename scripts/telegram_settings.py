@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
 sys.path.insert(0, str(ROOT / 'v2'))
 import file_lock
+import operation_guard
 from telegram_worker import TelegramError, telegram, is_owner
 
 KEYS = ('TELEGRAM_ENABLED', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_ID', 'TELEGRAM_BOT_USERNAME',
@@ -161,7 +162,7 @@ def commands(language):
 def save(payload, root=ROOT):
     root = Path(root)
     import host_agent
-    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')):
+    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')), operation_guard.maintenance(root):
         previous = configuration(root)
         enabled = payload.get('enabled') is True
         language = payload.get('language', 'en')
@@ -234,7 +235,7 @@ def set_heartbeat(minutes, root=ROOT):
     if type(minutes) is not int or (minutes != 0 and not 5 <= minutes <= 1440):
         raise ValueError('Choose 0 (off), or 5–1440 minutes. / Elige 0 (apagado) o de 5 a 1440 minutos.')
     root = Path(root)
-    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')):
+    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')), operation_guard.maintenance(root):
         if not heartbeat_preferences(root)['configured']:
             raise ValueError('Set up Telegram in the desktop app first. / Primero configura Telegram en la app de escritorio.')
         path = root / '.env'

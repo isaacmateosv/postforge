@@ -11,6 +11,7 @@ import time
 sys.path.insert(0,str(Path(__file__).resolve().parent/'lib'))
 import pmlib
 import file_lock
+import operation_guard
 from telegram_settings import atomic_write
 import tunnel_url as tunnel
 ROOT=Path(__file__).resolve().parent.parent
@@ -106,6 +107,7 @@ def status(check=False,force=False):
 
 
 def guard_idle(env):
+    operation_guard.assert_idle(ROOT)
     client=pmlib.Postiz(env)
     rows=pmlib.psql('SELECT count(*) FROM "Post" WHERE "organizationId"='+literal(client.org_id)+" AND state='QUEUE' AND \"deletedAt\" IS NULL",env)
     if int(rows[0][0]):raise ValueError('Cancel or finish scheduled posts before switching the public URL. / Cancela o completa las publicaciones programadas antes de cambiar la URL pública.')
@@ -145,7 +147,7 @@ def apply(payload):
     if provider not in PROVIDERS:raise ValueError('Choose a supported provider.')
     if payload.get('confirm') is not True:raise ValueError('Review and confirm the public URL change.')
     path=ROOT/'.env';work=ROOT/'run';work.mkdir(mode=0o700,exist_ok=True)
-    with file_lock.exclusive(str(work/'tunnel-url.lock'),blocking=False):
+    with file_lock.exclusive(str(work/'tunnel-url.lock'),blocking=False), operation_guard.maintenance(ROOT):
         original=path.read_text();config=values(path);env=pmlib.load_env();org=guard_idle(env)
         gateway=ROOT/'data/gateway/configuration.yml';override=ROOT/'docker-compose.override.yml'
         if not gateway.is_file() or gateway.is_symlink():raise ValueError('Configure the protected gateway before publishing a tunnel. / Configura el gateway protegido antes de publicar un túnel.')

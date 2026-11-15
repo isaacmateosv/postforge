@@ -51,4 +51,13 @@ class BackupTests(unittest.TestCase):
             self.assertNotIn('example',record)
             self.assertIn(b'a private passphrase',spawn.return_value.stdin.write.call_args.args[0])
 
+    def test_recent_only_returns_live_task_reference_without_request_secrets(self):
+        import os
+        with tempfile.TemporaryDirectory() as folder,patch.object(backup,'JOBS',Path(folder)):
+            identifier='a'*32
+            backup.write_status(identifier,state='running',action='inspect',pid=os.getpid())
+            self.assertEqual(backup.recent(),{'task':{'id':identifier,'action':'inspect'}})
+            backup.write_status(identifier,state='done',result={'file':'/private/finished.pfbackup'})
+            self.assertEqual(backup.recent(),{'task':None})
+
 if __name__=='__main__':unittest.main()

@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pmlib
 import desktop_updates
+import operation_guard
 
 ROOT = Path(__file__).resolve().parent.parent
 RELEASES = desktop_updates.RELEASES
@@ -46,6 +47,8 @@ def _bundle_name():
 
 
 def download(installed=None):
+    try:operation_guard.assert_idle(ROOT)
+    except ValueError as error:raise pmlib.PMError(str(error)) from None
     installed = installed or (ROOT / 'VERSION').read_text().strip()
     if desktop_updates.version(installed) is None:raise pmlib.PMError('Invalid installed app version.')
     with _open(RELEASES + '?per_page=40', 'application/vnd.github+json') as response:

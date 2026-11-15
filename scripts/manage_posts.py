@@ -40,6 +40,12 @@ def snapshot(env, scope, client):
 
 
 def clear(env, reviewed, client):
+    import operation_guard
+    with operation_guard.maintenance(pmlib.ROOT):
+        return _clear(env,reviewed,client)
+
+
+def _clear(env, reviewed, client):
     if reviewed.get("organization") != client.org_id or reviewed.get("scope") not in STATES:
         raise pmlib.PMError("The cleanup preview does not belong to this organization.")
     deleted = skipped = 0

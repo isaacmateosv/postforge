@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 import pmlib
 import file_lock
+import operation_guard
 
 STATUS_PART_SECONDS = 60
 QUEUE_FILE = os.path.join(pmlib.RUN_DIR, "whatsapp-pending.json")
@@ -197,16 +198,22 @@ def process(env, dry_run=False):
         for candidate in _read():
             if not _ready(candidate):
                 continue
-            item = _claim(candidate["id"])
-            if item is None:
-                continue
             try:
-                _send_item(item)
-            except Exception as error:
-                _finish(item["id"], status="needs_review", review_reason="delivery_unconfirmed",
-                        review_at=int(time.time()))
-                print("WhatsApp Status %s needs review after an unconfirmed send (%s)."
-                      % (item["id"], type(error).__name__), flush=True)
-            else:
-                _finish(item["id"], status="sent", sent_at=int(time.time()))
+                with operation_guard.maintenance(pmlib.ROOT):
+                    item = _claim(candidate["id"])
+                    if item is None:
+                        continue
+                    try:
+                        _send_item(item)
+                    except Exception as error:
+                        _finish(item["id"], status="needs_review", review_reason="delivery_unconfirmed",
+                                review_at=int(time.time()))
+                        print("WhatsApp Status %s needs review after an unconfirmed send (%s)."
+                              % (item["id"], type(error).__name__), flush=True)
+                    else:
+                        _finish(item["id"], status="sent", sent_at=int(time.time()))
+            except ValueError:
+                # A maintenance lease was acquired first. Leave this approved
+                # item pending, with no attempt recorded, for the next worker tick.
+                continue
     return [item for item in _read() if item.get("status") == "pending"]

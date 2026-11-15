@@ -32,7 +32,7 @@ fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["preferences", "preferences_save", "requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "backup_recent", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
@@ -70,6 +70,12 @@ fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result
 }
 
 #[tauri::command]
+fn copy_review_text(app:tauri::AppHandle,value:String)->Result<(),String> {
+    if value.trim().is_empty() || value.len()>20000 {return Err("Choose a reviewed caption to copy. / Elige un texto revisado para copiar.".into());}
+    app.clipboard().write_text(value).map_err(|_|"Could not copy the caption. Try again. / No se pudo copiar el texto. Vuelve a intentar.".into())
+}
+
+#[tauri::command]
 fn copy_public_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     let parsed=tauri::Url::parse(&url).map_err(|_|"Invalid link. / Enlace inválido.")?;
     if url.len()>2048 || url.chars().any(|c|c.is_control() || c.is_whitespace()) || parsed.scheme()!="https" || parsed.host_str().is_none()
@@ -96,7 +102,7 @@ async fn engine(app:tauri::AppHandle, state: tauri::State<'_, Workspace>, operat
     }
     let issue=app.state::<StartupIssue>().0.lock().map_err(|_|"Setup is busy.")?.clone();
     if let Some(message)=issue {
-        if operation=="requirements" {return Ok(serde_json::json!({"items":[{"name":"Python 3.9+ / local runtime","key":"python","installed":false,"ready":false,"url":"https://www.python.org/downloads/macos/"}],"ready_for_inspection":false,"ready_for_restore":false,"configured":false,"runtime_error":message}));}
+        if operation=="requirements" {return Ok(serde_json::json!({"items":[{"name":"Python 3.9+ / local runtime","key":"python","installed":false,"ready":false,"url":requirement_url("python").unwrap()}],"ready_for_inspection":false,"ready_for_restore":false,"configured":false,"runtime_error":message}));}
         return Err(message);
     }
     tauri::async_runtime::spawn_blocking(move || run_engine(root, operation, payload))
@@ -247,17 +253,21 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     Err("The verified update was downloaded and its folder opened. Close PostForge, then replace it with the new build. / Se descargó la actualización verificada y se abrió su carpeta. Cierra PostForge y reemplázalo con la nueva versión.".into())
 }
 
+fn requirement_url(key:&str) -> Option<&'static str> {
+    match key {
+        "python"=>Some(if cfg!(target_os="windows") {"https://www.python.org/downloads/windows/"} else if cfg!(target_os="macos") {"https://www.python.org/downloads/macos/"} else {"https://www.python.org/downloads/"}),
+        "docker"=>Some(if cfg!(target_os="windows") {"https://docs.docker.com/desktop/setup/install/windows-install/"} else if cfg!(target_os="macos") {"https://docs.docker.com/desktop/setup/install/mac-install/"} else {"https://docs.docker.com/engine/install/"}),
+        "ffmpeg"=>Some("https://ffmpeg.org/download.html"),
+        "ollama"=>Some(if cfg!(target_os="windows") {"https://ollama.com/download/windows"} else if cfg!(target_os="macos") {"https://ollama.com/download/mac"} else {"https://ollama.com/download/linux"}),
+        "openssl"=>Some("https://www.openssl.org/"),
+        _=>None,
+    }
+}
+
 #[tauri::command]
 async fn open_requirement(app:tauri::AppHandle,key:String)->Result<(),String> {
     use tauri_plugin_opener::OpenerExt;
-    let url=match key.as_str() {
-        "python"=>"https://www.python.org/downloads/macos/",
-        "docker"=>"https://docs.docker.com/desktop/setup/install/mac-install/",
-        "ffmpeg"=>"https://ffmpeg.org/download.html",
-        "ollama"=>"https://ollama.com/download/mac",
-        "openssl"=>"https://www.openssl.org/",
-        _=>return Err("Unknown requirement.".into()),
-    };
+    let url=requirement_url(&key).ok_or("Unknown requirement.")?;
     app.opener().open_url(url,None::<&str>).map_err(|_|"Could not open the official download page.".into())
 }
 
@@ -295,9 +305,8 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let fallback = std::env::var("POSTFORGE_PROJECT_DIR").map(PathBuf::from).unwrap_or_else(|_| {
-                app.path().home_dir().unwrap_or_default().join("postforge")
-            });
+            let explicit=std::env::var("POSTFORGE_PROJECT_DIR").ok().map(PathBuf::from);
+            let fallback=app.path().home_dir().unwrap_or_default().join("postforge");
             let fallback = if valid_workspace(&fallback) { fallback } else {
                 let installed = PathBuf::from("/usr/local/share/postforge");
                 if valid_workspace(&installed) { installed } else { fallback }
@@ -305,8 +314,8 @@ fn main() {
             let saved = app.path().app_config_dir().ok()
                 .and_then(|directory| std::fs::read_to_string(directory.join("workspace")).ok())
                 .map(PathBuf::from).filter(|path| valid_workspace(path));
-            let mut root=saved.unwrap_or(fallback);
-            if !valid_workspace(&root) {root=app.path().app_data_dir()?.join("installation");}
+            let mut root=explicit.clone().or(saved).unwrap_or(fallback);
+            if explicit.is_none() && !valid_workspace(&root) {root=app.path().app_data_dir()?.join("installation");}
             let mut startup_issue=None;
             if let Some(runtime)=app.path().resource_dir().ok().map(|p|p.join("Runtime")).filter(|p|p.is_dir()).or_else(||std::env::current_exe().ok().and_then(|p|p.parent().map(|p|p.join("Runtime"))).filter(|p|p.is_dir())) {
                 // Bootstrap a fresh host, or finish an upgrade initiated by an older client.
@@ -338,7 +347,7 @@ fn main() {
 
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
-        .invoke_handler(tauri::generate_handler![open_requirement, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
+        .invoke_handler(tauri::generate_handler![open_requirement, copy_review_text, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
         .build(tauri::generate_context!())
         .expect("PostForge desktop could not start")
         .run(|app,event| {

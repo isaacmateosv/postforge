@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timezone
 
 import file_lock
+import operation_guard
 import plan_post
 import pmlib
 
@@ -156,7 +157,7 @@ def issue_ticket(data, result, family, expected):
 
 def revise(env, identifier, edited=None, youtube_title=None, regenerate_title=False, post_at=None):
     ticket = load_ticket(identifier)
-    with file_lock.exclusive(str(path_for(ticket["family"])) + ".lock"):
+    with file_lock.exclusive(str(path_for(ticket["family"])) + ".lock"), operation_guard.maintenance(pmlib.ROOT):
         state = json.loads(path_for(ticket["family"]).read_text())
         if state["state"] != "review":
             raise pmlib.PMError("This plan has already been submitted. Check the calendar.")
@@ -198,7 +199,7 @@ def submit(env, identifier, mode):
         raise pmlib.PMError("Choose drafts or direct scheduling.")
     ticket = load_ticket(identifier)
     family_path = path_for(ticket["family"])
-    with file_lock.exclusive(str(Path(pmlib.RUN_DIR) / "tunnel-url.lock")), file_lock.exclusive(str(family_path) + ".lock"):
+    with file_lock.exclusive(str(Path(pmlib.RUN_DIR) / "tunnel-url.lock")), file_lock.exclusive(str(family_path) + ".lock"), operation_guard.maintenance(pmlib.ROOT):
         state = json.loads(family_path.read_text())
         if state["state"] == "completed":
             return dict(state["receipt"], already_submitted=True)

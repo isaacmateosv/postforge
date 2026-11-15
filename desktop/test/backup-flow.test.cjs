@@ -19,7 +19,7 @@ function fixture({failure=false}={}) {
     }};
   const source=fs.readFileSync(path.join(__dirname,'../ui/app.js'),'utf8');
   vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function backupSetMode('),source.indexOf('if (window.__TAURI__?.event) {',source.indexOf('function backupSetMode('))),context);
-  return {...context,handlers,calls,focus};
+  return {...context,handlers,calls,focus,setEngine:fn=>{context.engine=fn;}};
 }
 test('Restore opens a file workflow and clears misleading export success',()=>{
   const f=fixture();f.$('backup-stage').textContent='Complete';f.$('backup-result').textContent='Old backup';f.state.backupPath='/old/folder';
@@ -57,4 +57,21 @@ test('export uses a folder, moves Enter to confirmation and ignores repeated sub
 test('restore cannot start before inspection and the old-host confirmation',async()=>{
   const f=fixture();f.backupSetMode('inspect');f.state.backupPath='/private/test.pfbackup';f.$('backup-password').value='test passphrase';
   await f.backupRun('restore');assert.equal(f.calls.length,0);assert.match(f.$('backup-stage').textContent,/previous host/);
+});
+
+test('temporary progress failures retry reads without creating another backup task',async()=>{
+  const f=fixture();let polls=0,starts=0;f.setEngine(async(op)=>{if(op==='backup_start'){starts++;return{id:'a'.repeat(32)};}if(++polls<3)throw Error('Temporary bridge failure');return{state:'done',result:{fingerprint:'b'.repeat(64),rows:1,media_files:0}};});
+  f.backupSetMode('inspect');f.state.backupPath='/private/example.pfbackup';f.$('backup-password').value='test passphrase';await f.backupRun('inspect');
+  assert.equal(starts,1);assert.equal(polls,3);assert.equal(f.state.backupJob,null);assert.equal(f.$('backup-restore').hidden,false);
+});
+test('lost progress keeps the original task resumable and prevents a duplicate start',async()=>{
+  const f=fixture();let starts=0,offline=true;f.setEngine(async(op)=>{if(op==='backup_start'){starts++;return{id:'a'.repeat(32)};}if(offline)throw Error('Bridge offline');return{state:'done',result:{fingerprint:'b'.repeat(64),rows:1,media_files:0}};});
+  f.backupSetMode('inspect');f.state.backupPath='/private/example.pfbackup';f.$('backup-password').value='test passphrase';await f.backupRun('inspect');
+  assert.equal(f.$('backup-resume').hidden,false);assert.equal(f.$('backup-start').disabled,true);await f.backupRun('inspect');assert.equal(starts,1);
+  offline=false;await f.handlers['backup-resume']();assert.equal(starts,1);assert.equal(f.state.backupJob,null);assert.equal(f.$('backup-restore').hidden,false);
+});
+test('reopening finds an existing background task and resumes only its progress',async()=>{
+  const f=fixture();f.setEngine(async(op)=>op==='backup_recent'?{task:{id:'a'.repeat(32),action:'inspect'}}:{state:'done',result:{file:'/private/source.pfbackup',fingerprint:'b'.repeat(64),rows:1,media_files:0}});
+  await f.backupOpen('export');assert.equal(f.$('backup-mode').value,'inspect');assert.equal(f.$('backup-start').disabled,true);assert.equal(f.$('backup-resume').hidden,false);
+  await f.handlers['backup-resume']();assert.equal(f.state.backupPath,'/private/source.pfbackup');assert.equal(f.$('backup-restore').hidden,false);assert.equal(f.$('backup-old-host').checked,false);
 });

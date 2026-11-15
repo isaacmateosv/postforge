@@ -67,7 +67,7 @@ class RuntimeTests(unittest.TestCase):
             folder=Path(tmp).resolve();package=self.fixture(folder);target=folder/'fresh'
             original=Path(__file__).parent
             manifest=json.loads((package/runtime.MANIFEST).read_text())
-            for name in ('scripts/runtime_install.py','scripts/desktop_updates.py','scripts/lib/file_lock.py'):
+            for name in ('scripts/runtime_install.py','scripts/desktop_updates.py','scripts/lib/file_lock.py','scripts/lib/pmlib.py','scripts/lib/operation_guard.py'):
                 source=original/name.removeprefix('scripts/')
                 destination=package/name;destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(source.read_bytes())
                 manifest['files'][name]={'sha256':runtime.digest(destination),'mode':0o644}

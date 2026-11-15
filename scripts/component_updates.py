@@ -95,10 +95,12 @@ def check():
         results = list(pool.map(image_status, declared))
     updates = [{'name': image, 'kind': 'docker'} for image, state in results if state == 'changed']
     unknown = [image for image, state in results if state == 'unknown']
+    evolution_result=evolution.result()
+    evolution_expected=any(image.startswith('evoapicloud/evolution-api') for image in declared)
     return {'updates_available': bool(updates), 'components': updates,
             'docker_stack': 'Declared tags only; major-version changes require a new release.',
-            'unchecked_images': unknown, 'check_complete': bool(images) and not unknown,
-            'evolution': evolution.result()}
+            'unchecked_images': unknown, 'check_complete': bool(images) and not unknown and (not evolution_expected or evolution_result is not None),
+            'evolution': evolution_result}
 
 
 if __name__ == '__main__':

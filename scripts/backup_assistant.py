@@ -22,6 +22,7 @@ import file_lock
 import postiz_transfer as transfer
 import credentials
 import telegram_settings
+import operation_guard
 from gateway_backup import keys
 
 MAGIC=b'PostForge private migration v1\n'
@@ -210,10 +211,21 @@ def status(identifier):
     return result
 
 
+def recent():
+    """Expose only an in-flight task reference, never its passphrase or request."""
+    for path in sorted(JOBS.glob('*.json'),key=lambda item:item.stat().st_mtime,reverse=True):
+        if not re.fullmatch(r'[a-f0-9]{32}',path.stem):continue
+        try:item=status(path.stem)
+        except (OSError,ValueError):continue
+        if item.get('state')=='running':
+            return {'task':{key:item.get(key) for key in ('action',)}|{'id':path.stem}}
+    return {'task':None}
+
+
 def worker(identifier):
     payload=json.loads(sys.stdin.buffer.read(1048576));password=payload.pop('password')
     try:
-        with file_lock.exclusive(str(JOBS/'worker.lock'),blocking=False):
+        with file_lock.exclusive(str(JOBS/'worker.lock'),blocking=False), operation_guard.maintenance(ROOT):
             write_status(identifier,pid=os.getpid())
             progress=lambda message,percent:write_status(identifier,stage=message,percent=percent)
             if payload['action']=='export':result=create_bundle(payload['folder'],password,progress)

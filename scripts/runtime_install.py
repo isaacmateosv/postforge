@@ -16,6 +16,7 @@ import tempfile
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parent/'lib'))
 import file_lock
+import operation_guard
 
 ROOT_FILES={'VERSION','.env.example','docker-compose.yml','postforge.sh','publish-machine.sh','install.sh','LICENSE','COPYRIGHT','NOTICE.md','README.md','SETUP.md','ROLLBACK.md'}
 PREFIXES=('scripts/','v2/','patches/','config/','docs/help/')
@@ -72,10 +73,8 @@ def apply(source,target,refresh=False,only_newer=False):
     target.mkdir(parents=True,exist_ok=True,mode=0o700)
     run=target/'run';run.mkdir(mode=0o700,exist_ok=True)
     if run.is_symlink():raise ValueError('Runtime state must be a regular directory.')
-    with file_lock.exclusive(str(run/'runtime-install.lock'),blocking=False):
-        pending=run/'whatsapp-pending.json'
-        if refresh and pending.exists() and any(row.get('status')=='sending' for row in json.loads(pending.read_text())):
-            raise ValueError('Wait for WhatsApp delivery to finish before updating. / Espera a que termine el envío de WhatsApp antes de actualizar.')
+    with file_lock.exclusive(str(run/'runtime-install.lock'),blocking=False), operation_guard.maintenance(target):
+        if refresh:operation_guard.assert_idle(target)
         recovery=run/('runtime-recovery-'+secrets.token_hex(8));recovery.mkdir(mode=0o700)
         replaced=[];created=[]
         try:

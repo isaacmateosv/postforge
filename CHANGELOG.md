@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-rc.46]
+
+- Audit the active Rust workflow, backup recovery, update safety, non-secret defaults and cross-platform requirements; see the feature audit ledger for validation and remaining acceptance checks.
+- Serialize backup, runtime/service changes and publishing work through a shared maintenance lease. Recover detached backup progress without starting a duplicate task.
+- Restore history-retention and advanced caption defaults in the window and tray; preserve existing reviews and queued audience choices.
+- Distinguish TikTok Inbox handoff from publishing, keep its completion screen visible and provide caption copy. Correct stale cover/time/media and network-response behavior.
+- Improve business-neutral emoji handling and local generated-caption review, and repair current Rust macOS uninstall targets without deleting source checkouts.
+
 ## [2.0.0-rc.45]
 
 - Separate everyday Postiz access, changed-link recovery and social-account reconnection, with a state-specific next action in English and Ecuadorian Spanish.

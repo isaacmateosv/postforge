@@ -46,6 +46,8 @@ manage_posts = module("manage_posts", "manage_posts.py")
 
 class Operations(unittest.TestCase):
     def setUp(self):
+        lease=patch.object(plan_post.operation_guard,"maintenance",return_value=contextlib.nullcontext());lease.start();self.addCleanup(lease.stop)
+        log=patch.object(pmlib,"append_log");log.start();self.addCleanup(log.stop)
         # Synthetic planner fixtures have no real video to probe. Real-file
         # orientation is exercised separately by test_media_preview.py.
         orientation=patch.object(pmlib,'display_dimensions',side_effect=lambda path,width,height:(width,height))
@@ -307,10 +309,28 @@ class Operations(unittest.TestCase):
         with patch.object(pmlib, "http", side_effect=[
             (200, {"response": "Galletas para compartir."}),
             (200, {"response": "Galletas para compartir.\n\n#Galletas #Antojo"}),
+            (200, {"response": json.dumps({"caption":"Galletas para compartir.\n\n#Galletas #Antojo"})}),
         ]) as generate:
             caption, _, _ = create_draft.ollama_caption({}, "galletas", "Spanish")
-        self.assertEqual(generate.call_count, 2)
+        self.assertEqual(generate.call_count, 3)
         self.assertTrue(pmlib.apply_final_tag(caption, "#MiNegocio").endswith("#Galletas #Antojo #MiNegocio"))
+
+    def test_caption_editing_pass_uses_source_and_rejects_unusable_review(self):
+        reviewed='Revisamos batería y teclado de tu laptop. 🔌⌨️\n\n#ReparacionLaptop #BateriaYTeclado'
+        with patch.object(pmlib,'http',return_value=(200,{'response':json.dumps({'caption':reviewed})})) as call:
+            result,_=create_draft.review_caption({},'Tu Lenovo. #Lenovo #Tecnologia','Revisión de batería y teclado de laptops.','Spanish')
+        self.assertNotIn('Lenovo',result)
+        self.assertIn('SOURCE',call.call_args.kwargs['body']['prompt'])
+        self.assertEqual(call.call_args.kwargs['body']['keep_alive'],0)
+        with patch.object(pmlib,'http',return_value=(200,{'response':'not valid review JSON'})):
+            with self.assertRaises(pmlib.PMError):create_draft.review_caption({},'Draft','Source','Spanish')
+
+    def test_generated_named_details_and_numeric_claims_must_come_from_source(self):
+        source='Servicio de reparación de laptops. Revisión de batería y teclado.'
+        self.assertEqual(create_draft.unsupported_details('Teclado. #TecladoLenovo #LaptopEcuador',source),['Lenovo','Ecuador'])
+        self.assertEqual(create_draft.unsupported_details('Revisión HP. #HP #Reparacion','Revisión HP'),[])
+        self.assertEqual(create_draft.unsupported_details('Envío en 24 horas.',source),['24'])
+        self.assertEqual(create_draft.unsupported_details('Shipping and pineapple.',source),[])
 
     def test_caption_intent_distinguishes_brief_from_exact_text(self):
         instruction = 'post everywhere today at 6:40 pm; escribe sobre una torta para “Liga Deportiva Universitaria”'
@@ -321,7 +341,7 @@ class Operations(unittest.TestCase):
         _, exact, idea = plan_post.split_instruction('Instagram hoy 6pm; texto: “Frutillas y chantilly 🍓”')
         self.assertEqual(exact, "Frutillas y chantilly 🍓")
         self.assertIsNone(idea)
-        self.assertEqual(create_draft.fitting_emojis("Una torta 🎂", "torta de frutillas"), "Una torta 🍓")
+        self.assertEqual(create_draft.fitting_emojis("Una torta 🎂", "torta de frutillas"), "Una torta 🎂")
         self.assertEqual(create_draft.finish("Torta de frutillas 🍓.", "Spanish", topic="torta de frutillas"),
                          "Torta de frutillas. 🍓")
 
@@ -529,6 +549,12 @@ class Operations(unittest.TestCase):
         with patch.object(updates, 'run', return_value=json.dumps({'tag_name': 'v2.4.0-rc1', 'prerelease': True})):
             self.assertIsNone(updates.evolution_status([updates.EVOLUTION_PIN]))
 
+    def test_missing_evolution_upstream_check_is_not_reported_as_fully_current(self):
+        with patch.object(updates,'run',return_value=updates.EVOLUTION_PIN),patch.object(updates,'image_status',return_value=(updates.EVOLUTION_PIN,'current')),patch.object(updates,'evolution_status',return_value=None):
+            result=updates.check()
+        self.assertFalse(result['check_complete'])
+        self.assertIsNone(result['evolution'])
+
     def test_tunnel_validation_and_rollback(self):
         for url in ("http://example.org", "https://user@example.org", "example.org:443",
                     "example.org/path", "example.org?", "-bad.example.org", "127.0.0.1"):
@@ -595,6 +621,10 @@ class Operations(unittest.TestCase):
             home = root / 'home'
             app = home / 'Applications' / 'PostForge.app'
             app.mkdir(parents=True)
+            import plistlib
+            (app/'Contents').mkdir();(app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.postforge.tray'}))
+            current=home/'Applications/PostForge Desktop.app';(current/'Contents').mkdir(parents=True);(current/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.postforge.desktop'}))
+            system_apps=root/'system-applications';foreign=system_apps/'PostForge Desktop.app';(foreign/'Contents').mkdir(parents=True);(foreign/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'example.foreign.app'}))
             tools = root / 'bin'
             tools.mkdir()
             docker = tools / 'docker'
@@ -604,19 +634,22 @@ class Operations(unittest.TestCase):
             scripts.mkdir(parents=True)
             uninstall = scripts / 'uninstall.sh'
             shutil.copyfile(ROOT / 'uninstall.sh', uninstall)
+            lib=scripts/'lib';lib.mkdir()
+            for name in ('operation_guard.py','file_lock.py','pmlib.py'):shutil.copyfile(ROOT/'lib'/name,lib/name)
+            (scripts/'host_agent.py').write_text('# Disposable no-op agent for uninstall fixture.\n')
             (project / 'docker-compose.yml').touch()
             private_files = [project / '.env', project / 'data' / 'db', project / 'exports' / 'backup']
             for file in private_files:
                 file.parent.mkdir(exist_ok=True)
                 file.write_text('synthetic private data')
-            env = dict(os.environ, HOME=str(home), PATH=str(tools) + os.pathsep + os.environ['PATH'])
+            env = dict(os.environ, HOME=str(home), POSTFORGE_SYSTEM_APPLICATIONS=str(system_apps), PATH=str(tools) + os.pathsep + os.environ['PATH'])
             args = ['/bin/bash', str(uninstall), '--yes', '--keep-app-running']
             failed = subprocess.run(args + ['--purge-data'], env=dict(env, TEST_COMPOSE_OK='no'),
                                     capture_output=True, text=True)
             self.assertNotEqual(failed.returncode, 0)
             self.assertTrue(app.exists())
             subprocess.run(args, env=dict(env, TEST_COMPOSE_OK='yes'), check=True, capture_output=True)
-            self.assertFalse(app.exists())
+            self.assertFalse(app.exists());self.assertFalse(current.exists());self.assertTrue(foreign.exists())
             for file in private_files:
                 self.assertEqual(file.read_text(), 'synthetic private data')
 
@@ -659,6 +692,7 @@ class Operations(unittest.TestCase):
         import whatsapp_pending
         with tempfile.TemporaryDirectory() as folder, \
              patch.object(whatsapp_pending, "QUEUE_FILE", str(Path(folder) / "queue.json")), \
+             patch.object(pmlib,"ROOT",folder), \
              patch.object(whatsapp_pending, "_send_item") as send:
             base = {"status":"pending", "when":"2026-01-01T00:00:00Z"}
             whatsapp_pending._write([
@@ -681,6 +715,7 @@ class Operations(unittest.TestCase):
                 "approval_source": "explicit-whatsapp-command", "when": "2026-01-01T00:00:00Z"}
         with tempfile.TemporaryDirectory() as folder, \
              patch.object(whatsapp_pending, "QUEUE_FILE", str(Path(folder) / "queue.json")), \
+             patch.object(pmlib,"ROOT",folder), \
              patch.object(whatsapp_pending, "_send_item", side_effect=TimeoutError) as send:
             whatsapp_pending._write([item])
             whatsapp_pending.process({})
@@ -714,6 +749,12 @@ class Operations(unittest.TestCase):
         )
         inline = "Start with #Weekend Hikes are more fun outside."
         self.assertEqual(create_draft.split_hashtags(inline), (inline, []))
+
+    def test_caption_emojis_work_for_non_food_businesses_and_keep_clusters_intact(self):
+        self.assertEqual(create_draft.fitting_emojis('New books 📚 and deliveries 🚚', 'new books and delivery service'),'New books 📚 and deliveries 🚚')
+        clusters='Teamwork 👩🏽‍💻 🤝🏽 🇪🇨 ✨'
+        cleaned=create_draft.fitting_emojis(clusters,'technology team in Ecuador')
+        self.assertIn('👩🏽‍💻',cleaned);self.assertIn('🤝🏽',cleaned);self.assertIn('🇪🇨',cleaned);self.assertNotIn('✨',cleaned)
 
     def test_caption_removes_prompt_echo_and_duplicate_cta(self):
         text = 'Pan de yuca recién horneado. Pan de yuca recién horneado. 🍎\nEscribe frases cortas sobre el tema.\nHaz tu pedido por WhatsApp.\n#PanDeYuca #PanDeYuca'

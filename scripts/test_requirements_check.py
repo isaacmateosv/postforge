@@ -14,3 +14,10 @@ class RequirementsTests(unittest.TestCase):
     def test_optional_ollama_does_not_block_restore(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(requirements,'ROOT',Path(tmp)),patch.object(requirements.shutil,'which',side_effect=lambda key:None if key=='ollama' else '/installed/tool'),patch.object(requirements,'command',return_value=True):
             self.assertTrue(requirements.check()['ready_for_restore'])
+
+    def test_download_sources_follow_the_host_platform(self):
+        for system,python,docker,ollama in [('darwin','macos','mac-install','/mac'),('win32','windows','windows-install','/windows'),('linux','downloads/','engine/install','/linux')]:
+            with self.subTest(system=system):
+                source=requirements.sources(system)
+                self.assertIn(python,source['python']);self.assertIn(docker,source['docker']);self.assertTrue(source['ollama'].endswith(ollama))
+                self.assertTrue(all(url.startswith('https://') for url in source.values()))

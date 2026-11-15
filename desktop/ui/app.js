@@ -177,11 +177,12 @@ function renderMedia() {
 async function addMedia() {
   const paths = await invoke("choose_files", { imagesOnly: false });
   if (!paths.length) return;
-  if (state.media.length + paths.length > 10) {
+  const combined=[...new Set([...state.media,...paths])];
+  if (combined.length > 10) {
     notice(text("Choose up to ten files.", "Elige hasta diez archivos."));
     return;
   }
-  state.media = [...new Set([...state.media, ...paths])];
+  state.media = combined;
   invalidate();
   renderMedia();
 }
@@ -408,28 +409,37 @@ async function revise(edited) {
   });
 }
 
+function submissionMessage(plan,mode){
+  const hasStatus=plan.targets?.some(target=>target.network==="whatsapp");
+  const inbox=(plan.notes||[]).some(note=>note.startsWith("TikTok:"));
+  let message=mode==="schedule"?text("Schedule this reviewed plan for the selected time?","¿Programar este plan revisado a la hora elegida?"):text("Create Postiz drafts for later review and approval?","¿Crear borradores en Postiz para revisarlos y aprobarlos después?");
+  if(hasStatus)message+="\n\n"+(mode==="schedule"?text("This also approves WhatsApp Status delivery to the audience saved with this plan.","Esto también aprueba el Estado de WhatsApp para la audiencia guardada con este plan."):text("WhatsApp Status will wait for your separate approval.","El Estado de WhatsApp esperará tu aprobación por separado."));
+  if(inbox)message+="\n\n"+text("TikTok Inbox Upload sends the video to TikTok. You must paste the caption, choose its cover and finish publishing there.","La carga a la bandeja de TikTok envía el video a TikTok. Debes pegar el texto, elegir la portada y terminar de publicar allí.");
+  return message;
+}
+
 async function submit(mode) {
   if (!current() || state.busy) return;
   if ($("review-post-at").value !== new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(current().plan.when_utc)).replace(" ","T")) { if (!await rescheduleReview()) return; }
   const result = current();
   if (!result) return;
-  const prompt = mode === "schedule"
-    ? text("All selected destinations, including WhatsApp Status, will publish at the reviewed time. This also approves delivery to your configured WhatsApp audience.",
-           "Todos los destinos seleccionados, incluido el Estado de WhatsApp, se publicarán a la hora revisada. Esto también aprueba el envío al público de WhatsApp configurado.")
-    : text("Create this plan as Postiz drafts for later approval?", "¿Crear este plan como borradores de Postiz para aprobar después?");
+  const prompt = submissionMessage(result.plan,mode);
   const confirm = mode === "schedule" ? text("Schedule posts", "Programar publicaciones") : labels.create[state.language === "es" ? 1 : 0];
   if (!await modal(text("Confirm this plan", "Confirma este plan"), prompt, confirm)) return;
   await work(text("Submitting the reviewed plan", "Enviando el plan revisado"), async () => {
     state.receipt = await engine("submit", { review_id: result.review_id, mode });
     refreshDashboard(true);
-    $("receipt-title").textContent = mode === "schedule" ? text("Posts scheduled", "Publicaciones programadas") : text("Drafts prepared", "Borradores preparados");
+    $("receipt-title").textContent = mode === "schedule" ? text("Delivery scheduled", "Envío programado") : text("Drafts prepared", "Borradores preparados");
     $("receipt-content").textContent = text("Postiz entries: ", "Elementos de Postiz: ")
       + (state.receipt.drafts || []).filter(item => item.post_id).length
       + (state.receipt.whatsapp_scheduled ? text("\nWhatsApp Status is approved and scheduled.", "\nEl Estado de WhatsApp está aprobado y programado.") : state.receipt.whatsapp_pending_id ? text("\nWhatsApp Status is waiting for separate approval.", "\nEl Estado de WhatsApp espera su aprobación por separado.") : "");
+    const tiktokInbox=(state.receipt.notes||[]).find(note=>note.startsWith("TikTok:"));
+    if(tiktokInbox)$("receipt-content").textContent+="\n\n"+tiktokInbox;
+    $("receipt-tiktok-copy").hidden=!tiktokInbox;
     $("approve-status").hidden = !state.receipt.whatsapp_pending_id || state.receipt.whatsapp_scheduled;
     showPage("receipt");
     $("receipt-title").focus({preventScroll:true});
-    if(mode==="schedule") {$("receipt-return").hidden=false;receiptReturn.start(8);}
+    if(mode==="schedule" && !tiktokInbox) {$("receipt-return").hidden=false;receiptReturn.start(8);}
   });
 }
 
@@ -479,7 +489,10 @@ async function reset(force=false) {
   state.media = [];
   state.cover = null;
   $("cover-second").value = "";
-  invalidate();
+  $("caption-editor").hidden=true;$("copy").hidden=false;
+  if(state.options)$("final-tag").value=state.options.final_tag || "";
+  $("body").style.height="";
+  soon();
   renderMedia();
   showPage("compose");
   notice();
@@ -783,7 +796,7 @@ for (const id of ["post-at", "placement", "final-tag", "cover-second", "youtube-
   $(id).onchange = () => { if (id === "cover-second") { state.cover = null; renderMedia(); } invalidate(); if(id==="youtube-mode")renderYouTubeRoute(); };
 }
 bind("add-media", addMedia);
-bind("clear-media", () => { state.media = []; state.cover = null; invalidate(); renderMedia(); });
+bind("clear-media", () => { state.media = []; state.cover = null; $("cover-second").value=""; invalidate(); renderMedia(); });
 bind("cover-image", async () => {
   const selected = await invoke("choose_files", { imagesOnly: true });
   if (selected.length) { state.cover = selected[0]; $("cover-second").value = ""; invalidate(); renderMedia(); }
@@ -900,8 +913,9 @@ document.addEventListener("keydown", event => {
 if (window.__TAURI__?.event) {
   window.__TAURI__.event.listen("tauri://drag-drop", event => {
     if (state.busy) return;
-    if (state.media.length + event.payload.paths.length > 10) return;
-    state.media = [...new Set([...state.media, ...event.payload.paths])];
+    const combined=[...new Set([...state.media,...event.payload.paths])];
+    if (combined.length > 10) {notice(text("Choose up to ten files.","Elige hasta diez archivos."));return;}
+    state.media = combined;
     invalidate();
     renderMedia();
   });
@@ -932,7 +946,7 @@ engine("telegram_resume").catch(() => {
 // Native tray mirrors the same window workflows, without creating a second app.
 function updateTray() {
   invoke("tray_state", { language:state.language, drafts:state.dashboard?.drafts || 0,
-    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!state.backupBusy)+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length, update:!!state.updateAvailable }).catch(() => {});
+    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!(state.backupBusy || state.backupJob))+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length, update:!!state.updateAvailable }).catch(() => {});
 }
 async function requirementsOpen(automatic=false) {
   try {
@@ -975,7 +989,7 @@ async function checkUpdates(manual=false) {
   const request=manual ? ++updateDialogRequest : 0;
   if(manual) {
     openDialog("updates-dialog");$("updates-feedback").textContent=text("Checking the app and services…","Buscando actualizaciones de la app y los servicios…");
-    $("updates-progress").hidden=false;$("updates-install").hidden=true;$("updates-retry").disabled=true;
+    $("updates-progress").hidden=false;$("updates-install").hidden=true;$("updates-services").hidden=true;$("updates-releases").hidden=true;$("updates-retry").disabled=true;
   }
   try {
     const result=await updateResult(manual);
@@ -985,6 +999,15 @@ async function checkUpdates(manual=false) {
       $("updates-feedback").textContent=text("Desktop installed: ","App instalada: ")+result.installed+"\n"+
         (!result.checked ? text("The check could not finish. Try again.","La consulta no pudo completarse. Vuelve a intentar.") : result.available ? text("Available: ","Disponible: ")+result.latest : text("Your desktop app is up to date.","Tu app está actualizada."))+
         (result.services ? "\n"+text("Services: ","Servicios: ")+((result.services.updates_available || result.services.evolution?.update_available) ? text("updates available.","hay actualizaciones disponibles.") : result.services.check_complete ? text("current.","actualizados.") : text("some checks could not finish.","algunas consultas no pudieron completarse.")) : "");
+      const services=result.services;
+      const serviceUpdate=!!(services?.updates_available || services?.evolution?.update_available);
+      $("updates-services").hidden=!services;$("updates-releases").hidden=!serviceUpdate;
+      if(services){
+        let message=text("Service images are pinned to the versions tested with PostForge. Upstream releases are not installed automatically.","Las imágenes de los servicios están fijadas en versiones probadas con PostForge. Las versiones nuevas de los proveedores no se instalan automáticamente.");
+        if(services.evolution)message+="\nEvolution: "+services.evolution.installed+" → "+services.evolution.latest;
+        if(serviceUpdate)message+="\n"+text("Review a compatible PostForge release before changing service versions.","Revisa una versión compatible de PostForge antes de cambiar las versiones de los servicios.");
+        $("updates-services").textContent=message;
+      }
       $("updates-install").hidden=!result.available;
     }
   } catch(error) {
@@ -996,12 +1019,14 @@ async function checkUpdates(manual=false) {
 }
 async function installAvailableUpdate() {
   if(state.updateInstalling)return;
+  if(state.backupBusy || state.backupJob){$("updates-feedback").textContent=text("Finish backup or migration before installing an update. Resume its progress in Backup & Move.","Termina el respaldo o la migración antes de instalar una actualización. Retoma su progreso en Respaldo y traslado.");return;}
   state.updateInstalling=true;$("updates-install").disabled=true;$("updates-retry").disabled=true;$("updates-progress").hidden=false;
   $("updates-feedback").textContent=text("Downloading and verifying. PostForge will restart and refresh its services. Wait until publishing has finished before updating.","Descargando y verificando. PostForge se reiniciará y actualizará sus servicios. Espera a que termine cualquier publicación antes de actualizar.");
   try {await invoke("install_update");}
   catch(error){$("updates-feedback").textContent=friendlyError(error);}
   finally {state.updateInstalling=false;$("updates-install").disabled=false;$("updates-retry").disabled=false;$("updates-progress").hidden=true;}
 }
+bind("updates-releases",()=>invoke("open_releases"));
 bind("updates-retry",()=>checkUpdates(true));bind("updates-install",installAvailableUpdate);
 bind("updates-close",()=>{$("updates-dialog").close();++updateDialogRequest;});
 $("updates-dialog").addEventListener("cancel",()=>{++updateDialogRequest;});
@@ -1015,7 +1040,7 @@ async function fromSettings(action) {
   return action();
 }
 function backupSetMode(mode) {
-  if (state.backupBusy) return;
+  if (state.backupBusy || state.backupJob) return;
   $("backup-mode").value=mode;
   backupClearInspection();state.backupPath=null;
   ["backup-path","backup-stage","backup-result","backup-password","backup-confirm"].forEach(id=>{$(id).textContent="";if("value" in $(id)) $(id).value="";});
@@ -1027,9 +1052,66 @@ function backupSetMode(mode) {
   $("backup-instructions").textContent=exporting ? text("Choose a folder. The encrypted file includes all retained media, so videos can make it large.","Elige una carpeta. El archivo cifrado incluye todos los archivos conservados; los videos pueden hacerlo grande.") : text("Choose your .pfbackup file and enter its passphrase. Inspecting it does not replace data or stop services. Restore on the destination computer after inspection.","Elige tu archivo .pfbackup e ingresa su contraseña. Revisarlo no reemplaza datos ni detiene servicios. Restáuralo en el equipo de destino después de la revisión.");
   for (const name of ["export","inspect"]) $("backup-"+name+"-mode").setAttribute("aria-pressed",String(name===mode));
 }
-function backupOpen(mode) {
-  if (!state.backupBusy && (mode || !$("backup-instructions").textContent)) backupSetMode(mode || "export");
+async function backupOpen(mode) {
+  if (!state.backupBusy && !state.backupJob && (mode || !$("backup-instructions").textContent)) backupSetMode(mode || "export");
   openDialog("backup-dialog");
+  if(state.backupBusy)return;
+  if(!state.backupJob){
+    try{const recent=await engine("backup_recent");if(recent.task)state.backupJob=recent.task;}
+    catch(error){$("backup-stage").textContent=text("Could not check existing tasks. Check local services before starting another backup.","No se pudieron revisar las tareas existentes. Revisa los servicios locales antes de iniciar otro respaldo.");}
+  }
+  if(state.backupJob){
+    const job=state.backupJob;state.backupPath=job.location || state.backupPath;
+    const exporting=job.action==="export";$("backup-mode").value=exporting?"export":"inspect";
+    $("backup-confirm-row").hidden=!exporting;
+    $("backup-export-mode").setAttribute("aria-pressed",String(exporting));$("backup-inspect-mode").setAttribute("aria-pressed",String(!exporting));
+    $("backup-path").textContent=state.backupPath || "";
+    $("backup-stage").textContent=text("An operation is already running. Resume progress; do not start another one.","Ya hay una operación en curso. Retoma su progreso; no inicies otra.");
+  }
+  backupControls();updateTray();
+}
+function backupControls(){
+  const locked=!!(state.backupBusy || state.backupJob);
+  document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore,#backup-export-mode,#backup-inspect-mode").forEach(node=>node.disabled=locked);
+  $("backup-resume").hidden=!state.backupJob || !!state.backupBusy;
+  $("backup-resume").disabled=!!state.backupBusy;
+}
+function backupComplete(action,data){
+  if(action==="inspect"){
+    if(data.file)state.backupPath=data.file;
+    state.backupInspection=data;
+    $("backup-result").textContent=text("Verified backup","Respaldo verificado")+"\n"+data.rows+text(" database rows · "," registros · ")+data.media_files+text(" media files"," archivos")+"\n"+text("Gateway: ","Acceso seguro: ")+(data.gateway?"✓":"—")+text(" · Telegram: "," · Telegram: ")+(data.telegram?"✓":"—");
+    ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=false);
+    $("backup-old-host").checked=false;$("backup-replace").checked=false;
+    $("backup-stage").textContent=text("Enter the passphrase again when ready to restore.","Ingresa otra vez la contraseña cuando vayas a restaurarlo.");
+  }else if(action==="export"){
+    $("backup-result").textContent=text("Verified encrypted backup saved:\n","Respaldo cifrado y verificado guardado:\n")+data.file+"\nSHA-256: "+data.sha256;
+    $("backup-stage").textContent=text("Complete","Completado");
+  }else{
+    backupClearInspection();$("backup-result").textContent=text("Restored. Services remain stopped. Before starting: verify the public URL, gateway login, channels and schedules. Check WhatsApp linking. Enable Telegram only after the previous host is stopped.","Restaurado. Los servicios siguen detenidos. Antes de iniciarlos, verifica la URL pública, el acceso seguro, los canales y los horarios. Revisa la vinculación de WhatsApp. Activa Telegram solo cuando el equipo anterior esté detenido.")+(data.rollback?"\n"+text("Rollback backup: ","Respaldo de recuperación: ")+data.rollback:"");
+  }
+}
+async function backupObserve(){
+  const job=state.backupJob;if(!job || state.backupBusy)return;
+  state.backupBusy=true;backupControls();updateTray();$("backup-progress").hidden=false;$("backup-stage").dataset.error="false";
+  let failures=0;
+  try{
+    while(true){
+      await new Promise(resolve=>setTimeout(resolve,1000));
+      let result;
+      try{result=await engine("backup_status",{id:job.id});failures=0;}
+      catch(error){
+        if(++failures<3){$("backup-stage").textContent=text("Reconnecting to task progress…","Retomando el progreso de la tarea…");continue;}
+        throw Error(text("Progress could not be refreshed. The task may still be running. Use Resume progress; no second operation was started.","No se pudo actualizar el progreso. La tarea podría seguir en curso. Usa Retomar progreso; no se inició otra operación."));
+      }
+      $("backup-progress").value=result.percent || 0;$("backup-stage").textContent=result.stage?friendlyError(result.stage):"";
+      if(result.state==="running")continue;
+      state.backupJob=null;
+      if(result.state!=="done")throw Error(result.error || text("The task did not finish.","La tarea no terminó."));
+      backupComplete(job.action,result.result);break;
+    }
+  }catch(error){$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
+  finally{state.backupBusy=false;backupControls();updateTray();}
 }
 function backupClearInspection() {
   state.backupInspection=null;
@@ -1040,46 +1122,26 @@ function backupClose() {
   $("backup-password").value="";$("backup-confirm").value="";backupClearInspection();$("backup-dialog").close();
 }
 async function backupRun(action) {
-  if (state.backupBusy) return;
+  if(state.backupBusy)return;
+  if(state.backupJob){$("backup-stage").textContent=text("Resume the existing task before starting another.","Retoma la tarea existente antes de iniciar otra.");backupControls();return;}
   const password=$("backup-password").value;
-  if (!state.backupPath || password.length<12) {$("backup-stage").textContent=text("Choose a location and a passphrase of at least 12 characters.","Elige una ubicación y una contraseña de al menos 12 caracteres.");return;}
-  if (action==="export" && password!==$("backup-confirm").value) {$("backup-stage").textContent=text("Passphrases do not match.","Las contraseñas no coinciden.");return;}
-  const payload={action,password};
-  if (action==="export") payload.folder=state.backupPath;else payload.file=state.backupPath;
-  if (action==="restore") {
-    if (!state.backupInspection || !$("backup-old-host").checked) {$("backup-stage").textContent=text("Confirm that the previous host is stopped.","Confirma que el equipo anterior esté detenido.");return;}
-    if (!await modal(text("Restore local data?","¿Restaurar los datos locales?"),text("Local publishing services will stop. Verify restored channels before starting them again. Telegram stays paused.","Los servicios locales de publicación se detendrán. Verifica los canales restaurados antes de iniciarlos otra vez. Telegram queda en pausa."),text("Restore","Restaurar"))) return;
+  if(!state.backupPath || password.length<12){$("backup-stage").textContent=text("Choose a location and a passphrase of at least 12 characters.","Elige una ubicación y una contraseña de al menos 12 caracteres.");return;}
+  if(action==="export" && password!==$("backup-confirm").value){$("backup-stage").textContent=text("Passphrases do not match.","Las contraseñas no coinciden.");return;}
+  const payload={action,password};if(action==="export")payload.folder=state.backupPath;else payload.file=state.backupPath;
+  if(action==="restore"){
+    if(!state.backupInspection || !$("backup-old-host").checked){$("backup-stage").textContent=text("Confirm that the previous host is stopped.","Confirma que el equipo anterior esté detenido.");return;}
+    if(!await modal(text("Restore local data?","¿Restaurar los datos locales?"),text("Local publishing services will stop. Verify restored channels before starting them again. Telegram stays paused.","Los servicios locales de publicación se detendrán. Verifica los canales restaurados antes de iniciarlos otra vez. Telegram queda en pausa."),text("Restore","Restaurar")))return;
     Object.assign(payload,{confirmed:true,fingerprint:state.backupInspection.fingerprint,replace:$("backup-replace").checked});
   }
-  state.backupBusy=true;updateTray();$("backup-progress").hidden=false;$("backup-progress").value=0;
-  $("backup-stage").dataset.error="false";$("backup-stage").textContent=text("Starting…","Iniciando…");$("backup-result").textContent="";
-  document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore,#backup-export-mode,#backup-inspect-mode").forEach(node=>node.disabled=true);
-  try {
-    const job=await engine("backup_start",payload);
+  state.backupBusy=true;backupControls();updateTray();$("backup-stage").dataset.error="false";$("backup-stage").textContent=text("Starting…","Iniciando…");$("backup-result").textContent="";$("backup-progress").hidden=false;$("backup-progress").value=0;
+  try{
+    const job=await engine("backup_start",payload);state.backupJob={id:job.id,action,location:state.backupPath};
     $("backup-password").value="";$("backup-confirm").value="";
-    let result;
-    do {
-      await new Promise(resolve=>setTimeout(resolve,1000));
-      result=await engine("backup_status",{id:job.id});
-      $("backup-progress").value=result.percent || 0;
-      $("backup-stage").textContent=result.stage ? friendlyError(result.stage) : "";
-    } while (result.state==="running");
-    if (result.state!=="done") throw new Error(result.error);
-    const data=result.result;
-    if (action==="inspect") {
-      state.backupInspection=data;
-      $("backup-result").textContent=text("Verified backup", "Respaldo verificado")+"\n"+data.rows+text(" database rows · "," registros · ")+data.media_files+text(" media files", " archivos")+"\n"+text("Gateway: ","Acceso seguro: ")+(data.gateway ? "✓" : "—")+text(" · Telegram: "," · Telegram: ")+(data.telegram ? "✓" : "—");
-      ["backup-restore","backup-replace-row","backup-old-host-row"].forEach(id=>$(id).hidden=false);
-      $("backup-stage").textContent=text("Enter the passphrase again when ready to restore.","Ingresa otra vez la contraseña cuando vayas a restaurarlo.");
-    } else if (action==="export") {
-      $("backup-result").textContent=text("Verified encrypted backup saved:\n", "Respaldo cifrado y verificado guardado:\n")+data.file+"\nSHA-256: "+data.sha256;
-      $("backup-stage").textContent=text("Complete", "Completado");
-    } else {
-      backupClearInspection();$("backup-result").textContent=text("Restored. Services remain stopped. Before starting: verify the public URL, gateway login, channels and schedules. Check WhatsApp linking. Enable Telegram only after the previous host is stopped.","Restaurado. Los servicios siguen detenidos. Antes de iniciarlos, verifica la URL pública, el acceso seguro, los canales y los horarios. Revisa la vinculación de WhatsApp. Activa Telegram solo cuando el equipo anterior esté detenido.")+(data.rollback ? "\n"+text("Rollback backup: ","Respaldo de recuperación: ")+data.rollback : "");
-    }
-  } catch(error) {$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
-  finally {state.backupBusy=false;updateTray();document.querySelectorAll("#backup-dialog input,#backup-dialog select,#backup-pick,#backup-start,#backup-restore,#backup-export-mode,#backup-inspect-mode").forEach(node=>node.disabled=false);}
+  }catch(error){$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
+  finally{state.backupBusy=false;backupControls();updateTray();}
+  if(state.backupJob)await backupObserve();
 }
+bind("backup-resume",backupObserve);
 bind("backup-open",()=>fromSettings(()=>backupOpen("export")));
 bind("backup-import-open",()=>fromSettings(()=>backupOpen("inspect")));
 bind("backup-export-mode",()=>backupSetMode("export"));
@@ -1116,6 +1178,7 @@ if (window.__TAURI__?.event) {
       else if(action==="updates") await checkUpdates(true);
       else if(action==="network") await networkOpen();
       else if(action==="connections") await connectionsOpen();
+      else if(action==="preferences") await preferencesOpen();
       else if(action==="settings") openDialog("app-settings");
       else if(action==="help") await help();
       else if(action==="about") await modal("PostForge · "+(state.options?.version || ""),text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
@@ -1273,7 +1336,7 @@ async function networkCheck(fill=false){
   $("network-result").textContent=text("Checking public access","Comprobando el acceso público");
   try{const result=await engine("network_status",{force:true});
     if(fill){$("network-provider").value=result.provider;$("network-domain").value=result.custom_domain;$("network-ngrok-domain").value=result.ngrok_domain;$("network-token").value="";networkFields();}
-    renderNetworkStatus(result);return result;
+    return renderNetworkStatus(result)?result:state.network;
   }catch(error){renderNetworkStatus({...state.network,reachable:false,checked_at:Date.now()/1000});$("network-result").textContent=friendlyError(error);return null;}
 }
 async function networkOpen(){state.reconnectNetwork=null;document.querySelectorAll("#network-callbacks [data-network]").forEach(row=>{row.hidden=false;});$("network-advanced").open=false;$("network-reconnect-guide").open=false;$("network-callback-details").open=false;$("network-reconnect-target").textContent="";$("network-copy-feedback").textContent="";$("network-current").title=text("Click to copy link","Haz clic para copiar el enlace");openDialog("network-dialog");await networkCheck(true);}
@@ -1343,6 +1406,11 @@ bind("review-asap", () => {
   rescheduleReview();
 });
 
+bind("receipt-tiktok-copy",async()=>{
+  stopReceiptReturn();
+  try{await invoke("copy_review_text",{value:state.receipt?.caption || current()?.plan.caption || ""});selectionFeedback({state:"ready",message:text("Caption copied. Paste it in TikTok before publishing.","Texto copiado. Pégalo en TikTok antes de publicar.")});}
+  catch(error){selectionFeedback({state:"error",message:friendlyError(error)});}
+});
 bind("receipt-stay",stopReceiptReturn);
 bind("receipt-dashboard",()=>showPage("home"));
 $("receipt").addEventListener("pointerdown",stopReceiptReturn);
@@ -1351,3 +1419,27 @@ $("receipt").addEventListener("keydown",stopReceiptReturn);
 window.addEventListener("blur",()=>receiptReturn.pause());
 window.addEventListener("focus",()=>{if(state.page==="receipt")receiptReturn.resume();});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)receiptReturn.pause();else if(state.page==="receipt" && document.hasFocus())receiptReturn.resume();});
+
+
+async function preferencesOpen(){
+  const request=state.preferencesRequest=(state.preferencesRequest||0)+1;
+  openDialog("preferences-dialog");$("preferences-save").disabled=true;$("preferences-feedback").textContent=text("Loading preferences…","Cargando preferencias…");
+  try{
+    const result=await engine("preferences");if(request!==state.preferencesRequest || !$("preferences-dialog").open)return;state.preferences=result;
+    $("preference-days").value=result.retention_days;$("preference-tag").value=result.final_tag;$("preference-model").value=result.model;
+    $("preference-models").replaceChildren();for(const name of result.models || []){const option=document.createElement("option");option.value=name;$("preference-models").append(option);}
+    $("preference-model-state").textContent=result.model_ready===true?text("✓ Installed model found","✓ Se encontró el modelo instalado"):result.model_ready===false?text("This model was not found in Ollama. Exact words still work; install or choose a model before generating captions.","No se encontró este modelo en Ollama. Puedes conservar tus palabras; instala o elige un modelo antes de generar textos."):text("Ollama could not be checked. Exact words still work.","No se pudo comprobar Ollama. Puedes seguir conservando tus palabras.");
+    $("preferences-feedback").textContent=result.configured?"":text("Configure or restore this installation before saving defaults.","Configura o restaura esta instalación antes de guardar los valores predeterminados.");$("preferences-save").disabled=!result.configured;
+  }catch(error){$("preferences-feedback").textContent=friendlyError(error);}
+}
+bind("preferences-open",()=>fromSettings(preferencesOpen));bind("preferences-close",()=>{$("preferences-dialog").close();state.preferencesRequest=(state.preferencesRequest||0)+1;});
+bind("preferences-save",async()=>{
+  state.preferencesRequest=(state.preferencesRequest||0)+1;
+  $("preferences-save").disabled=true;
+  try{
+    const saved=await engine("preferences_save",{retention_days:Number($("preference-days").value),final_tag:$("preference-tag").value,model:$("preference-model").value.trim()});state.preferences=saved;
+    if(state.options)state.options.final_tag=saved.final_tag;
+    $("preferences-feedback").textContent=text("✓ Defaults saved for new plans. Existing reviews are unchanged. No files were deleted.","✓ Se guardaron los valores para planes nuevos. Las revisiones existentes no cambiaron. No se eliminó ningún archivo.");
+  }catch(error){$("preferences-feedback").textContent=friendlyError(error);}
+  finally{$("preferences-save").disabled=false;}
+});

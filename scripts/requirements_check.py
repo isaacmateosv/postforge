@@ -6,12 +6,15 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parent.parent
-SOURCES={
- 'python':'https://www.python.org/downloads/macos/',
- 'docker':'https://docs.docker.com/desktop/setup/install/mac-install/',
- 'ffmpeg':'https://ffmpeg.org/download.html',
- 'ollama':'https://ollama.com/download/mac',
- 'openssl':'https://www.openssl.org/'}
+def sources(system=None):
+    system=system or sys.platform
+    return {
+      'python':'https://www.python.org/downloads/windows/' if system=='win32' else 'https://www.python.org/downloads/macos/' if system=='darwin' else 'https://www.python.org/downloads/',
+      'docker':'https://docs.docker.com/desktop/setup/install/windows-install/' if system=='win32' else 'https://docs.docker.com/desktop/setup/install/mac-install/' if system=='darwin' else 'https://docs.docker.com/engine/install/',
+      'ffmpeg':'https://ffmpeg.org/download.html',
+      'ollama':'https://ollama.com/download/windows' if system=='win32' else 'https://ollama.com/download/mac' if system=='darwin' else 'https://ollama.com/download/linux',
+      'openssl':'https://www.openssl.org/'}
+
 
 def command(args):
     try:
@@ -28,5 +31,5 @@ def check():
           {'name':'Docker Desktop / Docker Engine + Compose','key':'docker','installed':docker,'ready':bool(engine and compose),'stopped':bool(docker and not engine)},
           {'name':'FFmpeg + ffprobe','key':'ffmpeg','installed':bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),'ready':bool(shutil.which('ffmpeg') and shutil.which('ffprobe'))},
           {'name':'Ollama · optional caption generation','key':'ollama','optional':True,'installed':bool(shutil.which('ollama')),'ready':bool(shutil.which('ollama'))}]
-    for row in rows:row['url']=SOURCES[row['key']]
+    for row in rows:row['url']=sources()[row['key']]
     return {'items':rows,'ready_for_inspection':all(row['ready'] for row in rows[:2]),'ready_for_restore':all(row['ready'] for row in rows[:3]),'ready_for_publish':all(row['ready'] for row in rows[:4]),'configured':(ROOT/'.env').is_file()}

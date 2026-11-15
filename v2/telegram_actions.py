@@ -22,14 +22,22 @@ class Actions:
     def __init__(self, env, call, token, status):
         self.env, self.call, self.token, self.status = env, call, token, status
 
+    def current_env(self):
+        # Live caption defaults do not change bot ownership or session identity.
+        latest=pmlib.load_env()
+        for key in ('LOCAL_LLM_MODEL','CAPTION_FINAL_TAG','PM_RETENTION_DAYS'):
+            if key in latest:self.env[key]=latest[key]
+            else:self.env.pop(key,None)
+        return self.env
+
     def options(self):
-        return composer.options(self.env)
+        return composer.options(self.current_env())
 
     def preview(self, data):
-        return composer.preview(self.env, data)
+        return composer.preview(self.current_env(), data)
 
     def revise(self, identifier, edited=None):
-        return composer.revise(self.env, identifier, edited)
+        return composer.revise(self.current_env(), identifier, edited)
 
     def heartbeat_preferences(self):
         import telegram_settings
@@ -43,7 +51,7 @@ class Actions:
         return self.heartbeat_preferences()["minutes"]
 
     def submit(self, identifier, mode):
-        return composer.submit(self.env, identifier, mode)
+        return composer.submit(self.current_env(), identifier, mode)
 
     def approve_status(self, identifier):
         if not whatsapp_pending.approve(identifier, source="telegram-review"):

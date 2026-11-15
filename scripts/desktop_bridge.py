@@ -17,14 +17,18 @@ import manage_posts
 
 
 def dispatch(operation, payload):
+    if operation in ("preferences","preferences_save"):
+        import preferences
+        return preferences.save(payload) if operation=="preferences_save" else preferences.status()
     if operation=="requirements":
         import requirements_check
         return requirements_check.check()
     if operation in ("media_inspect", "media_frame"):
         import media_preview
         return media_preview.inspect(payload["path"]) if operation=="media_inspect" else media_preview.frame(payload["path"],payload.get("second",0))
-    if operation in ("backup_start", "backup_status"):
+    if operation in ("backup_start", "backup_status", "backup_recent"):
         import backup_assistant
+        if operation=="backup_recent":return backup_assistant.recent()
         return backup_assistant.start(payload) if operation == "backup_start" else backup_assistant.status(payload["id"])
     if operation == "updates":
         import desktop_updates

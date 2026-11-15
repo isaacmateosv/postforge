@@ -20,6 +20,7 @@ const LABELS: &[(&str,&str,&str)] = &[
  ("section-app","App & Support","App y ayuda"),
  ("backup","Backup & Move","Respaldo y traslado"),
  ("updates","Check for Updates","Buscar actualizaciones"),
+ ("preferences","History & Caption Defaults","Historial y ajustes del texto"),
  ("settings","Settings & Recovery","Ajustes y recuperación"),
  ("help","Help","Ayuda"),("about","About PostForge","Acerca de PostForge"),
  ("quit","Quit PostForge (services keep running)","Salir de PostForge (los servicios siguen activos)")

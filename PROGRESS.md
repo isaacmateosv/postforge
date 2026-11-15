@@ -1,5 +1,11 @@
 # PostForge — Work Progress & Resume State
 
+## Overnight feature audit · 2026-11-15 · in progress
+
+Latest published baseline is **v2.0.0-rc.45**, whose release assets and native CI passed in the prior session. The source is now ahead of that release while the overnight audit is underway; do not describe these audit changes as installed or published yet. See [the feature audit ledger](docs/audits/2026-11-15-feature-audit.md) for the checked feature matrix, fixes and remaining work. Current source checks: 175 script, 21 service, 52 JavaScript tests passed. All posting, destructive restore/cleanup/uninstall and concurrency tests use fixtures; no real social content was sent by the audit.
+
+The rc.41 state below is historical evidence, not the current release.
+
 ## Current development state · 2026-11-13
 
 **Final verified release: v2.0.0-rc.41.** Release publication and native macOS/Windows/Linux CI all passed; GitHub contains all three platform ZIPs/checksums plus the Apple Silicon macOS Rust .pkg/checksum. The local app was upgraded through the real in-app Download & install path from rc.40 to rc.41, with backend/service refresh and relaunch. `codesign --verify --deep --strict` passed after launch; no bundled .pyc files were created. Tunnel container identity and private .env/gateway configuration hashes were unchanged. Postiz and WhatsApp recovered; the Telegram host receiver was confirmed running. No publishing jobs were queued or active for the test. Source working tests: 161 Python script, 21 service and 31 JavaScript checks passed. Fresh-host inspection and disposable-database restore rehearsal passed; no live destination data replacement is claimed.
