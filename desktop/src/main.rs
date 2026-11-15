@@ -70,6 +70,9 @@ fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result
 }
 
 #[tauri::command]
+fn app_version() -> &'static str { env!("CARGO_PKG_VERSION") }
+
+#[tauri::command]
 fn copy_review_text(app:tauri::AppHandle,value:String)->Result<(),String> {
     if value.trim().is_empty() || value.len()>20000 {return Err("Choose a reviewed caption to copy. / Elige un texto revisado para copiar.".into());}
     app.clipboard().write_text(value).map_err(|_|"Could not copy the caption. Try again. / No se pudo copiar el texto. Vuelve a intentar.".into())
@@ -358,7 +361,7 @@ fn main() {
 
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
-        .invoke_handler(tauri::generate_handler![open_help_link, open_requirement, copy_review_text, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
+        .invoke_handler(tauri::generate_handler![app_version, open_help_link, open_requirement, copy_review_text, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
         .build(tauri::generate_context!())
         .expect("PostForge desktop could not start")
         .run(|app,event| {

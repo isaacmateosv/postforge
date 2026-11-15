@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.48]
+
+- About reports the running native client version independently of the configured backend and remains available when Postiz is offline. This closes the final installed-versus-source version discrepancy found during native acceptance.
+- Includes the complete rc.46 audit and rc.47 cross-platform validation correction.
+
 ## [2.0.0-rc.47]
 
 - Complete the rc.46 audit release with a Windows-compatible permission assertion: Unix mode bits are checked on Unix; Windows uses its native file-access semantics. All preference content, validation and secret-preservation tests still run on every platform.

@@ -1214,7 +1214,7 @@ if (window.__TAURI__?.event) {
       else if(action==="preferences") await preferencesOpen();
       else if(action==="settings") openDialog("app-settings");
       else if(action==="help") await help();
-      else if(action==="about") await modal("PostForge · "+(state.options?.version || ""),text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
+      else if(action==="about") await showAbout();
     } catch(error) {notice(friendlyError(error));}
   });
   window.__TAURI__.event.listen("postforge-tray-refresh",updateTray);
@@ -1507,3 +1507,8 @@ async function servicesAction(action){
 bind("services-open",()=>fromSettings(servicesOpen));bind("services-recheck",servicesStatus);
 bind("services-start",()=>servicesAction("start"));bind("services-stop",()=>servicesAction("stop"));
 bind("services-network",async()=>{$("services-dialog").close();await networkOpen();});bind("services-close",()=>$("services-dialog").close());
+
+async function showAbout(){
+  const installed=await invoke("app_version");
+  await modal("PostForge · "+installed,text("Idea → local caption → review → drafts or scheduling\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) and contributors.\nFree software · GPL-3.0-or-later","Idea → texto local → revisión → borradores o programación\n\nCopyright © 2026 Isaac Mateo Sarzosa Valencia (isaacmateosv) y colaboradores.\nSoftware libre · GPL-3.0-or-later"),text("Done","Listo"));
+}

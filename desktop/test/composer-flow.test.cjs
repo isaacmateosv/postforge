@@ -15,3 +15,8 @@ test('an open caption edit blocks submission and caption navigation until applie
  load(f,'function updateVersionControls(', 'function navigateVersion(');f.updateVersionControls();for(const id of ['create','schedule','another','previous','next'])assert.equal(f.$(id).disabled,true);
  f.$('caption-editor').hidden=true;f.updateVersionControls();assert.equal(f.$('create').disabled,false);assert.equal(f.$('another').disabled,false);
 });
+
+test('About reports the running app version even when the backend differs or is offline',async()=>{
+ const f=fixture();f.state.options={version:'newer-runtime'};let title;f.invoke=async command=>{assert.equal(command,'app_version');return 'installed-client';};f.modal=async value=>title=value;
+ vm.runInContext(code.slice(code.indexOf('async function showAbout(')),f);await f.showAbout();assert.equal(title,'PostForge · installed-client');f.state.options=null;await f.showAbout();assert.equal(title,'PostForge · installed-client');
+});
