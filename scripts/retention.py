@@ -104,12 +104,12 @@ def candidates(cutoff, whatsapp_only=False):
                                 continue
             continue
         uploads = root.endswith('postiz-uploads')
-        if whatsapp_only:
-            if uploads:
-                root = os.path.join(root, "whatsapp-pending")
-            elif not root.endswith('wa-cache'):
+        if whatsapp_only and not uploads and not root.endswith('wa-cache'):
+            continue
+        scan_roots = [os.path.join(root, name) for name in ("whatsapp-pending", "whatsapp")] if whatsapp_only and uploads else [root]
+        for directory, _, filenames in (entry for scan in scan_roots for entry in os.walk(scan)):
+            if os.path.islink(directory):
                 continue
-        for directory, _, filenames in os.walk(root):
             for name in filenames:
                 path = os.path.join(directory, name)
                 try:
@@ -121,6 +121,13 @@ def candidates(cutoff, whatsapp_only=False):
                     continue
 
 
+def run_cleanup(args):
+    days = args.days if args.days is not None else configured_days()
+    if days < 1:
+        raise ValueError("--days must be at least 1")
+    return clean(args, days)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="delete the listed files")
@@ -129,9 +136,19 @@ def main():
     parser.add_argument("--whatsapp-cache", action="store_true", help="limit cleanup to PostForge-owned WhatsApp staging")
     parser.add_argument("--json", action="store_true", help="print one JSON summary instead of the file list")
     args = parser.parse_args()
-    days = args.days if args.days is not None else configured_days()
-    if days < 1:
-        parser.error("--days must be at least 1")
+    if args.apply:
+        sys.path.insert(0, os.path.join(ROOT, 'scripts', 'lib'))
+        import operation_guard
+        try:
+            with operation_guard.maintenance(ROOT):
+                run_cleanup(args)
+        except ValueError as error:
+            parser.exit(1, str(error) + "\n")
+    else:
+        run_cleanup(args)
+
+
+def clean(args, days):
     cutoff = time.time() - days * 86400
     files = list(candidates(cutoff, whatsapp_only=args.whatsapp_cache))
     size = 0
@@ -152,11 +169,10 @@ def main():
                 if not args.json:
                     print("  could not delete: %s" % exc)
     if args.apply:
-        for root in ROOTS:
-            if args.whatsapp_cache and root.endswith('postiz-uploads'):
-                root = os.path.join(root, 'whatsapp-pending')
-            elif args.whatsapp_cache and root.endswith('logs'):
-                continue
+        sweep_roots = [root for root in ROOTS if not args.whatsapp_cache or root.endswith(('wa-cache', 'wa-confirmations'))]
+        if args.whatsapp_cache:
+            sweep_roots += [os.path.join(root, name) for root in ROOTS if root.endswith('postiz-uploads') for name in ('whatsapp-pending', 'whatsapp')]
+        for root in sweep_roots:
             for directory, subdirectories, _ in os.walk(root, topdown=False):
                 for name in subdirectories:
                     path = os.path.join(directory, name)

@@ -32,3 +32,15 @@ class GuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'run/whatsapp-pending.json';path.parent.mkdir();path.write_text('broken')
             with self.assertRaisesRegex(ValueError,'Could not verify'):guard.assert_idle(folder)
+
+    def test_retention_apply_refuses_competing_maintenance_before_deleting(self):
+        import retention
+        import threading
+        outcome=[]
+        with tempfile.TemporaryDirectory() as folder,patch.object(retention,'ROOT',folder),patch.object(retention,'clean') as clean,patch('sys.argv',['retention','--apply','--json']):
+            def attempt():
+                try:retention.main()
+                except SystemExit as error:outcome.append(error.code)
+            with guard.maintenance(folder):
+                thread=threading.Thread(target=attempt);thread.start();thread.join(5)
+            self.assertFalse(thread.is_alive());self.assertEqual(outcome,[1]);clean.assert_not_called()

@@ -1,3 +1,5 @@
+> Overnight rc.46 audit: source validation passed (185 backend, 21 v2, 59 desktop tests; local Rust build). Package/public release and installed-client acceptance are being completed. Current evidence and known capability gaps: [feature audit](docs/audits/2026-11-15-feature-audit.md). No real posts, live restore, tunnel rotation or user-data cleanup were performed as audit tests.
+
 # PostForge — Work Progress & Resume State
 
 ## Overnight feature audit · 2026-11-15 · in progress

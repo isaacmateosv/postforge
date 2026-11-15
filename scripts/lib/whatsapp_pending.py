@@ -194,6 +194,8 @@ def recover_interrupted():
 
 
 def process(env, dry_run=False):
+    if any(os.path.isfile(os.path.join(pmlib.RUN_DIR,name)) for name in ('publishing-paused','idle-stop')):
+        return [item for item in _read() if item.get('status')=='pending']
     if not dry_run:
         for candidate in _read():
             if not _ready(candidate):

@@ -84,3 +84,31 @@ Google’s current [thumbnail API reference](https://developers.google.com/youtu
 Checkpoint: source version is now **rc.46 (unreleased)**. Latest complete source checks: **178 Python script, 21 service, 52 JavaScript** tests, plus static recheck. The actual local repair-service caption completed in 6.12 seconds without an invented named brand; Ollama `/api/ps` reported zero loaded models afterward. No social post was submitted. The installed app is still rc.41; final publication/install/acceptance checks remain pending.
 
 The native developer override now takes precedence over saved recovered-workspace settings, allowing isolated UI acceptance against a disposable installation. Validate that route in the upcoming full UI pass. New public modules must be tracked before packaging because the Runtime manifest uses Git's tracked-file allowlist.
+
+## Final source validation · rc.46
+
+- 185 backend tests, 21 v2 service/Telegram tests and 59 JavaScript tests passed. Rust release build completed locally in 49 seconds. Static syntax/version/private-file checks pass; final package and GitHub validation follow below.
+- New service controls are wired through the actual Rust → Python bridge. Tests cover disabled profiles, preserved connector identity, queued-work refusal, explicit confirmation, pause markers and visible failures. Live read-only status verified Docker, Postiz and Evolution running with an empty queue. No start/stop was performed on the live stack as a test.
+- Fixed a full-interface finding: unapplied caption edits no longer allow submission or version navigation. The editor has an accessible label and Apply/Cancel guidance. Cancelling restores submission; manual exact words remain distinct from generation.
+- Broadened automatic WhatsApp staging retention to both owned upload folders. Applying cleanup shares the maintenance lease; a competing maintenance operation refuses deletion before scanning. Referenced Postiz uploads and pending plans remain protected. No user media was deleted in this audit.
+- Offline help renders tables, strong text, inline/code blocks and safe official reference links with DOM nodes, without interpreting HTML. Documentation is consolidated around the current Rust workflow instead of appending contradictory Swift instructions.
+- Complete UI assets were exercised against synthetic bridge data in the local browser: exact-caption → delivery → review, caption-only variants preserving metadata, manual-edit safeguards, Settings, EN/es-EC, preferences, service controls and offline Help. At 1024×700 and 820×600, primary actions stayed visible and body width did not overflow. The preview deliberately rejects publication and contains no private installation files.
+- Live read-only overview confirmed connected WhatsApp, running Telegram, Postiz online, zero drafts/queue and no Status sends. This is operational reachability, not a new social publication test.
+
+## Coverage and limits after review
+
+| Feature | Acceptance evidence | Remaining external check |
+|---|---|---|
+| Requirements / runtime / PKG | Bootstrap and dependency regression suites; official platform links | Fresh physical Windows/Linux setup |
+| Composer / exact text / caption versions | Backend replay/metadata tests, complete synthetic UI, editor and reset checks | User preference for generated copy; facts still human-reviewed |
+| Media / covers / formats | Probe/orientation/splitting/signed-media tests and existing provider adapters | Final cover rendering and per-platform media acceptance |
+| Scheduling / retries / cleanup | Reviewed-family idempotency, held uncertain sends, preview/confirmation tests | Actual provider delivery; no real posts submitted here |
+| WhatsApp | QR/session/audience, callback safety, two-part/uncertain-send and receipt tests | Client-specific buttons and actual views beyond earlier user tests |
+| Telegram | Owner-only callbacks, group rejection, migration hold, heartbeat settings tests | Real BotFather/account setup for a different installation |
+| Public URL / account renewal | Provider rollback/callback/race tests and prior contextual-guide UI | Owned-domain DNS and future provider-console changes |
+| Backup / restore | Encryption/authentication, request privacy, inspection/confirmation, detached progress/recovery tests | Physical destination + representative large backup; no live restore here |
+| Updates / components | Channel/platform/digest/runtime tests; active-work guard | Package installation and final CI recorded below |
+| Retention / uninstall | Referenced-media fail-closed tests, competing lease, disposable uninstall fixtures | No real machine uninstall/purge performed |
+| Desktop / tray / help | Native build, standard template icon/sections, local responsive/EN/es-EC check | Final native reopen/help/update acceptance below |
+
+Known capability gaps are now explicit in README/SETUP/help: no full fresh-business UI wizard; no Rust automatic OS wake/one-hour idle shutdown; dedicated legacy Siri shortcut integration not ported; no authorized Telegram groups; no portable GUI uninstaller; Windows/Linux in-place update remains a verified manual swap; Mac artifacts are ad-hoc signed, not notarized. These are not represented as working features. OS Open App shortcuts remain available. Release 2 is still a release candidate.

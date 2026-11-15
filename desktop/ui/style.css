@@ -250,3 +250,10 @@ header,footer,main,nav,#baking-visual { max-width:1280px; }
 .network-footer { gap:10px; }
 .connection-row > button { grid-column:1/-1; justify-self:start; margin-top:8px; }
 #connection-summary { font-size:13px; line-height:1.65; margin-bottom:18px; }
+
+.help-document .help-link { display:inline; border:0; background:transparent; color:#a7cbff; padding:0; text-align:inherit; font:inherit; text-decoration:underline; text-underline-offset:3px; }
+.help-document code { font-size:.9em; background:var(--field); padding:2px 5px; border-radius:4px; }
+.help-table { max-width:100%; overflow-x:auto; margin:18px 0; }
+.help-table table { width:100%; border-collapse:collapse; }
+.help-table th,.help-table td { padding:12px 14px; border:1px solid var(--border); text-align:left; vertical-align:top; }
+.help-table th { background:var(--field); }

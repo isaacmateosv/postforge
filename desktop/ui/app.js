@@ -332,12 +332,15 @@ function reviewNeedsNetworkRefresh(plan,network) {
   return !!(plan?.public_origin && network?.url && plan.public_origin!==network.url);
 }
 function updateVersionControls() {
-  $("previous").disabled = state.busy || state.selected <= 0;
-  $("next").disabled = state.busy || state.selected >= state.history.length - 1;
+  const editing=!$("caption-editor").hidden;
+  $("another").disabled=state.busy || editing;
+  $("edit-caption").disabled=state.busy || editing;
+  $("previous").disabled = state.busy || editing || state.selected <= 0;
+  $("next").disabled = state.busy || editing || state.selected >= state.history.length - 1;
   $("version").textContent = (state.selected + 1) + text(" of ", " de ") + state.history.length;
   const stale=reviewNeedsNetworkRefresh(current()?.plan,state.network) || !!state.network?.needs_sync;
-  $("schedule").disabled = state.busy || stale || !current()?.plan.direct_schedule_available;
-  $("create").disabled = state.busy || stale || state.selected < 0;
+  $("schedule").disabled = state.busy || editing || stale || !current()?.plan.direct_schedule_available;
+  $("create").disabled = state.busy || editing || stale || state.selected < 0;
 }
 
 function navigateVersion(offset) {
@@ -420,6 +423,7 @@ function submissionMessage(plan,mode){
 
 async function submit(mode) {
   if (!current() || state.busy) return;
+  if (!$("caption-editor").hidden) { notice(text("Apply or cancel your caption edit before continuing.","Aplica o cancela la edición del texto antes de continuar.")); return; }
   if ($("review-post-at").value !== new Intl.DateTimeFormat("sv-SE", {timeZone:state.options.timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(current().plan.when_utc)).replace(" ","T")) { if (!await rescheduleReview()) return; }
   const result = current();
   if (!result) return;
@@ -712,38 +716,65 @@ function renderHelpDocument(markdown) {
   let pre = null;
   let paragraph = [];
   let list = null;
-  const clean = value => value.replace(/\*\*/g, "").replace(/`([^`]+)`/g, "$1");
+  const inline = (element,value) => {
+    const pattern=/\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g;
+    let start=0,match;
+    while((match=pattern.exec(value))){
+      if(match.index>start)element.append(document.createTextNode(value.slice(start,match.index)));
+      const label=match[1]||match[2]||match[3];
+      if(match[1]||match[2]){const part=document.createElement(match[1]?"strong":"code");part.textContent=label;element.append(part);}
+      else {
+        let url;try{url=new URL(match[4],"https://github.com/isaacmateosv/postforge/blob/main/docs/help/");}catch(_){}
+        const hosts=["github.com","developers.cloudflare.com","developers.google.com","developers.tiktok.com","docs.postiz.com","support.google.com"];
+        if(url && url.protocol==="https:" && !url.username && !url.password && hosts.includes(url.hostname)){
+          const link=document.createElement("button");link.className="help-link";link.textContent=label;link.type="button";
+          link.addEventListener("click",async()=>{try{await invoke("open_help_link",{url:url.href});}catch(error){$("help-feedback").textContent=friendlyError(error);}});element.append(link);
+        }else element.append(document.createTextNode(label));
+      }
+      start=pattern.lastIndex;
+    }
+    if(start<value.length)element.append(document.createTextNode(value.slice(start)));
+  };
   const flush = () => {
     if (paragraph.length) {
       const element = document.createElement("p");
-      element.textContent = clean(paragraph.join(" "));
+      inline(element,paragraph.join(" "));
       content.append(element);
       paragraph = [];
     }
   };
-  for (const line of markdown.split("\n")) {
+  const lines=markdown.split("\n");
+  for (let index=0;index<lines.length;index++) {
+    const line=lines[index];
     if (line.startsWith(String.fromCharCode(96).repeat(3))) {
       flush(); list = null; code = !code;
       if (code) { pre = document.createElement("pre"); content.append(pre); }
       continue;
     }
     if (code) { pre.textContent += line + "\n"; continue; }
+    if(line.trim().startsWith("|") && /^\s*\|?\s*:?-{3,}/.test(lines[index+1]||"")){
+      flush();list=null;const table=document.createElement("table"),head=document.createElement("thead"),body=document.createElement("tbody");
+      const row=(source,header)=>{const tr=document.createElement("tr");for(const cell of source.trim().replace(/^\||\|$/g,"").split("|")){const td=document.createElement(header?"th":"td");inline(td,cell.trim());if(header)td.setAttribute("scope","col");tr.append(td);}return tr;};
+      head.append(row(line,true));index++;
+      while((lines[index+1]||"").trim().startsWith("|"))body.append(row(lines[++index],false));
+      table.append(head,body);const wrapper=document.createElement("div");wrapper.className="help-table";wrapper.append(table);content.append(wrapper);continue;
+    }
     const heading = line.match(/^(#{1,3}) (.+)/);
     const item = line.match(/^(- |\d+\. )(.+)/);
     if (!line.trim() || heading || item) flush();
     if (heading) {
       list = null;
       const element = document.createElement("h" + heading[1].length);
-      element.textContent = clean(heading[2]);
+      inline(element,heading[2]);
       content.append(element);
     } else if (item) {
       const kind = item[1] === "- " ? "UL" : "OL";
       if (!list || list.tagName !== kind) { list = document.createElement(kind); content.append(list); }
       const element = document.createElement("li");
-      element.textContent = clean(item[2]);
+      inline(element,item[2]);
       list.append(element);
     } else if (line.trim()) {
-      if (list && /^\s+/.test(line)) list.lastElementChild.textContent += " " + clean(line.trim());
+      if (list && /^\s+/.test(line)) inline(list.lastElementChild," " + line.trim());
       else { list = null; paragraph.push(line.trim()); }
     } else { list = null; }
   }
@@ -759,12 +790,13 @@ async function loadOptions() {
     state.options = await engine("options");
     $("storage-location").textContent = state.options.workspace;
     $("zone").textContent = state.options.timezone;
-    $("final-tag").value = state.options.final_tag;
+    if(!state.defaultsLoaded && !$("body").value)$("final-tag").value = state.options.final_tag;
     const tomorrow = new Date(Date.now() + 86400000);
     const pieces = new Intl.DateTimeFormat("sv-SE", {
       timeZone: state.options.timezone, year: "numeric", month: "2-digit", day: "2-digit"
     }).format(tomorrow);
-    $("post-at").value = pieces + "T09:00";
+    if(!$("post-at").value)$("post-at").value = pieces + "T09:00";
+    state.defaultsLoaded=true;
     renderDestinations();
     notice();
   } catch (error) {
@@ -834,9 +866,9 @@ bind("bake", bake);
 bind("previous", () => navigateVersion(-1));
 bind("next", () => navigateVersion(1));
 bind("another", () => revise());
-bind("edit-caption", () => { $("edited").value = current().plan.caption; $("copy").hidden = true; $("caption-editor").hidden = false; });
+bind("edit-caption", () => { $("edited").value = current().plan.caption; $("copy").hidden = true; $("caption-editor").hidden = false; updateVersionControls(); $("edited").focus(); });
 bind("save-caption", () => revise($("edited").value));
-bind("cancel-edit", () => { $("copy").hidden = false; $("caption-editor").hidden = true; });
+bind("cancel-edit", () => { $("copy").hidden = false; $("caption-editor").hidden = true; updateVersionControls(); });
 bind("create", () => submit("draft"));
 bind("schedule", () => submit("schedule"));
 bind("calendar", openVerifiedPostiz);
@@ -904,7 +936,7 @@ bind("telegram-save", async () => {
   });
 });
 document.addEventListener("keydown", event => {
-  if (!document.querySelector("dialog[open]") && (event.metaKey || event.ctrlKey) && event.key === "Enter" && !state.busy) {
+  if (!document.querySelector("dialog[open]") && (event.metaKey || event.ctrlKey) && event.key === "Enter" && !event.isComposing && !state.busy) {
     event.preventDefault();
     if (state.page === "compose") delivery();
     else if (state.page === "delivery") bake();
@@ -1178,6 +1210,7 @@ if (window.__TAURI__?.event) {
       else if(action==="updates") await checkUpdates(true);
       else if(action==="network") await networkOpen();
       else if(action==="connections") await connectionsOpen();
+      else if(action==="services") await servicesOpen();
       else if(action==="preferences") await preferencesOpen();
       else if(action==="settings") openDialog("app-settings");
       else if(action==="help") await help();
@@ -1430,7 +1463,7 @@ async function preferencesOpen(){
     $("preference-models").replaceChildren();for(const name of result.models || []){const option=document.createElement("option");option.value=name;$("preference-models").append(option);}
     $("preference-model-state").textContent=result.model_ready===true?text("✓ Installed model found","✓ Se encontró el modelo instalado"):result.model_ready===false?text("This model was not found in Ollama. Exact words still work; install or choose a model before generating captions.","No se encontró este modelo en Ollama. Puedes conservar tus palabras; instala o elige un modelo antes de generar textos."):text("Ollama could not be checked. Exact words still work.","No se pudo comprobar Ollama. Puedes seguir conservando tus palabras.");
     $("preferences-feedback").textContent=result.configured?"":text("Configure or restore this installation before saving defaults.","Configura o restaura esta instalación antes de guardar los valores predeterminados.");$("preferences-save").disabled=!result.configured;
-  }catch(error){$("preferences-feedback").textContent=friendlyError(error);}
+  }catch(error){if(request===state.preferencesRequest && $("preferences-dialog").open)$("preferences-feedback").textContent=friendlyError(error);}
 }
 bind("preferences-open",()=>fromSettings(preferencesOpen));bind("preferences-close",()=>{$("preferences-dialog").close();state.preferencesRequest=(state.preferencesRequest||0)+1;});
 bind("preferences-save",async()=>{
@@ -1443,3 +1476,34 @@ bind("preferences-save",async()=>{
   }catch(error){$("preferences-feedback").textContent=friendlyError(error);}
   finally{$("preferences-save").disabled=false;}
 });
+
+
+async function servicesStatus(){
+  $("services-recheck").disabled=true;
+  try{
+    const result=await engine("services_status");state.services=result;
+    const pending=(result.queued||0)+(result.approved_status||0),active=state.serviceBusy || result.task?.running;
+    $("services-summary").textContent=!result.configured?text("Configure this installation or restore a backup first.","Primero configura esta instalación o restaura un respaldo."):!result.engine_ready?text("Start Docker Desktop or Docker Engine, then check again.","Inicia Docker Desktop o Docker Engine y vuelve a comprobar."):active?text("A service operation is in progress.","Hay una operación de servicios en curso."):result.running?text("Publishing services are running.","Los servicios de publicación están en ejecución."):text("Publishing services are stopped.","Los servicios de publicación están detenidos.");
+    $("services-start").disabled=!!active || !result.configured || !result.engine_ready;
+    $("services-stop").disabled=!!active || !result.running || !result.queue_known || pending>0;
+    if(pending)$("services-feedback").textContent=pending+text(" scheduled items must finish or be cancelled before stopping."," elementos programados deben terminar o cancelarse antes de detener los servicios.");
+    else if(!active)$("services-feedback").textContent=result.task?.error?text("Last service action: ","Última acción de servicios: ")+friendlyError(result.task.error):"";
+    if(result.task?.running){$("services-progress").hidden=false;$("services-progress").value=result.task.percent||0;$("services-feedback").textContent=friendlyError(result.task.stage||"");}
+  }catch(error){$("services-feedback").textContent=friendlyError(error);$("services-start").disabled=true;$("services-stop").disabled=true;}
+  finally{$("services-recheck").disabled=false;}
+}
+async function servicesOpen(){openDialog("services-dialog");await servicesStatus();}
+async function servicesAction(action){
+  if(state.busy || state.serviceBusy)return;
+  const approved=await modal(action==="start"?text("Start publishing services?","¿Iniciar los servicios de publicación?"):text("Stop publishing services?","¿Detener los servicios de publicación?"),action==="start"?text("Missing container images may download. No Ollama model is downloaded. After startup, check the current Postiz link. Existing data and approvals are kept.","Se podrían descargar imágenes de contenedores que falten. No se descarga ningún modelo de Ollama. Después de iniciar, revisa el enlace actual de Postiz. Se conservan los datos y las aprobaciones."):text("WhatsApp intake will pause. Shared tools and other projects stay open. No data or published social content is deleted. Finish queued work first.","Se pausará el ingreso por WhatsApp. Las herramientas compartidas y otros proyectos seguirán abiertos. No se eliminan datos ni contenido publicado. Primero completa el trabajo en cola."),text("Continue","Continuar"));
+  if(!approved)return;
+  state.serviceBusy=true;$("services-start").disabled=true;$("services-stop").disabled=true;$("services-progress").hidden=false;$("services-progress").value=0;
+  let polling=false,failure="";
+  const timer=setInterval(async()=>{if(polling || !$("services-dialog").open || document.hidden || !document.hasFocus())return;polling=true;try{const result=await engine("services_progress");if(result.running && result.action===action){$("services-progress").value=result.percent||0;$("services-feedback").textContent=friendlyError(result.stage||"");}}catch(_){}finally{polling=false;}},1500);
+  try{
+    await work(text("Updating publishing services","Actualizando los servicios de publicación"),async()=>{try{await engine("services_action",{action,confirmed:true});await refreshDashboard(true);if(action==="start")await loadOptions();}catch(error){failure=friendlyError(error);throw error;}});
+  }finally{clearInterval(timer);state.serviceBusy=false;$("services-progress").hidden=true;await servicesStatus();if(failure)$("services-feedback").textContent=failure;}
+}
+bind("services-open",()=>fromSettings(servicesOpen));bind("services-recheck",servicesStatus);
+bind("services-start",()=>servicesAction("start"));bind("services-stop",()=>servicesAction("stop"));
+bind("services-network",async()=>{$("services-dialog").close();await networkOpen();});bind("services-close",()=>$("services-dialog").close());

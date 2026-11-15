@@ -46,6 +46,9 @@ manage_posts = module("manage_posts", "manage_posts.py")
 
 class Operations(unittest.TestCase):
     def setUp(self):
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        for attribute,name in [('RUN_DIR','run'),('JOBS_DIR','run/jobs'),('LOGS_DIR','logs')]:
+            isolated=patch.object(pmlib,attribute,str(Path(temporary.name)/name));isolated.start();self.addCleanup(isolated.stop)
         lease=patch.object(plan_post.operation_guard,"maintenance",return_value=contextlib.nullcontext());lease.start();self.addCleanup(lease.stop)
         log=patch.object(pmlib,"append_log");log.start();self.addCleanup(log.stop)
         # Synthetic planner fixtures have no real video to probe. Real-file
@@ -517,11 +520,12 @@ class Operations(unittest.TestCase):
             plans = root / "wa-confirmations"
             scratch = root / "wa-cache"
             (uploads / "whatsapp-pending").mkdir(parents=True)
+            (uploads / "whatsapp").mkdir()
             plans.mkdir()
             scratch.mkdir()
             for name, when in (("expired", "2020-01-01T00:00:00Z"), ("future", "2099-01-01T00:00:00Z")):
                 (plans / (name + ".json")).write_text(json.dumps({"result": {"when_utc": when}}))
-            old = [scratch / "stale.mp4", uploads / "whatsapp-pending" / "delivered.mp4", uploads / "other.mp4"]
+            old = [uploads / "whatsapp" / "broadcast.mp4", scratch / "stale.mp4", uploads / "whatsapp-pending" / "delivered.mp4", uploads / "other.mp4"]
             for file in old:
                 file.touch()
             for file in old + list(plans.iterdir()):
@@ -529,7 +533,7 @@ class Operations(unittest.TestCase):
             with patch.object(retention, "ROOTS", tuple(map(str, (uploads, plans, scratch)))), \
                  patch.object(retention, "referenced_media", return_value=""):
                 self.assertEqual({Path(p).name for p in retention.candidates(time.time(), whatsapp_only=True)},
-                                 {"expired.json", "stale.mp4", "delivered.mp4"})
+                                 {"expired.json", "stale.mp4", "delivered.mp4", "broadcast.mp4"})
 
     def test_idle_stop_requires_live_empty_queue(self):
         for state, cached, total, expected in (
@@ -707,6 +711,13 @@ class Operations(unittest.TestCase):
             items=whatsapp_pending._read()
             self.assertEqual(items[0]["status"],"sent")
             self.assertTrue(all(item["status"]=="pending" for item in items[1:]))
+
+    def test_paused_services_leave_approved_status_pending_without_an_attempt(self):
+        import whatsapp_pending
+        marker=Path(pmlib.RUN_DIR)/'publishing-paused';marker.parent.mkdir(parents=True);marker.touch()
+        with patch.object(whatsapp_pending,'_read',return_value=[{'status':'pending','approved':True}]),patch.object(whatsapp_pending,'_claim') as claim:
+            pending=whatsapp_pending.process({})
+        self.assertEqual(len(pending),1);claim.assert_not_called()
 
     def test_whatsapp_uncertain_delivery_is_not_retried(self):
         import whatsapp_pending

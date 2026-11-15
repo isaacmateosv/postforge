@@ -228,6 +228,7 @@ def ollama_caption(env, topic, lang, *, previous=None):
     base = env.get("OLLAMA_HOST_URL", "http://localhost:11434").rstrip("/")
     model = env.get("LOCAL_LLM_MODEL", "llama3.2:3b")  # picked in the owner's blind test, 2026-10-31
     seconds = 0.0
+    grounding = topic + "\n" + env.get(CTA_SETTING.get(language(lang), ""), "")
     prompt = build_prompt(topic, lang)
     if previous:
         instruction = ("Redacta una alternativa con un inicio diferente. Conserva los hechos del tema."
@@ -235,12 +236,12 @@ def ollama_caption(env, topic, lang, *, previous=None):
                        "Write an alternative with a different opening. Keep the facts from the topic.")
         prompt += f"\n\n{instruction}\n<previous-caption>\n{previous[:600]}\n</previous-caption>"
     def complete(candidate):
-        edited,review_seconds=review_caption(env,candidate,topic,lang,unsupported_details(candidate,topic))
-        unsupported=unsupported_details(edited,topic)
+        edited,review_seconds=review_caption(env,candidate,topic,lang,unsupported_details(candidate,grounding))
+        unsupported=unsupported_details(edited,grounding)
         if unsupported:
             edited,repair_seconds=review_caption(env,edited,topic,lang,unsupported)
             review_seconds+=repair_seconds
-        if unsupported_details(edited,topic):
+        if unsupported_details(edited,grounding):
             raise PMError('The caption added details not present in your idea. Try another version or enter your exact words. / El texto añadió datos que no estaban en tu idea. Prueba otra versión o ingresa tus palabras exactas.')
         return edited,model,round(seconds+review_seconds,1)
     fallback = ""

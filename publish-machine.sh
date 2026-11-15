@@ -364,7 +364,7 @@ print_health() {
 
 case "${1:-}" in
   start)
-    rm -f "$RUN_DIR/idle-stop"
+    rm -f "$RUN_DIR/idle-stop" "$RUN_DIR/publishing-paused"
     echo "======================================================"
     echo "  STARTING PUBLISH MACHINE (M1 Optimized Mode)"
     echo "======================================================"
@@ -393,8 +393,7 @@ case "${1:-}" in
     # Here-string, not a pipe: under pipefail, `grep -q` exiting early makes `ollama list`
     # die of SIGPIPE, which looked like a missing model and re-pulled it on every start.
     if ! grep -qF "$MODEL" <<< "$(ollama list 2>/dev/null || true)"; then
-      echo "      Model not found. Pulling quantized weights..."
-      ollama pull "$MODEL"
+      echo "      Model not installed. Exact captions remain available; choose or install a model explicitly before generating captions."
     fi
 
     else
@@ -491,12 +490,14 @@ case "${1:-}" in
       exit 0
     fi
 
-    # 2. Force unload every Ollama model from Unified VRAM
+    touch "$RUN_DIR/publishing-paused"
+
+    # 2. Shared models may belong to another app; eviction is explicit opt-in.
     echo "[2/3] Releasing Ollama VRAM back to macOS..."
-    if pgrep -x "ollama" > /dev/null; then
+    if [ "${PM_EVICT_SHARED_MODELS_ON_STOP:-false}" = "true" ] && pgrep -x "ollama" > /dev/null; then
       evict_ollama_models
     else
-      echo "      Ollama daemon offline."
+      echo "      Shared Ollama models left alone (PostForge requests unload their own model)."
     fi
 
     # 3. Docker Desktop's VM keeps its memory until Docker Desktop quits

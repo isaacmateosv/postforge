@@ -11,7 +11,7 @@ function fixture(engine) {
  const nodes=new Map(),handlers={},state={language:'en'};
  const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
  const context={state,$,text:(en,es)=>state.language==='es'?es:en,friendlyError:String,
-  document:{createElement:element},engine,openDialog:id=>{$(id).open=true;},bind:(id,fn)=>{handlers[id]=fn;}};
+  document:{createElement:element,createTextNode:text=>({textContent:text})},URL,engine,openDialog:id=>{$(id).open=true;},bind:(id,fn)=>{handlers[id]=fn;}};
  const source=fs.readFileSync(path.join(__dirname,'../ui/app.js'),'utf8');vm.createContext(context);
  vm.runInContext(source.slice(source.indexOf('let helpRequest=0;'),source.indexOf('async function loadOptions()')),context);
  return {...context,handlers};
@@ -34,7 +34,18 @@ test('switching guides rejects an older response; closing does not reopen Help',
  const pending=[];const f=fixture(()=>new Promise(resolve=>pending.push(resolve)));
  const first=f.help(false),second=f.help(true);
  pending[1]({markdown:'# Technical'});await second;pending[0]({markdown:'# Old quick'});await first;
- assert.equal(f.$('help-body').children[0].children[0].textContent,'Technical');
+ assert.equal(f.$('help-body').children[0].children[0].children[0].textContent,'Technical');
  const third=f.help(false);f.handlers['help-close']();pending[2]({markdown:'# Closed'});await third;
  assert.equal(f.$('help-dialog').open,false);assert.equal(f.$('help-body').children.length,0);
+});
+
+test('offline help renders emphasis, code and tables without interpreting injected HTML',()=>{
+ const f=fixture(async()=>({}));const doc=f.renderHelpDocument('# Guide\n\n| Action | Detail |\n|---|---|\n| **Review** | `literal` |\n\n<script>unsafe()</script>');
+ assert.equal(doc.children[1].className,'help-table');
+ const table=doc.children[1].children[0];assert.equal(table.children[1].children[0].children[0].children[0].tagName,'STRONG');
+ assert.equal(doc.children[2].children[0].textContent,'<script>unsafe()</script>');
+});
+test('help allows official HTTPS references but rejects script and unknown hosts',()=>{
+ const f=fixture(async()=>({}));const doc=f.renderHelpDocument('[Official](https://docs.postiz.com/providers/youtube) [Bad](javascript:alert) [Unknown](https://example.invalid/)');
+ const buttons=doc.children[0].children.filter(item=>item.tagName==='BUTTON');assert.equal(buttons.length,1);assert.equal(buttons[0].textContent,'Official');
 });

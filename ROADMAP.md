@@ -1,26 +1,22 @@
 # Roadmap
 
-## Release 1 — publishing foundation
+## Release 2 · current release candidates
 
-Native macOS app, Postiz drafts, WhatsApp intake, local captions, connection monitoring,
-backups, retention and safe update checks.
+Rust/Tauri desktop client for macOS, Windows and Linux; structured composition and review; native tray; bilingual offline help; optional private Telegram and WhatsApp guided flows; authenticated public gateway; portable encrypted backups; verified updates and bounded local service controls.
 
-## Release 2 (v2.0.0) — browser access and Telegram
+The [feature audit](docs/audits/2026-11-15-feature-audit.md) separates implemented behavior, automated validation and real-device acceptance. See [SETUP](SETUP.md) and the [desktop guide](desktop/README.md) for current use.
 
-- Read-only browser dashboard and link to Postiz on macOS, Windows, and Linux.
-- Authenticated HTTPS gateway for optional remote access. Keep the local deployment usable without ngrok.
-- Telegram private-chat setup, service reachability, and optional heartbeat with persisted state.
-- External missed-heartbeat monitoring for host or network loss.
-- Guided Telegram posting buttons with private ownership, versioned callbacks and explicit final approval.
+## Before a stable v2 claim
 
-The Rust/Tauri composer now adds structured delivery fields and a shared desktop
-workflow. Native CI builds are separate from real-device installation and
-publishing validation. The Swift Mac controller retains its system integrations.
+- Physical Windows/Linux installation, restore and publishing acceptance beyond CI compilation.
+- Destination-machine migration rehearsal with representative large media and user-owned credentials.
+- Social-platform rendering and permission acceptance, including covers, Reel placements and TikTok audited Direct Post where configured.
+- Production signing/notarization and a complete fresh-business setup wizard.
+- Port and test OS startup, scheduled wake and automatic idle policy; the Rust client currently offers explicit service controls.
+- A portable, explicitly reviewed uninstaller; current automated removal helper is macOS-specific.
 
-Telegram buttons use shared reviewed snapshots and versioned callbacks.
-WhatsApp numbered plan replies remain supported. Announcement image cards and
-full cross-platform system integration remain future work.
+## Later scope
 
-See [the v2 release candidate](v2/README.md) for setup and verification status.
+Authorized Telegram groups with isolated sender/group sessions; external missed-heartbeat monitoring; optional announcement-image rendering; platform-specific Siri/OS automation beyond Open App shortcuts. These are not silently enabled by adding a bot to a group or installing the desktop client.
 
-Telegram credentials, code and background requests are not part of release 1.
+Release 1 and the Swift controller remain historical source. Run one current client/controller at a time.

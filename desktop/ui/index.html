@@ -140,7 +140,7 @@
         <button id="previous" aria-label="Previous caption">‹</button><span id="version"></span><button id="next" aria-label="Next caption">›</button>
       </div></div>
       <div id="copy"></div>
-      <div id="caption-editor" hidden><textarea id="edited" rows="7"></textarea><div class="actions"><button id="save-caption"></button><button id="cancel-edit"></button></div></div>
+      <div id="caption-editor" hidden><label for="edited" data-en="Edit the reviewed caption" data-es="Edita el texto revisado"></label><textarea id="edited" rows="7"></textarea><p class="hint" data-en="Apply or cancel this edit before creating drafts or scheduling." data-es="Aplica o cancela esta edición antes de crear borradores o programar."></p><div class="actions"><button id="save-caption"></button><button id="cancel-edit"></button></div></div>
       <div class="actions wrap"><button id="another"></button><button id="edit-caption"></button></div>
       <div class="finish">
         <p data-en="Choose how this plan should continue." data-es="Elige cómo quieres continuar con este plan."></p>
@@ -203,6 +203,7 @@
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
 <div class="settings-row"><label for="language" data-en="Language" data-es="Idioma"></label><select id="language" aria-label="Language"><option value="en">English</option><option value="es">Español (Ecuador)</option></select></div>
 <div class="settings-row"><div><strong data-en="Public access" data-es="Acceso público"></strong><small data-en="Open Postiz, repair a changed link or set up your domain" data-es="Abre Postiz, actualiza un enlace que cambió o configura tu dominio"></small></div><button id="network-open" data-en="Manage Postiz link" data-es="Administrar enlace de Postiz"></button></div>
+<div class="settings-row"><div><strong data-en="Publishing services" data-es="Servicios de publicación"></strong><small data-en="Start or stop this installation without quitting shared tools" data-es="Inicia o detén esta instalación sin cerrar herramientas compartidas"></small></div><button id="services-open" data-en="Manage services" data-es="Administrar servicios"></button></div>
 <div class="settings-row"><div><strong data-en="System requirements" data-es="Requisitos del sistema"></strong><small data-en="Check installed tools and download sources" data-es="Revisa las herramientas y dónde descargarlas"></small></div><button id="requirements-open" data-en="Check requirements" data-es="Revisar requisitos"></button></div>
 <div class="settings-section"><h3 data-en="App & data" data-es="App y datos"></h3>
 <div class="settings-row"><div><strong data-en="Updates" data-es="Actualizaciones"></strong><small data-en="Check the app and local services" data-es="Revisa la app y los servicios locales"></small></div><button id="updates-open" data-en="Check for updates" data-es="Buscar actualizaciones"></button></div>
@@ -212,6 +213,13 @@
 </div>
 <details><summary data-en="Advanced · installation folder" data-es="Avanzado · carpeta de instalación"></summary><p data-en="Locate an existing PostForge installation folder only. To open a .pfbackup file, use Restore backup above. Services, credentials and media must belong to the same installation." data-es="Localiza únicamente una carpeta de instalación existente de PostForge. Para abrir un archivo .pfbackup, usa Restaurar respaldo arriba. Los servicios, las credenciales y los archivos deben pertenecer a la misma instalación."></p><button id="workspace"></button><p id="storage-location" class="hint"></p></details>
 <div class="actions end"><button id="settings-close" data-en="Done" data-es="Listo"></button></div>
+</dialog>
+<dialog hidden role="dialog" id="services-dialog" aria-labelledby="services-title">
+<h2 id="services-title" data-en="Publishing services" data-es="Servicios de publicación"></h2>
+<p data-en="Manage this installation’s containers. Docker Desktop, Ollama and other projects are left running." data-es="Administra los contenedores de esta instalación. Docker Desktop, Ollama y otros proyectos siguen en ejecución."></p>
+<div id="services-summary" class="callout" role="status"></div><progress id="services-progress" max="100" hidden></progress><p id="services-feedback" role="status" aria-live="polite"></p>
+<p class="hint" data-en="Stopping pauses WhatsApp intake. The host Telegram receiver remains available while the Mac is awake. Complete or cancel scheduled work before stopping. Temporary links may change when services start again." data-es="Al detener los servicios se pausa el ingreso por WhatsApp. El receptor de Telegram sigue disponible mientras el Mac esté despierto. Completa o cancela el trabajo programado antes de detenerlos. Los enlaces temporales pueden cambiar al iniciar otra vez."></p>
+<div class="actions wrap"><button id="services-recheck" data-en="Check again" data-es="Comprobar otra vez"></button><button id="services-start" class="primary" data-en="Start services" data-es="Iniciar servicios"></button><button id="services-stop" data-en="Stop services" data-es="Detener servicios"></button><button id="services-network" data-en="Check Postiz link" data-es="Revisar enlace de Postiz"></button><button id="services-close" data-en="Done" data-es="Listo"></button></div>
 </dialog>
 <dialog hidden role="dialog" id="preferences-dialog" aria-labelledby="preferences-title">
 <h2 id="preferences-title" data-en="History & caption defaults" data-es="Historial y ajustes del texto"></h2>

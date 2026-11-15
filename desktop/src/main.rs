@@ -32,7 +32,7 @@ fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["preferences", "preferences_save", "requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "backup_recent", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+    let allowed = ["services_status", "services_action", "services_progress", "preferences", "preferences_save", "requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "backup_recent", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
                    "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
@@ -155,6 +155,17 @@ async fn open_calendar(app: tauri::AppHandle) -> Result<(), String> {
 async fn open_releases(app: tauri::AppHandle) -> Result<(),String> {
     use tauri_plugin_opener::OpenerExt;
     app.opener().open_url("https://github.com/isaacmateosv/postforge/releases",None::<&str>).map_err(|_|"Could not open releases".into())
+}
+
+#[tauri::command]
+fn open_help_link(app:tauri::AppHandle,url:String)->Result<(),String> {
+    use tauri_plugin_opener::OpenerExt;
+    let parsed=tauri::Url::parse(&url).map_err(|_|"Invalid documentation link.")?;
+    let hosts=["github.com","developers.cloudflare.com","developers.google.com","developers.tiktok.com","docs.postiz.com","support.google.com"];
+    if url.len()>4096 || url.chars().any(|c|c.is_control()) || parsed.scheme()!="https" || !hosts.contains(&parsed.host_str().unwrap_or("")) || !parsed.username().is_empty() || parsed.password().is_some() || parsed.port().is_some() {
+        return Err("Choose an official documentation link. / Elige un enlace de documentación oficial.".into());
+    }
+    app.opener().open_url(url,None::<&str>).map_err(|_|"Could not open documentation. / No se pudo abrir la documentación.".into())
 }
 
 // Download a verified release through the planner, swap the installed bundle in
@@ -347,7 +358,7 @@ fn main() {
 
             if let tauri::WindowEvent::CloseRequested{api,..}=event {api.prevent_close();let _=window.hide();}
         })
-        .invoke_handler(tauri::generate_handler![open_requirement, copy_review_text, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
+        .invoke_handler(tauri::generate_handler![open_help_link, open_requirement, copy_review_text, copy_public_url, engine, choose_files, choose_workspace, open_calendar, open_releases, install_update, backup_location, tray_ui::tray_state])
         .build(tauri::generate_context!())
         .expect("PostForge desktop could not start")
         .run(|app,event| {

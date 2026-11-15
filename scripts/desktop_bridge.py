@@ -17,6 +17,10 @@ import manage_posts
 
 
 def dispatch(operation, payload):
+    if operation in ("services_status", "services_action", "services_progress"):
+        import service_control
+        if operation == "services_action": return service_control.apply(payload)
+        return service_control.task() if operation == "services_progress" else service_control.status()
     if operation in ("preferences","preferences_save"):
         import preferences
         return preferences.save(payload) if operation=="preferences_save" else preferences.status()

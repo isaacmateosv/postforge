@@ -6,6 +6,8 @@
 - Serialize backup, runtime/service changes and publishing work through a shared maintenance lease. Recover detached backup progress without starting a duplicate task.
 - Restore history-retention and advanced caption defaults in the window and tray; preserve existing reviews and queued audience choices.
 - Distinguish TikTok Inbox handoff from publishing, keep its completion screen visible and provide caption copy. Correct stale cover/time/media and network-response behavior.
+- Restore guarded service start/stop in Settings and the tray without downloading models or quitting shared tools; clean both WhatsApp staging folders under the maintenance lease.
+- Block submission of unapplied caption edits; render offline help tables/formatting safely and consolidate current EN/es-EC setup/workflow instructions.
 - Improve business-neutral emoji handling and local generated-caption review, and repair current Rust macOS uninstall targets without deleting source checkouts.
 
 ## [2.0.0-rc.45]

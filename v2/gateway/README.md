@@ -67,7 +67,8 @@ in two days. Local accounts created with no Postiz email provider are activated
 at creation. The gateway password and authenticator QR code are separate from
 the invitation.
 
-Use the tray's **Gateway Access** editor for gateway authorization. Keep
+Gateway user provisioning currently uses the local operator helpers above. The
+Rust client's Postiz Link & Access screen manages the origin, not gateway users. Keep
 workspace roles and invitations in Postiz. If a future onboarding screen
 offers temporary signup, put it behind an explicit owner action, show the
 expiry, and restore disabled registration automatically.
