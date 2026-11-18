@@ -60,11 +60,27 @@ def private_write(path, content, work):
             os.unlink(temporary)
 
 
+# Resolve public hostnames over DNS-over-HTTPS so endpoint verification does not
+# depend on the host's local resolver. On this deployment the system resolver
+# (e.g. Tailscale MagicDNS) can lag on a freshly minted tunnel hostname that
+# public DNS already serves, which would otherwise make every rotation "fail
+# verification" and roll back. Localhost is left to the normal resolver.
+PUBLIC_DOH = "https://1.1.1.1/dns-query"
+
+
+def doh_args(url):
+    host = (urlsplit(url).hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost"):
+        return []
+    return ["--doh-url", PUBLIC_DOH]
+
+
 def probe(url):
     try:
         response = subprocess.run(
             [shutil.which("curl") or "curl", "--silent", "--fail", "--max-time", "5",
              "--max-filesize", "4096", "--header", "ngrok-skip-browser-warning: true",
+             *doh_args(url),
              "--write-out", "\n%{http_code}", url.rstrip("/") + "/api/"],
             capture_output=True, timeout=7, check=True,
         ).stdout
@@ -92,7 +108,7 @@ def gateway_ready(url):
             [shutil.which("curl") or "curl", "--silent", "--max-time", "5", "--output", os.devnull,
              "--header", "ngrok-skip-browser-warning: true", "--header", "Accept: text/html",
              "--header", "Sec-Fetch-Mode: navigate", "--write-out", "%{http_code} %{redirect_url}",
-             url + "/api/"], capture_output=True, text=True, timeout=7, check=True,
+             *doh_args(url), url + "/api/"], capture_output=True, text=True, timeout=7, check=True,
         )
         status, _, location = result.stdout.partition(" ")
         target = urlsplit(urljoin(url, location))
@@ -103,7 +119,7 @@ def gateway_ready(url):
         portal = subprocess.run(
             [shutil.which("curl") or "curl", "--silent", "--max-time", "5", "--output", os.devnull,
              "--header", "ngrok-skip-browser-warning: true", "--write-out", "%{http_code}",
-             url + "/authelia/"], capture_output=True, text=True, timeout=7, check=True,
+             *doh_args(url), url + "/authelia/"], capture_output=True, text=True, timeout=7, check=True,
         )
         return portal.stdout == "200"
     except (subprocess.SubprocessError, OSError, ValueError):
