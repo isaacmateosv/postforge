@@ -44,7 +44,7 @@ Required credential groups:
 - **Public access:** a selected tunnel profile and locally provisioned Caddy/Authelia gateway. TryCloudflare does not require an ngrok account; a named Cloudflare tunnel needs its own token/domain. Saved ngrok credentials remain optional.
 - **Optional Telegram:** dedicated bot token, one verified numeric owner ID, language, enable/hold flag and heartbeat interval. Never share a bot token between simultaneously active installations.
 
-The runtime must be configured before **Manage services → Start services** can succeed. For source/advanced operation, `./postforge.sh doctor` and `./scripts/recheck.sh --live` provide diagnostics. On Windows use the Rust service controls rather than assuming Bash is installed.
+The runtime must be configured before **Manage services → Start services** can succeed. For source/advanced operation, `./postforge.sh doctor` and `./scripts/recheck.sh --live` provide diagnostics. On Windows use the Rust service controls rather than assuming Bash is installed. After editing `.env` while services run, use **Manage services → Apply settings changes**: it recreates only services whose settings changed and keeps the current tunnel link, so social accounts stay connected.
 
 ## Gateway and accounts
 

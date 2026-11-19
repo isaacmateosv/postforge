@@ -44,7 +44,7 @@ Grupos de credenciales:
 - **Acceso público:** perfil de túnel y gateway Caddy/Authelia configurado localmente. TryCloudflare no requiere ngrok; un túnel con nombre requiere su propio token y dominio. Las credenciales guardadas de ngrok son opcionales.
 - **Telegram opcional:** token de bot dedicado, un ID numérico privado verificado, idioma, activación/pausa de migración e intervalo de avisos. No uses el mismo token en dos instalaciones activas.
 
-Configura el entorno antes de usar **Administrar servicios → Iniciar servicios**. Para operación avanzada desde el código, `./postforge.sh doctor` y `./scripts/recheck.sh --live` ofrecen diagnósticos. En Windows usa los controles Rust; no supongas que Bash está instalado.
+Configura el entorno antes de usar **Administrar servicios → Iniciar servicios**. Para operación avanzada desde el código, `./postforge.sh doctor` y `./scripts/recheck.sh --live` ofrecen diagnósticos. En Windows usa los controles Rust; no supongas que Bash está instalado. Si editas `.env` con los servicios en ejecución, usa **Administrar servicios → Aplicar cambios de ajustes**: recrea solo los servicios cuyos ajustes cambiaron y conserva el enlace actual del túnel, así tus redes siguen conectadas.
 
 ## Gateway y cuentas
 

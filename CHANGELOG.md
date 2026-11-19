@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0-rc.50]
+
+- Publishing services: while services run, the start control becomes **Apply settings changes** with its own confirmation. It reloads `.env`, recreates only services whose settings changed and keeps the public tunnel link. The tray item is renamed to match.
+- Tunnel endpoint verification resolves public hostnames over DNS-over-HTTPS, so quick-tunnel rotations no longer roll back when the local resolver (for example Tailscale MagicDNS) lags on a new hostname.
+
 ## [2.0.0-rc.49]
 
 - Refresh configured Windows services through the bundled Python controller without requiring Bash on the host. Preserve stopped installations, restart active receivers against updated code, recreate non-tunnel containers and retain the running connector under the installer maintenance lease.

@@ -18,7 +18,7 @@ const LABELS: &[(&str,&str,&str)] = &[
  ("network","Postiz Link & Access","Enlace y acceso a Postiz"),
  ("connections","Social Account Connections","Conexiones de redes sociales"),
  ("section-services","Local Services","Servicios locales"),
- ("services","Start / Stop Publishing Services","Iniciar / detener servicios de publicación"),
+ ("services","Start, Stop or Apply Settings Changes","Iniciar, detener o aplicar cambios de ajustes"),
  ("section-app","App & Support","App y ayuda"),
  ("backup","Backup & Move","Respaldo y traslado"),
  ("updates","Check for Updates","Buscar actualizaciones"),
