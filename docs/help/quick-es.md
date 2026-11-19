@@ -62,6 +62,10 @@ Después de otras programaciones directas, una cuenta de ocho segundos activos v
 
 Abre **WhatsApp** para ver la conexión o escanear el QR con el teléfono autorizado. Se conserva una sesión que funciona. Configura la audiencia predeterminada de los Estados en esa ventana; los planes en cola mantienen la audiencia con la que se aprobaron.
 
+La ventana muestra la cuenta vinculada (nombre de perfil y número). **Desvincular este teléfono** la cierra en PostForge para que vincules el mismo u otro número con **Obtener / renovar QR**. Los borradores, Postiz y las redes no cambian; el ingreso por WhatsApp y los Estados se pausan hasta vincular un teléfono otra vez.
+
+**Para publicar desde WhatsApp:** mantén los servicios de publicación en ejecución, abre tu propio chat en el teléfono vinculado (tu nombre o “Envíate un mensaje”), envía primero la foto o el video (hasta 10 minutos antes) y luego un mensaje que nombre una red y una hora. También sirven las notas de voz. PostForge responde en ese chat; nunca lee mensajes de otras personas.
+
 Envía los archivos y una solicitud a tu chat contigo mismo mientras los servicios estén activos. Sé explícito:
 
 ```text
@@ -79,7 +83,7 @@ En Inicio, abre **Estados de WhatsApp · revisión y aprobación**. El historial
 
 ## Telegram
 
-Cada instalación usa su propio bot y una cuenta privada autorizada. En **Telegram**, valida el token de BotFather, envía `/start` al bot, busca y elige tu cuenta privada, configura el idioma y los avisos de actividad y, finalmente, actívalo y guarda.
+Cada instalación usa su propio bot y una cuenta privada autorizada. En **Telegram**, valida el token de BotFather, envía `/start` al bot, busca y elige tu cuenta privada, configura el idioma y los avisos de actividad y, finalmente, actívalo y guarda. **Desconectar bot** olvida el token y la cuenta autorizada en este equipo y detiene el receptor, para que configures otro bot; revoca el token anterior en @BotFather si ya no lo usas.
 
 Usa `/new` para el flujo con botones, `/status` para comprobar servicios, `/settings` para los avisos de actividad y `/cancel` para descartar una solicitud sin terminar. El tipo de texto, los destinos, formatos, hora y confirmación son pasos separados. Los grupos no están admitidos, aunque Telegram permita añadir el bot a uno.
 

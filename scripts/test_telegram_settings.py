@@ -172,3 +172,23 @@ class TelegramSettingsTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TelegramDisconnectTest(TelegramSettingsTest):
+    def test_disconnect_forgets_bot_and_owner_but_keeps_other_settings(self):
+        self.save()
+        (self.root / 'run/telegram').mkdir(parents=True, exist_ok=True)
+        (self.root / 'run/telegram/token').write_text(TOKEN, encoding='utf-8')
+        with self.assertRaises(ValueError):
+            settings.disconnect({}, self.root)
+        calls = []
+        with patch.object(settings, 'telegram', side_effect=lambda token, method, **_: calls.append(method) or True):
+            result = settings.disconnect({'confirmed': True}, self.root)
+        content = self.env.read_text(encoding='utf-8')
+        self.assertIn('KEEP_ME=synthetic-value', content)
+        self.assertNotIn(TOKEN, content)
+        self.assertIn('TELEGRAM_ENABLED=false', content)
+        self.assertFalse(result['configured'])
+        self.assertFalse((self.root / 'run/telegram/token').exists())
+        self.assertFalse(list((self.root / 'run/host-agent').glob('telegram*.json')))
+        self.assertEqual(calls, ['deleteMyCommands'])

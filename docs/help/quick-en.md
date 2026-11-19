@@ -62,6 +62,10 @@ After other direct schedules, an eight-second active countdown returns to Dashbo
 
 Open **WhatsApp** to see the connection or scan the QR with your authorized phone. A working session is preserved. Choose its default Status audience in the same window; queued plans keep the audience they were approved with.
 
+The window shows the linked account (profile name and number). **Unlink this phone** logs it out of PostForge so you can link the same or another number with **Get / refresh QR**. Drafts, Postiz and social accounts are not affected; WhatsApp intake and Status pause until a phone is linked again.
+
+**To post from WhatsApp:** keep publishing services running, open your own chat on the linked phone (your name or “Message yourself”), send the photo or video first (up to 10 minutes before), then a message that names a network and a time. Voice notes work too. PostForge replies in that chat; messages to anyone else are never read.
+
 Send media and a request to your self-chat while services are running. Be explicit:
 
 ```text
@@ -79,7 +83,7 @@ On Dashboard, expand **WhatsApp Status · review & approval**. Receipt history o
 
 ## Telegram
 
-Each installation uses its own dedicated bot and one private owner. In **Telegram**, validate the BotFather token, send `/start` to the bot, find/select your private account, choose language and heartbeat, then explicitly enable and save.
+Each installation uses its own dedicated bot and one private owner. In **Telegram**, validate the BotFather token, send `/start` to the bot, find/select your private account, choose language and heartbeat, then explicitly enable and save. **Disconnect bot** forgets the token and owner on this computer and stops the receiver, so you can enroll another bot; revoke the old token in @BotFather if you no longer use it.
 
 Send `/new` for guided buttons, `/status` for service reachability, `/settings` for heartbeat options or `/cancel` to abandon an unfinished request. Caption mode, destinations, formats, time and confirmation are separate steps. Group posting is not supported, even if Telegram lets you add the bot to a group.
 

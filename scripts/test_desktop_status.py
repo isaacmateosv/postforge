@@ -20,12 +20,27 @@ class DesktopStatusTests(unittest.TestCase):
         orientation.start();self.addCleanup(orientation.stop)
 
     def test_linked_whatsapp_never_creates_or_replaces_session(self):
-        with patch.object(pmlib, 'http', return_value=(200, {'instance': {'state': 'open'}})) as api:
+        replies = [(200, {'instance': {'state': 'open'}}),
+                   (200, [{'ownerJid': '593900000001@s.whatsapp.net', 'profileName': 'Synthetic Shop'}])]
+        with patch.object(pmlib, 'http', side_effect=replies) as api:
             result = desktop_status.whatsapp({'AUTHENTICATION_API_KEY': 'synthetic'}, connect=True)
         self.assertTrue(result['connected'])
         self.assertNotIn('qr', result)
-        self.assertEqual(api.call_count, 1)
-        self.assertEqual(api.call_args.args[0], 'GET')
+        self.assertEqual(result['number'], '+593900000001')
+        self.assertEqual(result['profile_name'], 'Synthetic Shop')
+        self.assertEqual([call.args[0] for call in api.call_args_list], ['GET', 'GET'])
+
+    def test_whatsapp_logout_requires_confirmation_and_falls_back_to_delete(self):
+        with self.assertRaises(ValueError):
+            desktop_status.whatsapp_logout({}, {})
+        replies = [(400, {}), (200, {}), (200, {'instance': {'state': 'close'}})]
+        with patch.object(pmlib, 'http', side_effect=replies) as api, \
+             patch('operation_guard.assert_idle'):
+            result = desktop_status.whatsapp_logout({'AUTHENTICATION_API_KEY': 'synthetic'}, {'confirmed': True})
+        self.assertFalse(result['connected'])
+        urls = [call.args[1] for call in api.call_args_list]
+        self.assertIn('/instance/logout/status-engine', urls[0])
+        self.assertIn('/instance/delete/status-engine', urls[1])
 
     def test_qr_is_embedded_and_non_image_response_is_rejected(self):
         png = b'\x89PNG\r\n\x1a\n' + b'synthetic'

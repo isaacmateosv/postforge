@@ -221,6 +221,39 @@ def save(payload, root=ROOT):
         return status(root)
 
 
+def disconnect(payload, root=ROOT):
+    """Forget this installation's bot and owner so another bot can be enrolled from scratch.
+    The bot itself is not deleted; BotFather can revoke its token separately."""
+    if payload.get('confirmed') is not True:
+        raise ValueError('Review and confirm disconnecting Telegram. / Revisa y confirma la desconexión de Telegram.')
+    root = Path(root)
+    import host_agent
+    with file_lock.exclusive(str(root / 'run/telegram-settings.lock')), operation_guard.maintenance(root):
+        previous = configuration(root)
+        path = root / '.env'
+        if not path.is_file() or path.is_symlink():
+            raise ValueError('Connect a configured PostForge project first. / Primero conecta un proyecto PostForge configurado.')
+        token = previous['TELEGRAM_BOT_TOKEN']
+        was_running = bool(host_agent.running())
+        host_agent.stop()
+        cleared = dict(previous, TELEGRAM_ENABLED='false', TELEGRAM_BOT_TOKEN='', TELEGRAM_BOT_ID='',
+                       TELEGRAM_BOT_USERNAME='', TELEGRAM_OWNER_ID='', TELEGRAM_MIGRATION_HOLD='false')
+        atomic_write(path, merge_env(path.read_text(encoding='utf-8'), cleared))
+        runtime = root / 'run/host-agent'
+        for item in [*runtime.glob('telegram*.json'), *runtime.glob('conversation-*.json'),
+                     root / 'run/telegram/token', root / 'run/telegram/settings.env']:
+            if item.is_file() and not item.is_symlink():
+                item.unlink()
+        if token and TOKEN.fullmatch(token):
+            try:
+                call(token, 'deleteMyCommands')  # best effort: the old bot stops offering PostForge commands
+            except Exception:
+                pass
+        if was_running:
+            host_agent.start()  # other host tasks keep running; Telegram stays off without a token
+        return status(root)
+
+
 def heartbeat_preferences(root=ROOT):
     """Read only non-secret preferences; mobile menus never expose credentials."""
     config = configuration(root)

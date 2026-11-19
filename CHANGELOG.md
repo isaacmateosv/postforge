@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0]
+
+First stable release of the cross-platform desktop app. Includes everything from 2.0.0-rc.1 to rc.51, plus:
+
+- WhatsApp window shows the linked profile and number, with **Unlink this phone** for clean re-enrolment and a built-in guide to posting from your own chat.
+- Telegram window adds **Disconnect bot**: forgets the token and owner, stops the receiver and removes the bot's commands.
+- Scheduling animation with progress steps; activity pill and spinners for all background work.
+- Accessibility: filled buttons meet WCAG AA contrast, stronger form borders, one footer layout in every window, healthy status shown in green.
+- Network switches keep only the newest private recovery copy of `.env`.
+- Security, workflow and UX audit: `docs/audits/2026-11-19-security-ux-audit.md`.
+
 ## [2.0.0-rc.51]
 
 - Facebook feed video is uploaded in a single attempt. Postiz's shared retry resent the non-idempotent `POST /videos` when Meta answered slowly, publishing the same reel three times (and three automatic reel-to-Story cards). A failure is now reported once instead.

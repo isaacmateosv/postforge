@@ -378,7 +378,7 @@ login/logout check passed; you're creating the social apps now; OK to download a
   - **Your verdict on test 1** (copy: `logs/caption-ab/taste-test-round2/picks/`): picks 8B 4,
     3B 3; "wouldn't post" 8B 7, 3B 5; on 5 of 8 Spanish topics you rejected both. Your notes set
     the brand rules (now in the prompts, and in memory):
-    - the client business has **no shop**: orders only, which customers **retiran** (pick up) or receive
+    - The client business has **no shop**: orders only, which customers **retiran** (pick up) or receive
       through an **Uber** courier. Never "visit us", a shop, or a neighborhood.
     - **Premium voice:** avant-garde gourmet pastry and a premium, person-centered experience at
       relatively low prices. Everything should sound classy.

@@ -32,8 +32,8 @@ fn run_engine(project: PathBuf, operation: String, mut payload: Value) -> Result
     if !valid_workspace(&project) {
         return Err("Local installation not found. Open Settings → Advanced recovery. / No se encontró la instalación local. Abre Ajustes → Recuperación avanzada.".into());
     }
-    let allowed = ["services_status", "services_action", "services_progress", "preferences", "preferences_save", "requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "backup_recent", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "preview", "revise", "submit", "cleanup_preview", "cleanup",
-                   "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_resume", "approve_status"];
+    let allowed = ["services_status", "services_action", "services_progress", "preferences", "preferences_save", "requirements", "network_status", "network_apply", "options", "connections", "media_inspect", "media_frame", "updates", "update_download", "backup_start", "backup_status", "backup_recent", "whatsapp_receipts", "whatsapp_audience", "whatsapp_audience_save", "dashboard", "whatsapp_state", "whatsapp_connect", "whatsapp_finish", "whatsapp_logout", "preview", "revise", "submit", "cleanup_preview", "cleanup",
+                   "help", "telegram_status", "telegram_inspect", "telegram_detect", "telegram_save", "telegram_disconnect", "telegram_resume", "approve_status"];
     if !allowed.contains(&operation.as_str()) {
         return Err("Unknown PostForge operation.".into());
     }

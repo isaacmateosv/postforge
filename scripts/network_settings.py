@@ -59,6 +59,13 @@ def render_override(content,provider):
     return content[:start]+provider_block(provider)+content[end:]
 
 
+def prune_recovery(work,keep):
+    """Each recovery set holds a full copy of .env; keep only the newest successful one."""
+    import shutil
+    for old in work.glob('network-recovery-*'):
+        if old!=keep and old.is_dir() and not old.is_symlink():shutil.rmtree(old,ignore_errors=True)
+
+
 def restore_provider(path):
     """Rebuild the generated connector from encrypted portable settings, without starting it."""
     config=values(path);provider=config['PM_TUNNEL_PROVIDER'] or 'ngrok'
@@ -195,6 +202,7 @@ def apply(payload):
             tunnel.wait_until_ready(local,target,expected,gated=True)
             rebase_media(env,org,config['FRONTEND_URL'],target);rebased=True
             # Keep one recent private recovery set; no provider secrets enter responses.
+            prune_recovery(work,keep=recovery)
             atomic_write(work/'network-last-change.json',json.dumps({'old_url':config['FRONTEND_URL'],'url':target,'at':time.time(),'provider':provider}))
             warning=None
             try:agent_reloaded=reload_agent()

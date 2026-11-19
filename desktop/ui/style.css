@@ -4,12 +4,12 @@
   /* One type scale for the whole app. */
   --fs-small:12px; --fs-body:14px; --fs-large:16px; --fs-title:20px; --fs-display:24px; --fs-stat:30px;
   /* Action colours: Postiz (violet), publish now (green), drafts (blue), disruptive (red). */
-  --postiz:#8b6cf0; --postiz-hover:#9d84f5; --publish:#2f9e62; --publish-hover:#38b572; --danger:#e0786a; }
+  --action:#2766cc; --action-hover:#2a6fdb; --postiz:#7150e0; --postiz-hover:#7a5ae6; --publish:#1d7a4c; --publish-hover:#1e8050; --danger:#e0786a; }
 * { box-sizing:border-box; }
 html { height:100%; }
 body { margin:0; height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; background:var(--bg); color:var(--ink); font:var(--fs-body)/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
-header,footer,main,nav,#notice,#baking-visual { max-width:1160px; margin:0 auto; width:100%; }
-body > header,body > footer,body > nav,#notice,#baking-visual { flex-shrink:0; }
+header,footer,main,nav,#notice,#baking-visual,#sending-visual { max-width:1160px; margin:0 auto; width:100%; }
+body > header,body > footer,body > nav,#notice,#baking-visual,#sending-visual { flex-shrink:0; }
 header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:22px 32px 18px; }
 h1 { font-size:var(--fs-display); font-weight:650; letter-spacing:-.6px; margin:0; }
 h2 { font-size:var(--fs-title); font-weight:650; letter-spacing:-.35px; margin:0 0 10px; }
@@ -25,14 +25,14 @@ button,input,select,textarea { font:inherit; }
 button { cursor:pointer; color:var(--ink); background:#343e4d; border:1px solid #505b6a; border-radius:8px; padding:8px 14px; font-weight:500; line-height:1.4; transition:background .15s,border-color .15s; }
 button:hover:not(:disabled) { background:#414e60; border-color:#748299; }
 button:disabled { opacity:.4; cursor:default; }
-button.primary { color:white; background:var(--blue); border-color:transparent; padding:11px 20px; font-weight:600; }
-button.primary:hover:not(:disabled) { background:#5d9ffa; }
+button.primary { color:white; background:var(--action); border-color:transparent; padding:11px 20px; font-weight:600; }
+button.primary:hover:not(:disabled) { background:var(--action-hover); }
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible { outline:3px solid #8dbaff; outline-offset:3px; }
 .tools button { background:transparent; border-color:transparent; padding:7px 10px; font-size:var(--fs-small); }
 .tools button:hover:not(:disabled) { background:#ffffff0c; }
 .tools .ready { color:#8fd6ad; }
 .tools .ready:hover { background:#8fd6ad10; }
-input,select,textarea { background:var(--field); border:1px solid #536073; border-radius:8px; color:var(--ink); padding:10px 12px; max-width:100%; }
+input,select,textarea { background:var(--field); border:1px solid #73839a; border-radius:8px; color:var(--ink); padding:10px 12px; max-width:100%; }
 textarea { display:block; width:100%; min-height:130px; max-height:300px; resize:vertical; margin:10px 0; line-height:1.65; }
 input[type=checkbox],input[type=radio] { accent-color:var(--blue); }
 nav { display:flex; gap:4px; padding:0 32px 18px; }
@@ -69,7 +69,7 @@ legend { font-size:var(--fs-small); font-weight:600; color:var(--muted); margin-
 .media-heading { justify-content:space-between; flex-wrap:wrap; margin-top:24px; }
 .media-heading button { font-size:var(--fs-small); padding:7px 12px; }
 .media-heading > div:has(button),.dashboard-actions { display:flex; gap:8px; align-items:center; }
-#drop-zone { margin:12px 0 24px; padding:16px; border:1px dashed #536073; border-radius:9px; }
+#drop-zone { margin:12px 0 24px; padding:16px; border:1px dashed #73839a; border-radius:9px; }
 #drop-zone p { margin:0; font-size:var(--fs-small); }
 #media-list { padding-left:20px; font-size:var(--fs-small); overflow-wrap:anywhere; }
 #media-list:empty { display:none; }
@@ -228,7 +228,7 @@ header,footer,main,nav,#baking-visual { max-width:1280px; }
 
 .backup-modes { display:flex; gap:12px; margin:20px 0 12px; }
 .backup-modes button { flex:1; min-height:44px; }
-.backup-modes button[aria-pressed=true] { background:var(--blue); color:white; border-color:var(--blue); }
+.backup-modes button[aria-pressed=true] { background:var(--action); color:white; border-color:var(--action); }
 #backup-instructions { line-height:1.6; margin-bottom:20px; }
 #backup-stage:empty, #backup-result:empty { display:none; }
 #backup-stage[data-error=true] { color:var(--red, #ffb4ab); }
@@ -282,3 +282,30 @@ button.loading::after { content:""; position:absolute; inset:0; margin:auto; wid
   .spinner,.working::before,#notice.busy::before,button.loading::after { animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 }
+
+/* Scheduling: a calendar gets its check while a plane carries the posts out. */
+#sending-visual { display:flex; align-items:center; justify-content:center; gap:16px; padding:10px 32px 18px; }
+#sending-visual svg { width:64px; height:54px; flex:none; overflow:visible; }
+#sending-visual strong { display:block; font-size:var(--fs-body); font-weight:500; }#sending-visual span { display:block; font-size:var(--fs-small); color:var(--muted); margin-top:2px; min-height:1.5em; }
+.send-cal { fill:var(--bg); stroke:#8194ae; stroke-width:2; }.send-cal-top { fill:none; stroke:#8194ae; stroke-width:2; stroke-linecap:round; }
+.send-check { fill:none; stroke:#5fd08f; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:32; stroke-dashoffset:0; }
+.send-plane path { fill:#a3c8fa; stroke:#6ea7f5; stroke-width:1.5; stroke-linejoin:round; }.send-trail { fill:none; stroke:#6ea7f5; stroke-width:1.5; stroke-dasharray:3 4; }
+@media(prefers-reduced-motion:no-preference) {
+  .send-check { animation:send-check 2.4s ease-in-out infinite; }
+  .send-plane { animation:send-plane 2.4s ease-in-out infinite; }
+  .send-trail { animation:send-trail 2.4s linear infinite; }
+  @keyframes send-check { 0%,15% { stroke-dashoffset:32; } 45%,100% { stroke-dashoffset:0; } }
+  @keyframes send-plane { 0%,30% { transform:translate(-6px,6px); opacity:0; } 50% { opacity:1; } 85% { transform:translate(8px,-8px); opacity:1; } 100% { transform:translate(14px,-14px); opacity:0; } }
+  @keyframes send-trail { to { stroke-dashoffset:-14; } }
+}
+
+/* Every window: other actions on the left; Close/Done and the main action on the right (main last). */
+.dialog-footer { flex-wrap:wrap; row-gap:10px; }
+.dialog-footer > span { gap:10px; }
+.dialog-footer > span:last-child { margin-left:auto; justify-content:flex-end; }
+.dialog-footer > span:empty { display:none; }
+
+/* A status that is healthy reads green everywhere; yellow stays reserved for attention. */
+.callout.ok { background:#253a30; border-color:#527d65; color:#b6e5c7; }
+/* Narrow windows keep every header button on one line: the activity pill shrinks to its spinner. */
+@media(max-width:1000px) { .activity { padding:6px 8px; margin-right:4px; } #activity-text { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); } }

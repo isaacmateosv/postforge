@@ -53,6 +53,9 @@ def dispatch(operation, payload):
     if operation == "whatsapp_receipts":
         import desktop_status
         return desktop_status.receipts(env,payload)
+    if operation == "whatsapp_logout":
+        import desktop_status
+        return desktop_status.whatsapp_logout(env, payload)
     if operation == "whatsapp_finish":
         import desktop_status
         import subprocess
@@ -111,7 +114,8 @@ def dispatch(operation, payload):
         actions = {"telegram_status": lambda: telegram_settings.status(),
                    "telegram_inspect": lambda: telegram_settings.inspect(payload),
                    "telegram_detect": lambda: telegram_settings.detect(payload),
-                   "telegram_save": lambda: telegram_settings.save(payload)}
+                   "telegram_save": lambda: telegram_settings.save(payload),
+                   "telegram_disconnect": lambda: telegram_settings.disconnect(payload)}
         if operation in actions:
             return actions[operation]()
     raise pmlib.PMError("Unknown desktop operation.")

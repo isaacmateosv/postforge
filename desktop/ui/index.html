@@ -33,6 +33,14 @@
 <g class="mix-sparks"><path d="m18 14 1.5 4.5L24 20l-4.5 1.5L18 26l-1.5-4.5L12 20l4.5-1.5Z"/><path d="m80 22 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/><path d="m40 6 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/></g>
 </svg><div><strong data-en="Baking your idea" data-es="Horneando tu idea"></strong><span data-en="Finding the right words" data-es="Buscando las palabras precisas"></span></div>
 </div>
+<div id="sending-visual" role="status" aria-live="polite" hidden>
+<svg viewBox="0 0 96 76" aria-hidden="true">
+<rect class="send-cal" x="10" y="18" width="46" height="44" rx="6"/><path class="send-cal-top" d="M10 30h46M22 12v12M44 12v12"/>
+<path class="send-check" d="M22 46l7 7 13-14"/>
+<g class="send-plane"><path d="M58 40 90 24 80 58 70 47Z"/><path d="M70 47 90 24"/></g>
+<path class="send-trail" d="M40 62Q52 56 60 50"/>
+</svg><div><strong id="sending-title"></strong><span id="sending-step"></span></div>
+</div>
 <main>
 <button id="public-access-warning" class="callout" hidden></button>
 <section id="home" class="page">
@@ -198,7 +206,7 @@
 <div class="actions wrap"><button id="network-apply" data-en="Save access settings" data-es="Guardar ajustes de acceso"></button></div>
 <div class="network-recovery"><p class="hint" data-en="Last resort: requesting a different temporary link changes the address again. It does not renew social account sessions and may require updating developer callbacks before a future reconnection." data-es="Último recurso: pedir otro enlace temporal vuelve a cambiar la dirección. No renueva las sesiones de tus redes y puede exigir actualizar las redirecciones antes de una futura reconexión."></p><button id="network-rotate" data-en="Request a different temporary link" data-es="Pedir otro enlace temporal"></button></div>
 </details>
-<div class="actions wrap network-footer"><button id="network-check" data-en="Check again" data-es="Comprobar otra vez"></button><button id="network-accounts" data-en="Check social accounts" data-es="Revisar cuentas de redes"></button><button id="network-postiz" class="postiz" data-en="Open Postiz" data-es="Abrir Postiz"></button><button id="network-close" data-en="Done" data-es="Listo"></button></div>
+<div class="actions between dialog-footer network-footer"><span class="actions wrap"><button id="network-check" data-en="Check again" data-es="Comprobar otra vez"></button><button id="network-accounts" data-en="Check social accounts" data-es="Revisar cuentas de redes"></button></span><span class="actions wrap"><button id="network-close" data-en="Done" data-es="Listo"></button><button id="network-postiz" class="postiz" data-en="Open Postiz" data-es="Abrir Postiz"></button></span></div>
 </dialog>
 <dialog hidden role="dialog" id="app-settings" aria-labelledby="settings-title">
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
@@ -220,7 +228,7 @@
 <p data-en="Manage this installation’s containers. Docker Desktop, Ollama and other projects are left running." data-es="Administra los contenedores de esta instalación. Docker Desktop, Ollama y otros proyectos siguen en ejecución."></p>
 <div id="services-summary" class="callout" role="status"></div><progress id="services-progress" max="100" hidden></progress><p id="services-feedback" role="status" aria-live="polite"></p>
 <p class="hint" data-en="Stopping pauses WhatsApp intake. The host Telegram receiver remains available while the Mac is awake. Complete or cancel scheduled work before stopping. Temporary links may change when services start again. After editing .env, use Apply settings changes: only changed services restart and the current link is kept." data-es="Al detener los servicios se pausa el ingreso por WhatsApp. El receptor de Telegram sigue disponible mientras el Mac esté despierto. Completa o cancela el trabajo programado antes de detenerlos. Los enlaces temporales pueden cambiar al iniciar otra vez. Después de editar .env, usa Aplicar cambios de ajustes: solo se reinician los servicios que cambiaron y se conserva el enlace actual."></p>
-<div class="actions wrap"><button id="services-recheck" data-en="Check again" data-es="Comprobar otra vez"></button><button id="services-start" class="primary" data-en="Start services" data-es="Iniciar servicios"></button><button id="services-stop" class="danger" data-en="Stop services" data-es="Detener servicios"></button><button id="services-network" data-en="Check Postiz link" data-es="Revisar enlace de Postiz"></button><button id="services-close" data-en="Done" data-es="Listo"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"><button id="services-recheck" data-en="Check again" data-es="Comprobar otra vez"></button><button id="services-network" data-en="Check Postiz link" data-es="Revisar enlace de Postiz"></button><button id="services-stop" class="danger" data-en="Stop services" data-es="Detener servicios"></button></span><span class="actions wrap"><button id="services-close" data-en="Done" data-es="Listo"></button><button id="services-start" class="primary" data-en="Start services" data-es="Iniciar servicios"></button></span></div>
 </dialog>
 <dialog hidden role="dialog" id="preferences-dialog" aria-labelledby="preferences-title">
 <h2 id="preferences-title" data-en="History & caption defaults" data-es="Historial y ajustes del texto"></h2>
@@ -229,19 +237,26 @@
 <div class="settings-field"><label for="preference-tag" data-en="Default business hashtag · optional" data-es="Hashtag predeterminado del negocio · opcional"></label><input id="preference-tag" placeholder="#YourBusiness" maxlength="61"><small data-en="Leave empty to omit it. Generated hashtags remain alongside this final tag." data-es="Déjalo vacío para omitirlo. Los hashtags generados se conservan junto a esta etiqueta final."></small></div>
 <details class="access-guide"><summary data-en="Advanced · local caption model" data-es="Avanzado · modelo local para textos"></summary><div class="settings-field"><label for="preference-model" data-en="Installed Ollama model" data-es="Modelo instalado en Ollama"></label><input id="preference-model" list="preference-models" autocomplete="off" spellcheck="false"><datalist id="preference-models"></datalist><small data-en="Use a model already installed on this machine. This does not download models or enable a cloud AI provider. Exact words work without a model." data-es="Usa un modelo que ya esté instalado en este equipo. Esto no descarga modelos ni activa proveedores de IA en la nube. Conservar tus palabras funciona sin un modelo."></small></div><p id="preference-model-state" class="hint"></p></details>
 <p id="preferences-feedback" role="status" aria-live="polite"></p>
-<div class="actions between"><button id="preferences-close" data-en="Done" data-es="Listo"></button><button id="preferences-save" class="primary" data-en="Save defaults" data-es="Guardar valores predeterminados"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"></span><span class="actions wrap"><button id="preferences-close" data-en="Done" data-es="Listo"></button><button id="preferences-save" class="primary" data-en="Save defaults" data-es="Guardar valores predeterminados"></button></span></div>
 </dialog>
 <dialog hidden role="dialog" id="whatsapp-settings" aria-labelledby="whatsapp-title">
 <h2 id="whatsapp-title" data-en="Connect WhatsApp" data-es="Conecta WhatsApp"></h2>
 <div id="wa-state" class="callout" role="status"></div>
-<p data-en="On your phone: WhatsApp → Settings → Linked devices → Link a device. Scan the QR here. An existing working session is kept." data-es="En tu teléfono: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo. Escanea el QR aquí. Se conserva una sesión que ya funciona."></p>
+<p id="wa-pair-help" data-en="On your phone: WhatsApp → Settings → Linked devices → Link a device. Scan the QR here. An existing working session is kept." data-es="En tu teléfono: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo. Escanea el QR aquí. Se conserva una sesión que ya funciona."></p>
 <img id="wa-qr" alt="WhatsApp pairing QR" hidden><div id="wa-feedback" role="status"></div>
+<details id="wa-howto" class="audience-settings" open><summary data-en="How to post from WhatsApp" data-es="Cómo publicar desde WhatsApp"></summary>
+<ol class="access-steps">
+<li data-en="Keep publishing services running on this computer. The WhatsApp listener starts with them." data-es="Mantén los servicios de publicación en ejecución en este equipo. El receptor de WhatsApp se inicia con ellos."></li>
+<li data-en="On the linked phone, open your own chat: search your name or “Message yourself”." data-es="En el teléfono vinculado, abre tu propio chat: busca tu nombre o “Envíate un mensaje”."></li>
+<li data-en="Send the photo or video first (up to 10 minutes before), then a message that names a network and a time, for example: “Instagram and Facebook tomorrow 9am”. A voice note works too." data-es="Envía primero la foto o el video (hasta 10 minutos antes) y luego un mensaje que nombre una red y una hora, por ejemplo: “Instagram y Facebook mañana a las 9am”. También sirve una nota de voz."></li>
+<li data-en="PostForge replies in the same chat with the plan and creates drafts for you to approve. Messages to anyone else are never read." data-es="PostForge responde en el mismo chat con el plan y crea borradores para que los apruebes. Nunca lee mensajes de otras personas."></li>
+</ol></details>
 <details class="audience-settings"><summary data-en="Status audience" data-es="Audiencia de los Estados"></summary>
 <p class="hint" data-en="The default applies to new plans. Already queued plans keep their audience. Sending to all contacts can take several minutes per video segment." data-es="El valor predeterminado se aplica a los planes nuevos. Los que ya están en cola conservan su audiencia. El envío a todos los contactos puede tardar varios minutos por cada parte del video."></p>
 <label for="wa-audience" data-en="Default audience" data-es="Audiencia predeterminada"></label><select id="wa-audience"><option value="all" data-en="All contacts" data-es="Todos los contactos"></option><option value="test" data-en="Selected contacts" data-es="Contactos seleccionados"></option></select>
 <label id="wa-recipient-field"><span data-en="Phone numbers with country code · separated by commas" data-es="Números con código de país · separados por comas"></span><textarea id="wa-recipients" rows="2" placeholder="+593…"></textarea></label>
 <button id="wa-audience-save" data-en="Save audience" data-es="Guardar audiencia"></button><p id="wa-audience-result" role="status"></p></details>
-<div class="actions between"><button id="wa-refresh" data-en="Get / refresh QR" data-es="Obtener / renovar QR"></button><button id="wa-close" data-en="Done" data-es="Listo"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"><button id="wa-logout" class="danger" hidden data-en="Unlink this phone" data-es="Desvincular este teléfono"></button></span><span class="actions wrap"><button id="wa-refresh" data-en="Get / refresh QR" data-es="Obtener / renovar QR"></button><button id="wa-close" class="primary" data-en="Done" data-es="Listo"></button></span></div>
 </dialog>
 
 <dialog hidden role="dialog" id="modal" aria-labelledby="modal-title">
@@ -274,14 +289,14 @@
   </div>
   <p class="hint" data-en="Settings, including the secret token, are stored in the private .env and included in encrypted credentials backups. Restores keep Telegram paused until you confirm the old host is stopped. Keep group privacy enabled; no public webhook or inline mode is required." data-es="Los ajustes, incluido el token secreto, se guardan en el .env privado y viajan en los respaldos cifrados de credenciales. Al restaurar, Telegram queda en pausa hasta confirmar que el equipo anterior está detenido. Mantén activa la privacidad de grupos; no necesitas webhook público ni modo inline."></p>
   </div>
-  <div class="actions end settings-actions"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></div>
+  <div class="actions between dialog-footer settings-actions"><span class="actions wrap"><button id="telegram-disconnect" class="danger" hidden data-en="Disconnect bot" data-es="Desconectar bot"></button></span><span class="actions wrap"><button id="telegram-close" data-en="Close" data-es="Cerrar"></button><button id="telegram-save" class="primary" data-en="Save settings" data-es="Guardar ajustes"></button></span></div>
 </dialog>
 
 <dialog hidden role="dialog" id="requirements-dialog" aria-labelledby="requirements-title">
 <h2 id="requirements-title" data-en="Setup requirements" data-es="Requisitos de instalación"></h2>
 <p id="requirements-feedback" role="status"></p><div id="requirements-list"></div>
 <p class="hint" data-en="Inspection needs Python and OpenSSL. Restoring needs Docker running with Compose. Publishing video needs FFmpeg and ffprobe. Ollama is optional for generated captions. No dependencies are installed automatically." data-es="La revisión necesita Python y OpenSSL. Para restaurar, Docker debe estar ejecutándose con Compose. Publicar videos necesita FFmpeg y ffprobe. Ollama es opcional para generar textos. No se instalan dependencias automáticamente."></p>
-<div class="actions between"><button id="requirements-close" data-en="Close" data-es="Cerrar"></button><button id="requirements-retry" data-en="Check again" data-es="Revisar otra vez"></button><button id="requirements-restore" data-en="Open backup restore" data-es="Abrir restauración de respaldo"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"><button id="requirements-restore" data-en="Open backup restore" data-es="Abrir restauración de respaldo"></button></span><span class="actions wrap"><button id="requirements-close" data-en="Close" data-es="Cerrar"></button><button id="requirements-retry" data-en="Check again" data-es="Revisar otra vez"></button></span></div>
 </dialog>
 
 <dialog hidden role="dialog" id="updates-dialog" aria-labelledby="updates-title">
@@ -289,7 +304,7 @@
 <progress id="updates-progress" hidden></progress><p id="updates-feedback" role="status"></p>
 <p id="updates-services" class="hint" hidden></p><button id="updates-releases" hidden data-en="Review available releases" data-es="Revisar versiones disponibles"></button>
 <p class="hint" data-en="Installing updates restarts the desktop and refreshes configured services. Finish active publishing first. Your credentials, media and data are retained." data-es="La instalación reinicia la app y actualiza los servicios configurados. Primero termina cualquier publicación activa. Se conservan tus credenciales, archivos y datos."></p>
-<div class="actions between"><button id="updates-close" data-en="Close" data-es="Cerrar"></button><button id="updates-retry" data-en="Check again" data-es="Revisar otra vez"></button><button id="updates-install" class="primary" hidden data-en="Download &amp; install" data-es="Descargar e instalar"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"><button id="updates-retry" data-en="Check again" data-es="Revisar otra vez"></button></span><span class="actions wrap"><button id="updates-close" data-en="Close" data-es="Cerrar"></button><button id="updates-install" class="primary" hidden data-en="Download &amp; install" data-es="Descargar e instalar"></button></span></div>
 </dialog>
 
 <dialog hidden role="dialog" id="help-dialog" aria-labelledby="help-title">
@@ -312,8 +327,9 @@
 <progress id="backup-progress" value="0" max="100" hidden></progress><p id="backup-stage" role="status"></p><div id="backup-result"></div>
 <label id="backup-replace-row" hidden><input id="backup-replace" type="checkbox"><span data-en="Replace existing local Postiz data (a rollback backup is created first)." data-es="Reemplazar los datos locales de Postiz (primero se crea un respaldo de recuperación)."></span></label>
 <label id="backup-old-host-row" hidden><input id="backup-old-host" type="checkbox"><span data-en="The previous publishing host is stopped." data-es="El equipo que publicaba anteriormente está detenido."></span></label>
-<div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-resume" hidden data-en="Resume progress" data-es="Retomar progreso"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="danger" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></div>
+<div class="actions between dialog-footer"><span class="actions wrap"><button id="backup-resume" hidden data-en="Resume progress" data-es="Retomar progreso"></button></span><span class="actions wrap"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="danger" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></span></div>
 </dialog>
-<dialog hidden role="dialog" id="connections-dialog" aria-labelledby="connections-title"><h2 id="connections-title" data-en="Channel connections" data-es="Conexiones de los canales"></h2><p class="hint" data-en="Connection status and token validity reported by Postiz. Publishing results appear in the history." data-es="Estado de conexión y vigencia de los tokens que registra Postiz. Los resultados de publicación aparecen en el historial."></p><div id="connection-summary" class="callout" role="status"></div><div id="connection-rows"></div><p id="connection-checked" class="hint"></p><div class="actions between"><button id="connections-refresh" data-en="Check &amp; renew" data-es="Revisar y renovar"></button><button id="connections-close" data-en="Done" data-es="Listo"></button></div></dialog>
+<dialog hidden role="dialog" id="connections-dialog" aria-labelledby="connections-title"><h2 id="connections-title" data-en="Channel connections" data-es="Conexiones de los canales"></h2><p class="hint" data-en="Connection status and token validity reported by Postiz. Publishing results appear in the history." data-es="Estado de conexión y vigencia de los tokens que registra Postiz. Los resultados de publicación aparecen en el historial."></p><div id="connection-summary" class="callout" role="status"></div><div id="connection-rows"></div><p id="connection-checked" class="hint"></p><div class="actions between dialog-footer"><span class="actions wrap"><button id="connections-refresh" data-en="Check &amp; renew" data-es="Revisar y renovar"></button></span><span class="actions wrap"><button id="connections-close" data-en="Done" data-es="Listo"></button></span></div>
+</dialog>
 </body>
 </html>

@@ -18,7 +18,7 @@ def whatsapp(env, connect=False):
     code, body = pmlib.http('GET', 'http://localhost:8080/instance/connectionState/' + instance, headers, timeout=4)
     state = (body.get('instance') or {}).get('state') if isinstance(body, dict) else None
     if state == 'open':
-        return {'connected': True, 'state': 'open'}
+        return dict({'connected': True, 'state': 'open'}, **whatsapp_identity(env, instance, headers))
     if not connect:
         return {'connected': False, 'state': state or 'unavailable'}
     if code == 404:
@@ -35,6 +35,37 @@ def whatsapp(env, connect=False):
     except (ValueError, TypeError):
         raise pmlib.PMError('A QR code is not ready. Check Evolution and try again. / El QR aún no está listo. Revisa Evolution y vuelve a intentar.') from None
     return {'connected': False, 'state': 'pairing', 'qr': 'data:image/png;base64,' + base64.b64encode(raw).decode()}
+
+
+def whatsapp_identity(env, instance, headers):
+    """The linked phone number and profile name, so the operator can see which account is in use."""
+    code, body = pmlib.http('GET', 'http://localhost:8080/instance/fetchInstances?instanceName=' + instance, headers, timeout=4)
+    item = (body[0] if isinstance(body, list) and body else body) if code == 200 else None
+    if not isinstance(item, dict):
+        return {}
+    digits = str(item.get('ownerJid') or '').split('@')[0].split(':')[0]
+    name = str(item.get('profileName') or '').strip()[:80]
+    return {'number': '+' + digits if digits.isdigit() and 6 <= len(digits) <= 15 else None, 'profile_name': name or None}
+
+
+def whatsapp_logout(env, payload):
+    """Unlink the phone from Evolution so another number can be enrolled with a fresh QR."""
+    if payload.get('confirmed') is not True:
+        raise ValueError('Review and confirm unlinking WhatsApp. / Revisa y confirma la desvinculación de WhatsApp.')
+    import operation_guard
+    try:
+        operation_guard.assert_idle(pmlib.ROOT)
+    except ValueError as error:
+        raise pmlib.PMError(str(error)) from None
+    instance = quote(env.get('WA_INSTANCE', 'status-engine'), safe='')
+    headers = {'apikey': env.get('AUTHENTICATION_API_KEY', '')}
+    code, _ = pmlib.http('DELETE', 'http://localhost:8080/instance/logout/' + instance, headers, timeout=15)
+    if code not in (200, 201, 404):
+        # A half-closed session cannot log out; removing the instance also clears it.
+        code, _ = pmlib.http('DELETE', 'http://localhost:8080/instance/delete/' + instance, headers, timeout=15)
+        if code not in (200, 201, 404):
+            raise pmlib.PMError('Evolution could not unlink WhatsApp. Check that services are running. / Evolution no pudo desvincular WhatsApp. Revisa que los servicios estén en ejecución.')
+    return whatsapp(env)
 
 
 def dashboard(env):

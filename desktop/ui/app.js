@@ -128,7 +128,18 @@ async function engine(operation, payload = {}) {
   return invoke("engine", { operation, payload });
 }
 
-async function work(message, action, baking=false) {
+// visual: true = baking whisk (captions), "send" = scheduling animation with rotating steps.
+let sendingTimer=null;
+function sendingVisual(show,title=""){
+  clearInterval(sendingTimer);sendingTimer=null;
+  $("sending-visual").hidden=!show;
+  if(!show)return;
+  const steps=[text("Preparing your media","Preparando tus archivos"),text("Uploading to Postiz","Subiendo a Postiz"),text("Queueing each network","Programando cada red"),text("Checking the schedule","Revisando la programación")];
+  let index=0;$("sending-title").textContent=title;$("sending-step").textContent=steps[0];
+  sendingTimer=setInterval(()=>{index=Math.min(index+1,steps.length-1);$("sending-step").textContent=steps[index];},2600);
+}
+async function work(message, action, visual=false) {
+  const baking=visual===true,sending=visual==="send";
   if (state.busy) return;
   state.busy = true;
   // The pressed button shows a spinner in place of its label until the work ends.
@@ -138,8 +149,9 @@ async function work(message, action, baking=false) {
   renderSteps();
   const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #workflow-actions button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
   controls.forEach(node => node.disabled = true);
-  notice(baking ? "" : message, true);
+  notice(baking || sending ? "" : message, true);
   $("baking-visual").hidden = !baking;
+  if(sending)sendingVisual(true,message);
   try {
     await action();
     notice();
@@ -147,6 +159,7 @@ async function work(message, action, baking=false) {
     notice(text("Please review this before continuing.\n", "Revisa esto antes de continuar.\n") + friendlyError(error));
   } finally {
     $("baking-visual").hidden = true;
+    sendingVisual(false);
     state.busy = false;
     pressed?.classList.remove("loading");
     updateTray();
@@ -434,7 +447,7 @@ async function submit(mode) {
   const prompt = submissionMessage(result.plan,mode);
   const confirm = mode === "schedule" ? text("Schedule posts", "Programar publicaciones") : labels.create[state.language === "es" ? 1 : 0];
   if (!await modal(text("Confirm this plan", "Confirma este plan"), prompt, confirm)) return;
-  await work(text("Submitting the reviewed plan", "Enviando el plan revisado"), async () => {
+  await work(mode === "schedule" ? text("Scheduling your posts", "Programando tus publicaciones") : text("Creating your drafts", "Creando tus borradores"), async () => {
     state.receipt = await engine("submit", { review_id: result.review_id, mode });
     refreshDashboard(true);
     $("receipt-title").textContent = mode === "schedule" ? text("Delivery scheduled", "Envío programado") : text("Drafts prepared", "Borradores preparados");
@@ -448,7 +461,7 @@ async function submit(mode) {
     showPage("receipt");
     $("receipt-title").focus({preventScroll:true});
     if(mode==="schedule" && !tiktokInbox) {$("receipt-return").hidden=false;receiptReturn.start(8);}
-  });
+  }, "send");
 }
 
 async function approveStatus() {
@@ -596,7 +609,7 @@ async function refreshDashboard(force=false) {
     showConnections();
     checkPublicAccess();
     updateTray();
-    if (changed || force) renderDashboard();
+    if (changed || force) { renderDashboard(); if (state.options) renderDestinations(); }
   }
   catch (error) { $("dashboard-posts").textContent = text("Local services are unavailable. Open Settings for recovery.", "Los servicios locales no están disponibles. Abre Ajustes para recuperarlos."); }
   finally { state.dashboardPending = false; }
@@ -620,9 +633,14 @@ async function waState() {
   waChecking = true;
   try {
     const result = await engine("whatsapp_state");
-    $("wa-state").textContent = result.connected ? text("✓ WhatsApp connected", "✓ WhatsApp conectado") : text("○ Waiting for the phone", "○ Esperando al teléfono");
+    const who=[result.profile_name,result.number].filter(Boolean).join(" · ");
+    $("wa-state").textContent = result.connected ? text("✓ Connected","✓ Conectado")+(who?" · "+who:"") : text("○ Not linked · get a QR and scan it with the phone","○ Sin vincular · obtén un QR y escanéalo con el teléfono");
     $("wa-state").classList.toggle("connected", result.connected);
     $("wa-refresh").hidden = result.connected;
+    $("wa-logout").hidden = !result.connected;
+    $("wa-pair-help").hidden = !!result.connected;
+    $("wa-refresh").classList.toggle("primary", !result.connected);
+    $("wa-close").classList.toggle("primary", !!result.connected);
     if (result.connected) {
       waClose();
       if (waHadQR) {
@@ -663,7 +681,9 @@ function friendlyError(error) {
 }
 
 function renderTelegramStatus(config) {
-  $("telegram-open").textContent = "Telegram";
+  $("telegram-open").textContent = (config.running ? "✓ " : "○ ") + "Telegram";
+  $("telegram-open").classList.toggle("ready", !!config.running);
+  $("telegram-summary").classList.toggle("ok", !!config.running);
   $("telegram-enabled").checked = config.enabled && !config.migration_hold;
   $("telegram-owner").value = config.owner_id;
   $("telegram-language").value = config.language;
@@ -674,6 +694,7 @@ function renderTelegramStatus(config) {
     : config.running ? text("Connected · owner ", "Conectado · cuenta ") + config.owner_id
     : config.configured ? text("Configured · paused", "Configurado · en pausa")
     : text("Not configured · bring your own bot", "Sin configurar · usa tu propio bot"));
+  $("telegram-disconnect").hidden = !(config.has_token || config.owner_id);
   $("telegram-token").placeholder = config.has_token
     ? text("Saved token · leave empty to keep", "Token guardado · deja vacío para conservarlo")
     : text("Paste the token from BotFather", "Pega el token de BotFather");
@@ -853,6 +874,14 @@ bind("settings-open", () => openDialog("app-settings"));
 bind("settings-close", () => $("app-settings").close());
 bind("whatsapp-open", whatsappSettings);
 bind("wa-close", () => { waClose(); $("whatsapp-settings").close(); });
+bind("wa-logout", async () => {
+  const number=$("wa-state").textContent.replace(/^.*?·\s*/,"");
+  if(!await modal(text("Unlink this phone?","¿Desvincular este teléfono?"),text("PostForge stops reading and replying in WhatsApp, and WhatsApp Status can't be sent until a phone is linked again. Drafts, Postiz and social accounts are not affected. Afterwards, get a QR to link the same or another number.\n\nLinked: ","PostForge deja de leer y responder en WhatsApp, y no se pueden enviar Estados hasta vincular un teléfono otra vez. Los borradores, Postiz y las redes no cambian. Después, obtén un QR para vincular el mismo u otro número.\n\nVinculado: ")+number,text("Unlink","Desvincular")))return;
+  $("wa-logout").disabled=true;$("wa-feedback").classList?.add("working");$("wa-feedback").textContent=text("Unlinking…","Desvinculando…");
+  try{await engine("whatsapp_logout",{confirmed:true});$("wa-feedback").textContent=text("✓ Unlinked. Get a QR to link a phone.","✓ Desvinculado. Obtén un QR para vincular un teléfono.");waHadQR=false;await waState();clearInterval(waTimer);waTimer=setInterval(waState,4000);await refreshDashboard(true);}
+  catch(error){$("wa-feedback").textContent=friendlyError(error);}
+  finally{$("wa-logout").disabled=false;$("wa-feedback").classList?.remove("working");}
+});
 $("whatsapp-settings").oncancel = waClose;
 bind("wa-refresh", async () => {
   $("wa-refresh").disabled = true;
@@ -913,6 +942,17 @@ bind("telegram-detect", () => telegramAction(async () => {
 $("telegram-owners").onchange = () => { $("telegram-owner").value = $("telegram-owners").value; };
 bind("telegram-close", () => { $("telegram-token").value = ""; $("telegram-settings").close(); });
 $("telegram-settings").oncancel = () => { $("telegram-token").value = ""; };
+bind("telegram-disconnect", async () => {
+  if (!await modal(text("Disconnect this bot?", "¿Desconectar este bot?"),
+    text("PostForge forgets the bot token and authorized owner on this computer and stops the Telegram receiver. The bot itself is not deleted; you can revoke its token in @BotFather. Then you can enroll a new bot here.",
+         "PostForge olvida el token del bot y la cuenta autorizada en este equipo y detiene el receptor de Telegram. El bot no se elimina; puedes revocar su token en @BotFather. Después puedes configurar un bot nuevo aquí."),
+    text("Disconnect", "Desconectar"))) return;
+  await telegramAction(async () => {
+    renderTelegramStatus(await engine("telegram_disconnect", { confirmed: true }));
+    $("telegram-token").value = ""; $("telegram-owner").value = "";
+    $("telegram-feedback").textContent = text("✓ Disconnected. Paste a new BotFather token to enroll another bot.", "✓ Desconectado. Pega un token nuevo de BotFather para configurar otro bot.");
+  });
+});
 bind("telegram-save", async () => {
   const payload = { token: $("telegram-token").value, owner_id: $("telegram-owner").value,
     enabled: $("telegram-enabled").checked, language: $("telegram-language").value,
@@ -1503,6 +1543,7 @@ async function servicesStatus(){
     const start=$("services-start"),label=result.running?["Apply settings changes","Aplicar cambios de ajustes"]:["Start services","Iniciar servicios"];
     if(start.dataset){start.dataset.en=label[0];start.dataset.es=label[1];}start.textContent=text(...label);
     start.disabled=!!active || !result.configured || !result.engine_ready;
+    $("services-summary").classList?.toggle("ok", !!result.running && !active);
     $("services-stop").disabled=!!active || !result.running || !result.queue_known || pending>0;
     if(pending)$("services-feedback").textContent=pending+text(" scheduled items must finish or be cancelled before stopping."," elementos programados deben terminar o cancelarse antes de detener los servicios.");
     else if(!active)$("services-feedback").textContent=result.task?.error?text("Last service action: ","Última acción de servicios: ")+friendlyError(result.task.error):"";
