@@ -17,6 +17,7 @@
 <header>
   <div class="brand"><img src="mark.png" alt=""><div><h1>PostForge</h1><p id="subtitle"></p></div></div>
   <div class="tools">
+    <span id="activity" class="activity" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span id="activity-text"></span></span>
 
     <button id="go-home" data-en="Dashboard" data-es="Inicio"></button><button id="whatsapp-open">WhatsApp</button><button id="telegram-open">Telegram</button><button id="connections-open" data-en="Connections" data-es="Conexiones"></button><button id="settings-open" data-en="Settings" data-es="Ajustes"></button><button id="help"></button>
   </div>
@@ -47,7 +48,7 @@
 <label><span data-en="Type" data-es="Tipo"></span><select id="receipt-kind"><option value="all" data-en="All types" data-es="Todos los tipos"></option><option value="video">Video</option><option value="image" data-en="Image" data-es="Imagen"></option><option value="text" data-en="Text" data-es="Texto"></option></select></label></div>
 <div id="receipt-rows" aria-live="polite"></div><div class="history-pagination"><button id="receipt-prev" data-en="Previous" data-es="Anterior"></button><span id="receipt-page"></span><button id="receipt-next" data-en="Next" data-es="Siguiente"></button></div>
 <p class="hint" data-en="Views depend on read receipts being enabled on both phones." data-es="Las vistas dependen de que ambos teléfonos tengan activadas las confirmaciones de lectura."></p></section></details>
-  <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><div class="dashboard-actions"><button id="reconnect"></button><button id="home-calendar" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div></div><div id="dashboard-posts" class="post-list"></div></article>
+  <article class="card"><div class="media-heading"><div><h2 data-en="Drafts & upcoming posts" data-es="Borradores y próximas publicaciones"></h2><p data-en="Open Postiz to review, approve or change a saved post." data-es="Abre Postiz para revisar, aprobar o cambiar una publicación guardada."></p></div><div class="dashboard-actions"><button id="reconnect"></button><button id="home-calendar" class="postiz" data-en="Open Postiz ↗" data-es="Abrir Postiz ↗"></button></div></div><div id="dashboard-posts" class="post-list"></div></article>
 </section>
 
 <section id="compose" class="page" hidden>
@@ -154,7 +155,7 @@
   <article class="card">
     <div class="success-mark" aria-hidden="true">✓</div><h2 id="receipt-title" tabindex="-1"></h2><div id="receipt-content"></div>
     <div id="receipt-return" hidden><p id="receipt-countdown" aria-live="off"></p><progress id="receipt-progress" max="8" value="8" aria-label="Return to dashboard"></progress><button id="receipt-stay" data-en="Stay here" data-es="Quedarme aquí"></button></div>
-    <div class="actions wrap"><button id="receipt-tiktok-copy" hidden data-en="Copy caption for TikTok" data-es="Copiar texto para TikTok"></button><button id="receipt-dashboard" class="primary" data-en="Go to Dashboard" data-es="Ir al inicio"></button><button id="new-plan"></button><button id="calendar"></button><button id="approve-status"></button></div>
+    <div class="actions wrap"><button id="receipt-tiktok-copy" hidden data-en="Copy caption for TikTok" data-es="Copiar texto para TikTok"></button><button id="receipt-dashboard" class="primary" data-en="Go to Dashboard" data-es="Ir al inicio"></button><button id="new-plan"></button><button id="calendar" class="postiz"></button><button id="approve-status" class="publish"></button></div>
   </article>
 </section>
 </main>
@@ -162,7 +163,7 @@
   <div><strong id="workflow-next-title"></strong><small id="workflow-next-detail"></small></div>
   <div id="compose-actions" class="actions"><button id="to-delivery" class="primary"></button></div>
   <div id="delivery-actions" class="actions"><button id="back-compose"></button><button id="bake" class="primary"></button></div>
-  <div id="review-actions" class="actions wrap"><button id="create" class="primary"></button><button id="schedule"></button></div>
+  <div id="review-actions" class="actions wrap"><button id="create" class="primary"></button><button id="schedule" class="publish"></button></div>
 </section>
 <div id="selection-feedback" role="status" aria-live="polite" hidden></div>
 <footer><span id="workspace-status"></span><button id="new"></button></footer>
@@ -197,7 +198,7 @@
 <div class="actions wrap"><button id="network-apply" data-en="Save access settings" data-es="Guardar ajustes de acceso"></button></div>
 <div class="network-recovery"><p class="hint" data-en="Last resort: requesting a different temporary link changes the address again. It does not renew social account sessions and may require updating developer callbacks before a future reconnection." data-es="Último recurso: pedir otro enlace temporal vuelve a cambiar la dirección. No renueva las sesiones de tus redes y puede exigir actualizar las redirecciones antes de una futura reconexión."></p><button id="network-rotate" data-en="Request a different temporary link" data-es="Pedir otro enlace temporal"></button></div>
 </details>
-<div class="actions wrap network-footer"><button id="network-check" data-en="Check again" data-es="Comprobar otra vez"></button><button id="network-accounts" data-en="Check social accounts" data-es="Revisar cuentas de redes"></button><button id="network-postiz" class="primary" data-en="Open Postiz" data-es="Abrir Postiz"></button><button id="network-close" data-en="Done" data-es="Listo"></button></div>
+<div class="actions wrap network-footer"><button id="network-check" data-en="Check again" data-es="Comprobar otra vez"></button><button id="network-accounts" data-en="Check social accounts" data-es="Revisar cuentas de redes"></button><button id="network-postiz" class="postiz" data-en="Open Postiz" data-es="Abrir Postiz"></button><button id="network-close" data-en="Done" data-es="Listo"></button></div>
 </dialog>
 <dialog hidden role="dialog" id="app-settings" aria-labelledby="settings-title">
 <h2 id="settings-title" data-en="Settings & connections" data-es="Ajustes y conexiones"></h2>
@@ -219,7 +220,7 @@
 <p data-en="Manage this installation’s containers. Docker Desktop, Ollama and other projects are left running." data-es="Administra los contenedores de esta instalación. Docker Desktop, Ollama y otros proyectos siguen en ejecución."></p>
 <div id="services-summary" class="callout" role="status"></div><progress id="services-progress" max="100" hidden></progress><p id="services-feedback" role="status" aria-live="polite"></p>
 <p class="hint" data-en="Stopping pauses WhatsApp intake. The host Telegram receiver remains available while the Mac is awake. Complete or cancel scheduled work before stopping. Temporary links may change when services start again. After editing .env, use Apply settings changes: only changed services restart and the current link is kept." data-es="Al detener los servicios se pausa el ingreso por WhatsApp. El receptor de Telegram sigue disponible mientras el Mac esté despierto. Completa o cancela el trabajo programado antes de detenerlos. Los enlaces temporales pueden cambiar al iniciar otra vez. Después de editar .env, usa Aplicar cambios de ajustes: solo se reinician los servicios que cambiaron y se conserva el enlace actual."></p>
-<div class="actions wrap"><button id="services-recheck" data-en="Check again" data-es="Comprobar otra vez"></button><button id="services-start" class="primary" data-en="Start services" data-es="Iniciar servicios"></button><button id="services-stop" data-en="Stop services" data-es="Detener servicios"></button><button id="services-network" data-en="Check Postiz link" data-es="Revisar enlace de Postiz"></button><button id="services-close" data-en="Done" data-es="Listo"></button></div>
+<div class="actions wrap"><button id="services-recheck" data-en="Check again" data-es="Comprobar otra vez"></button><button id="services-start" class="primary" data-en="Start services" data-es="Iniciar servicios"></button><button id="services-stop" class="danger" data-en="Stop services" data-es="Detener servicios"></button><button id="services-network" data-en="Check Postiz link" data-es="Revisar enlace de Postiz"></button><button id="services-close" data-en="Done" data-es="Listo"></button></div>
 </dialog>
 <dialog hidden role="dialog" id="preferences-dialog" aria-labelledby="preferences-title">
 <h2 id="preferences-title" data-en="History & caption defaults" data-es="Historial y ajustes del texto"></h2>
@@ -311,7 +312,7 @@
 <progress id="backup-progress" value="0" max="100" hidden></progress><p id="backup-stage" role="status"></p><div id="backup-result"></div>
 <label id="backup-replace-row" hidden><input id="backup-replace" type="checkbox"><span data-en="Replace existing local Postiz data (a rollback backup is created first)." data-es="Reemplazar los datos locales de Postiz (primero se crea un respaldo de recuperación)."></span></label>
 <label id="backup-old-host-row" hidden><input id="backup-old-host" type="checkbox"><span data-en="The previous publishing host is stopped." data-es="El equipo que publicaba anteriormente está detenido."></span></label>
-<div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-resume" hidden data-en="Resume progress" data-es="Retomar progreso"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="primary" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></div>
+<div class="actions between"><button id="backup-close" data-en="Close" data-es="Cerrar"></button><button id="backup-resume" hidden data-en="Resume progress" data-es="Retomar progreso"></button><button id="backup-start" class="primary" data-en="Create backup" data-es="Crear respaldo"></button><button id="backup-restore" class="danger" hidden data-en="Restore this backup" data-es="Restaurar este respaldo"></button></div>
 </dialog>
 <dialog hidden role="dialog" id="connections-dialog" aria-labelledby="connections-title"><h2 id="connections-title" data-en="Channel connections" data-es="Conexiones de los canales"></h2><p class="hint" data-en="Connection status and token validity reported by Postiz. Publishing results appear in the history." data-es="Estado de conexión y vigencia de los tokens que registra Postiz. Los resultados de publicación aparecen en el historial."></p><div id="connection-summary" class="callout" role="status"></div><div id="connection-rows"></div><p id="connection-checked" class="hint"></p><div class="actions between"><button id="connections-refresh" data-en="Check &amp; renew" data-es="Revisar y renovar"></button><button id="connections-close" data-en="Done" data-es="Listo"></button></div></dialog>
 </body>

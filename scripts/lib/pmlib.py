@@ -480,6 +480,11 @@ VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
 
 
 IMAGE_MAX_BYTES = 9 * 1024 * 1024  # Postiz's limit is 10 MB per image
+# Meta, Threads and others download feed video from the public link. A 111 MB / 10 Mbps phone
+# clip timed out there (2026-11-19: Instagram "Video download failed", Threads "could not process
+# the media", Facebook resent the upload three times). Phone video above this rate is re-encoded;
+# the platforms re-encode to a lower rate themselves, so the visible quality is unchanged.
+SOCIAL_VIDEO_MAX_KBPS = 5000
 
 
 def normalize_media(src, tmp):
@@ -491,7 +496,7 @@ def normalize_media(src, tmp):
         small = os.path.getsize(src) <= IMAGE_MAX_BYTES
         return "image", (src if ext in (".jpg", ".jpeg", ".png") and small else to_jpeg(src, tmp))
     if ext in VIDEO_EXT:
-        return "video", to_mp4(src, tmp)
+        return "video", to_mp4(src, tmp, max_kbps=SOCIAL_VIDEO_MAX_KBPS)
     raise PMError("Unsupported media type '%s' (images: JPG/PNG/HEIC/WEBP, videos: MP4/MOV/WEBM)." % ext)
 
 
@@ -536,8 +541,9 @@ def to_jpeg(src, out_dir, max_side=1920):
     return out
 
 
-def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
-    """Return src if it already is an H.264/AAC MP4 within limits, else a transcoded copy."""
+def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None, max_kbps=None):
+    """Return src if it already is an H.264/AAC MP4 within limits, else a transcoded copy.
+    max_kbps caps the overall bitrate (with 15% tolerance before re-encoding a compliant file)."""
     if not which("ffprobe") or not which("ffmpeg"):
         raise PMError("ffmpeg/ffprobe are required for video (brew install ffmpeg).")
     duration, vcodec, acodec, width, height = ffprobe(src)
@@ -546,8 +552,10 @@ def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
     ext = os.path.splitext(src)[1].lower()
     too_long = bool(max_seconds) and duration > max_seconds
     fits_bytes = max_bytes is None or os.path.getsize(src) <= max_bytes
+    source_kbps = os.path.getsize(src) * 8 / 1000 / duration if duration > 0 else 0
+    fits_rate = max_kbps is None or source_kbps <= max_kbps * 1.15
     if (ext == ".mp4" and vcodec == "h264" and acodec in (None, "aac")
-            and not too_long and fits_bytes and max(width, height) <= max_side):
+            and not too_long and fits_bytes and fits_rate and max(width, height) <= max_side):
         return src
     out = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".mp4")
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", src]
@@ -559,6 +567,12 @@ def to_mp4(src, out_dir, max_seconds=None, max_side=1920, *, max_bytes=None):
         # Allow for audio, MP4 overhead and encoder bitrate variation.
         video_kbps = max(100, int(max_bytes * 8 * 0.8 / seconds / 1000) - 96)
         rate_limit = ["-maxrate", f"{video_kbps}k", "-bufsize", f"{video_kbps}k"]
+    if max_kbps is not None:
+        video_kbps = max(300, max_kbps - 96)
+        if not rate_limit or int(rate_limit[1][:-1]) > video_kbps:
+            rate_limit = ["-maxrate", f"{video_kbps}k", "-bufsize", f"{video_kbps * 2}k"]
+    # Keep one video and one audio track; phone timecode/metadata tracks are dropped.
+    cmd += ["-map", "0:v:0", "-map", "0:a:0?", "-dn"]
     cmd += [
         "-vf", "scale='min(%d,iw)':'min(%d,ih)':force_original_aspect_ratio=decrease,"
                "scale=trunc(iw/2)*2:trunc(ih/2)*2" % (max_side, max_side),

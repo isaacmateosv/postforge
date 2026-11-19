@@ -189,6 +189,41 @@ class Operations(unittest.TestCase):
             self.assertEqual(calls[2].kwargs["when"] - calls[1].kwargs["when"], timedelta(minutes=1))
             self.assertTrue(any("2 Story drafts" in warning for warning in result["warnings"]))
 
+    def test_temporary_link_skips_facebook_story_but_keeps_feed(self):
+        now = datetime.now(timezone.utc)
+        p = plan_post.plan({}, "Facebook tomorrow at 9am; caption: Delivery check",
+                           ["clip.mp4"], "English", now, placement_override="both")
+        p["reviewed_caption"] = "Delivery check"
+        env = {"FRONTEND_URL": "https://sample-words-here.trycloudflare.com"}
+        with patch.object(pmlib, "Postiz") as client, \
+             patch.object(pmlib, "normalize_media", return_value=("video", "clip.mp4")), \
+             patch.object(pmlib, "is_short", return_value=False), \
+             patch.object(pmlib, "ffprobe", return_value=(30, "h264", "aac", 1080, 1920)), \
+             patch.object(plan_post.media_links, "load_key", return_value=b"k"), \
+             patch.object(pmlib, "append_log"):
+            client.return_value.integrations.return_value = [{"id": "test", "identifier": "facebook", "name": "Test"}]
+            result = plan_post.run(env, p, True)
+        self.assertEqual([t["placement"] for t in result["targets"]], ["feed"])
+        self.assertTrue(any("separate Story skipped" in warning for warning in result["warnings"]))
+        self.assertFalse(plan_post.temporary_link({"FRONTEND_URL": "https://posts.example.com"}))
+
+    def test_social_video_above_bitrate_cap_is_reencoded_without_extra_tracks(self):
+        commands = []
+        with patch.object(pmlib, "which", return_value="/bin/true"), \
+             patch.object(pmlib, "ffprobe", return_value=(90, "h264", "aac", 1080, 1920)), \
+             patch.object(pmlib.os.path, "getsize", return_value=111_000_000), \
+             patch.object(pmlib, "run", side_effect=lambda cmd, **_: commands.append(cmd)), \
+             patch.object(pmlib, "info"):
+            out = pmlib.to_mp4("/in/clip.mp4", "/out", max_kbps=pmlib.SOCIAL_VIDEO_MAX_KBPS)
+        self.assertEqual(out, "/out/clip.mp4")
+        cmd = commands[0]
+        self.assertEqual(cmd[cmd.index("-maxrate") + 1], f"{pmlib.SOCIAL_VIDEO_MAX_KBPS - 96}k")
+        self.assertIn("-dn", cmd)
+        with patch.object(pmlib, "which", return_value="/bin/true"), \
+             patch.object(pmlib, "ffprobe", return_value=(45, "h264", "aac", 1080, 1920)), \
+             patch.object(pmlib.os.path, "getsize", return_value=16_000_000):
+            self.assertEqual(pmlib.to_mp4("/in/small.mp4", "/out", max_kbps=pmlib.SOCIAL_VIDEO_MAX_KBPS), "/in/small.mp4")
+
     def test_text_announcement_overrides_require_explicit_supported_destinations(self):
         now = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
         selected = plan_post.plan({}, 'Instagram tomorrow at 7pm; caption: "Opening at 10 tomorrow"',

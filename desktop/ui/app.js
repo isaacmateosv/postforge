@@ -131,6 +131,9 @@ async function engine(operation, payload = {}) {
 async function work(message, action, baking=false) {
   if (state.busy) return;
   state.busy = true;
+  // The pressed button shows a spinner in place of its label until the work ends.
+  const pressed=document.activeElement?.tagName==="BUTTON"?document.activeElement:null;
+  pressed?.classList.add("loading");
   updateTray();
   renderSteps();
   const controls = document.querySelectorAll("main button, main input, main textarea, main select, header button, header select, footer button, #workflow-actions button, #telegram-settings button, #telegram-settings input, #telegram-settings select");
@@ -145,6 +148,7 @@ async function work(message, action, baking=false) {
   } finally {
     $("baking-visual").hidden = true;
     state.busy = false;
+    pressed?.classList.remove("loading");
     updateTray();
     controls.forEach(node => node.disabled = false);
     $("placement").disabled = state.media.length === 0;
@@ -976,9 +980,20 @@ engine("telegram_resume").catch(() => {
 });
 
 // Native tray mirrors the same window workflows, without creating a second app.
+function activityCount() {
+  return Number(!!state.busy)+Number(!!state.serviceBusy)+Number(!!state.networkBusy)+Number(!!state.updateInstalling)+Number(!!(state.backupBusy || state.backupJob))+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length;
+}
+// A header pill with a spinner whenever anything runs, including work started from dialogs.
+function updateActivity() {
+  const count=activityCount(),pill=$("activity");
+  if(!pill)return;
+  pill.hidden=count===0;
+  $("activity-text").textContent=count>1?count+text(" tasks running"," tareas en curso"):text("Working…","Trabajando…");
+}
 function updateTray() {
+  updateActivity();
   invoke("tray_state", { language:state.language, drafts:state.dashboard?.drafts || 0,
-    queued:state.dashboard?.queue || 0, busy:Number(!!state.busy)+Number(!!(state.backupBusy || state.backupJob))+(state.dashboard?.status_items || []).filter(item=>item.status==="sending").length, update:!!state.updateAvailable }).catch(() => {});
+    queued:state.dashboard?.queue || 0, busy:activityCount(), update:!!state.updateAvailable }).catch(() => {});
 }
 async function requirementsOpen(automatic=false) {
   try {
@@ -1052,11 +1067,11 @@ async function checkUpdates(manual=false) {
 async function installAvailableUpdate() {
   if(state.updateInstalling)return;
   if(state.backupBusy || state.backupJob){$("updates-feedback").textContent=text("Finish backup or migration before installing an update. Resume its progress in Backup & Move.","Termina el respaldo o la migración antes de instalar una actualización. Retoma su progreso en Respaldo y traslado.");return;}
-  state.updateInstalling=true;$("updates-install").disabled=true;$("updates-retry").disabled=true;$("updates-progress").hidden=false;
+  state.updateInstalling=true;globalThis.updateTray?.();$("updates-feedback").classList?.add("working");$("updates-install").disabled=true;$("updates-retry").disabled=true;$("updates-progress").hidden=false;
   $("updates-feedback").textContent=text("Downloading and verifying. PostForge will restart and refresh its services. Wait until publishing has finished before updating.","Descargando y verificando. PostForge se reiniciará y actualizará sus servicios. Espera a que termine cualquier publicación antes de actualizar.");
   try {await invoke("install_update");}
   catch(error){$("updates-feedback").textContent=friendlyError(error);}
-  finally {state.updateInstalling=false;$("updates-install").disabled=false;$("updates-retry").disabled=false;$("updates-progress").hidden=true;}
+  finally {state.updateInstalling=false;globalThis.updateTray?.();$("updates-feedback").classList?.remove("working");$("updates-install").disabled=false;$("updates-retry").disabled=false;$("updates-progress").hidden=true;}
 }
 bind("updates-releases",()=>invoke("open_releases"));
 bind("updates-retry",()=>checkUpdates(true));bind("updates-install",installAvailableUpdate);
@@ -1125,7 +1140,7 @@ function backupComplete(action,data){
 }
 async function backupObserve(){
   const job=state.backupJob;if(!job || state.backupBusy)return;
-  state.backupBusy=true;backupControls();updateTray();$("backup-progress").hidden=false;$("backup-stage").dataset.error="false";
+  state.backupBusy=true;backupControls();updateTray();$("backup-stage").classList?.add("working");$("backup-progress").hidden=false;$("backup-stage").dataset.error="false";
   let failures=0;
   try{
     while(true){
@@ -1143,7 +1158,7 @@ async function backupObserve(){
       backupComplete(job.action,result.result);break;
     }
   }catch(error){$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
-  finally{state.backupBusy=false;backupControls();updateTray();}
+  finally{state.backupBusy=false;backupControls();updateTray();$("backup-stage").classList?.remove("working");}
 }
 function backupClearInspection() {
   state.backupInspection=null;
@@ -1165,12 +1180,12 @@ async function backupRun(action) {
     if(!await modal(text("Restore local data?","¿Restaurar los datos locales?"),text("Local publishing services will stop. Verify restored channels before starting them again. Telegram stays paused.","Los servicios locales de publicación se detendrán. Verifica los canales restaurados antes de iniciarlos otra vez. Telegram queda en pausa."),text("Restore","Restaurar")))return;
     Object.assign(payload,{confirmed:true,fingerprint:state.backupInspection.fingerprint,replace:$("backup-replace").checked});
   }
-  state.backupBusy=true;backupControls();updateTray();$("backup-stage").dataset.error="false";$("backup-stage").textContent=text("Starting…","Iniciando…");$("backup-result").textContent="";$("backup-progress").hidden=false;$("backup-progress").value=0;
+  state.backupBusy=true;backupControls();updateTray();$("backup-stage").classList?.add("working");$("backup-stage").dataset.error="false";$("backup-stage").textContent=text("Starting…","Iniciando…");$("backup-result").textContent="";$("backup-progress").hidden=false;$("backup-progress").value=0;
   try{
     const job=await engine("backup_start",payload);state.backupJob={id:job.id,action,location:state.backupPath};
     $("backup-password").value="";$("backup-confirm").value="";
   }catch(error){$("backup-progress").hidden=true;$("backup-stage").dataset.error="true";$("backup-stage").textContent=friendlyError(error);}
-  finally{state.backupBusy=false;backupControls();updateTray();}
+  finally{state.backupBusy=false;backupControls();updateTray();$("backup-stage").classList?.remove("working");}
   if(state.backupJob)await backupObserve();
 }
 bind("backup-resume",backupObserve);
@@ -1379,11 +1394,11 @@ async function networkApply(rotate=false,synchronize=false){
   const syncing=!rotate && state.network?.needs_sync && provider===state.network.provider;
   const confirmed=await modal(rotate?text("Request a different link?","¿Pedir otro enlace?"):syncing?text("Use the detected Postiz link?","¿Usar el enlace detectado de Postiz?"):text("Save public access settings?","¿Guardar los ajustes de acceso público?"),rotate?text("This deliberately replaces the temporary address. It does not reconnect social accounts. You may need to sign into the gateway and Postiz again and update developer callbacks before reconnecting a channel. Finish queued posts first.","Se reemplazará la dirección temporal. Esto no reconecta tus redes. Puede que debas volver a iniciar sesión en el gateway y Postiz, y actualizar las redirecciones antes de reconectar un canal. Primero completa las publicaciones en cola."):text("PostForge will update the gateway and Postiz together. Your existing social accounts are kept; do not reconnect working accounts. Queued posts must finish first. Keep this window open while the services restart.","PostForge actualizará el gateway y Postiz juntos. Se conservan tus cuentas de redes; no reconectes las que funcionan. Las publicaciones en cola deben terminar primero. Mantén esta ventana abierta mientras se reinician los servicios."),syncing?text("Use detected link","Usar enlace detectado"):text("Continue","Continuar"));
   if(!confirmed)return;
-  state.networkBusy=true;document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=true);
+  state.networkBusy=true;globalThis.updateTray?.();$("network-result").classList?.add("working");document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=true);
   $("network-result").textContent=text("Applying configuration and verifying the gateway. This can take a few minutes. Keep this window open.","Aplicando la configuración y verificando el gateway. Puede tardar unos minutos. Mantén esta ventana abierta.");
   try{await engine("network_apply",{provider,custom_domain:$("network-domain").value,ngrok_domain:$("network-ngrok-domain").value,token:$("network-token").value,rotate,confirm:true});$("network-token").value="";state.options=await engine("options");const checked=await networkCheck(true);if(checked?.reachable && !checked.needs_sync){$("network-result").textContent=reviewNeedsNetworkRefresh(current()?.plan,checked)?text("✓ Public access verified. Your caption is kept. Copy any edits and prepare a fresh review for the new URL before posting.","✓ Acceso público verificado. Se conserva tu texto. Copia cualquier edición y prepara una revisión nueva para la URL actual antes de publicar."):text("✓ Public access verified. Open Postiz with this link. Keep working social accounts connected; update a callback only before a needed reconnection.","✓ Acceso público verificado. Abre Postiz con este enlace. Conserva las cuentas que funcionan; actualiza una redirección solo antes de una reconexión necesaria.");networkCallbacks(checked.url);}}
   catch(error){$("network-result").textContent=friendlyError(error);}
-  finally{state.networkBusy=false;document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=false);if(state.network){networkLinkView.update(state.network,{busy:false,lang:state.language,placeholder:text("Use the detected link first","Primero usa el enlace detectado")});$("network-postiz").disabled=!state.network.reachable || !!state.network.needs_sync;}}
+  finally{state.networkBusy=false;globalThis.updateTray?.();$("network-result").classList?.remove("working");document.querySelectorAll("#network-dialog input,#network-dialog select,#network-dialog button").forEach(node=>node.disabled=false);if(state.network){networkLinkView.update(state.network,{busy:false,lang:state.language,placeholder:text("Use the detected link first","Primero usa el enlace detectado")});$("network-postiz").disabled=!state.network.reachable || !!state.network.needs_sync;}}
 }
 bind("network-open",()=>fromSettings(networkOpen));bind("network-check",()=>networkCheck());bind("network-sync",()=>networkApply(false,true));bind("network-apply",()=>networkApply());bind("network-rotate",()=>networkApply(true));bind("network-close",()=>$("network-dialog").close());$("network-provider").onchange=networkFields;
 bind("network-accounts",async()=>{$("network-dialog").close();await connectionsOpen();});
@@ -1501,12 +1516,12 @@ async function servicesAction(action){
   const applying=action==="start" && !!state.services?.running;
   const approved=await modal(applying?text("Apply settings changes?","¿Aplicar cambios de ajustes?"):action==="start"?text("Start publishing services?","¿Iniciar los servicios de publicación?"):text("Stop publishing services?","¿Detener los servicios de publicación?"),applying?text("PostForge reloads your saved settings (.env) and restarts only the services whose settings changed. The public tunnel keeps its current link and social accounts stay connected. WhatsApp intake pauses for a moment. Finish queued work first.","PostForge vuelve a cargar tus ajustes guardados (.env) y reinicia solo los servicios cuyos ajustes cambiaron. El túnel público conserva su enlace actual y tus redes siguen conectadas. El ingreso por WhatsApp se pausa un momento. Primero completa el trabajo en cola."):action==="start"?text("Missing container images may download. No Ollama model is downloaded. After startup, check the current Postiz link. Existing data and approvals are kept.","Se podrían descargar imágenes de contenedores que falten. No se descarga ningún modelo de Ollama. Después de iniciar, revisa el enlace actual de Postiz. Se conservan los datos y las aprobaciones."):text("WhatsApp intake will pause. Shared tools and other projects stay open. No data or published social content is deleted. Finish queued work first.","Se pausará el ingreso por WhatsApp. Las herramientas compartidas y otros proyectos seguirán abiertos. No se eliminan datos ni contenido publicado. Primero completa el trabajo en cola."),applying?text("Apply changes","Aplicar cambios"):text("Continue","Continuar"));
   if(!approved)return;
-  state.serviceBusy=true;$("services-start").disabled=true;$("services-stop").disabled=true;$("services-progress").hidden=false;$("services-progress").value=0;
+  state.serviceBusy=true;globalThis.updateTray?.();$("services-feedback").classList?.add("working");$("services-start").disabled=true;$("services-stop").disabled=true;$("services-progress").hidden=false;$("services-progress").value=0;
   let polling=false,failure="";
   const timer=setInterval(async()=>{if(polling || !$("services-dialog").open || document.hidden || !document.hasFocus())return;polling=true;try{const result=await engine("services_progress");if(result.running && result.action===action){$("services-progress").value=result.percent||0;$("services-feedback").textContent=friendlyError(result.stage||"");}}catch(_){}finally{polling=false;}},1500);
   try{
     await work(text("Updating publishing services","Actualizando los servicios de publicación"),async()=>{try{await engine("services_action",{action,confirmed:true});await refreshDashboard(true);if(action==="start")await loadOptions();}catch(error){failure=friendlyError(error);throw error;}});
-  }finally{clearInterval(timer);state.serviceBusy=false;$("services-progress").hidden=true;await servicesStatus();if(failure)$("services-feedback").textContent=failure;}
+  }finally{clearInterval(timer);state.serviceBusy=false;globalThis.updateTray?.();$("services-feedback").classList?.remove("working");$("services-progress").hidden=true;await servicesStatus();if(failure)$("services-feedback").textContent=failure;}
 }
 bind("services-open",()=>fromSettings(servicesOpen));bind("services-recheck",servicesStatus);
 bind("services-start",()=>servicesAction("start"));bind("services-stop",()=>servicesAction("stop"));

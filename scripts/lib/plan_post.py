@@ -18,6 +18,7 @@ The caption comes from your idea ("idea:", "sobre", "about", "la idea es"), writ
 model with the brand rules and the fixed order line. Your exact words ("texto:", "caption:", or in
 quotes) are kept as written. Times are configured locally (PM_TIMEZONE, default America/Guayaquil).
 """
+from urllib.parse import urlsplit
 import argparse
 import json
 import math
@@ -275,6 +276,12 @@ def placement(command):
     if feed and not story:
         return "feed"
     return "both"
+
+
+def temporary_link(env):
+    """True when the public URL is a TryCloudflare quick-tunnel hostname."""
+    host = (urlsplit(str(env.get("FRONTEND_URL", ""))).hostname or "").lower()
+    return host.endswith(".trycloudflare.com")
 
 
 def draft_placements(network, requested, has_media):
@@ -567,6 +574,20 @@ def _run(env, p, dry_run, schedule=False):
         usable = []
         for network, channel, _ in targets:
             places = draft_placements(network, requested, bool(kinds))
+            if network == "facebook" and "story" in places and temporary_link(env):
+                # Cloudflare prepends a managed robots.txt to trycloudflare.com that disallows
+                # Meta's story fetcher (meta-externalfetcher), so every Facebook Story fails with
+                # "403 Restricted by robots.txt". Facebook still shares the published reel to the Page Story by
+                # itself (a card linking to the reel); feed posts and Instagram Stories are unaffected.
+                places = tuple(place for place in places if place != "story")
+                result["warnings"].append(
+                    "Facebook: se omitió la historia separada. Facebook comparte el reel en tu historia automáticamente y enlaza a él. "
+                    "Las historias de video separadas no se pueden descargar con enlaces temporales de Cloudflare; con tu propio dominio vuelven a estar disponibles."
+                    if es else
+                    "Facebook: separate Story skipped. Facebook shares the reel to your Story automatically, linking to it. "
+                    "Separate video Stories cannot be downloaded through temporary Cloudflare links; your own domain makes them available again.")
+                if not places:
+                    continue
             if not places:
                 result["warnings"].append(
                     (f"{NAMES[network]}: se omitió porque no admite ese formato con estos archivos." if es else

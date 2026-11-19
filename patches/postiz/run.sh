@@ -73,6 +73,32 @@ for pair in $PM_META_SCOPE_FIX; do
   echo "[pm-patch] meta scopes: $action ($hits files)"
 done
 
+# Gotcha #22: a Facebook feed video is one non-idempotent POST /videos {file_url}. When Meta is
+# slow to download a large file it answers 500 or "temporary, retry" although it keeps creating
+# the reel, and the shared fetch then resends the POST up to twice more: three identical reels
+# (2026-11-19). Starting that one call at the retry limit makes its first failure final, so a
+# slow upload is reported once instead of published three times. Other calls keep their retries.
+FB_VIDEO_OLD="}, 'upload mp4')).json();"
+FB_VIDEO_NEW="}, 'upload mp4', 3)).json();"
+fb_hits=0
+fb_done=0
+for d in $META_DIRS; do
+  f="$d/libraries/nestjs-libraries/src/integrations/social/facebook.provider.js"
+  [ -f "$f" ] || continue
+  if grep -qF "$FB_VIDEO_NEW" "$f"; then
+    fb_done=$((fb_done + 1))
+  elif grep -qF "$FB_VIDEO_OLD" "$f"; then
+    sed -i "s/}, 'upload mp4')).json();/}, 'upload mp4', 3)).json();/" "$f" && fb_hits=$((fb_hits + 1))
+  fi
+done
+if [ "$fb_hits" -gt 0 ]; then
+  echo "[pm-patch] facebook video single-attempt: applied ($fb_hits files)"
+elif [ "$fb_done" -gt 0 ]; then
+  echo "[pm-patch] facebook video single-attempt: already applied"
+else
+  echo "[pm-patch] facebook video single-attempt: NOT applied (image changed?)"
+fi
+
 node /pm-patches/preserve-media.js || exit 1
 
 nginx || exit 1

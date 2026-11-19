@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-rc.51]
+
+- Facebook feed video is uploaded in a single attempt. Postiz's shared retry resent the non-idempotent `POST /videos` when Meta answered slowly, publishing the same reel three times (and three automatic reel-to-Story cards). A failure is now reported once instead.
+- Phone video above 5 Mbps is re-encoded before upload and extra timecode/metadata tracks are dropped, so Meta, Threads and others download it quickly (a 111 MB clip becomes about 26 MB with no visible change). This addresses Instagram "Video download failed" and Threads "could not process the media".
+- On temporary Cloudflare links, separate Facebook video Story drafts are skipped with an explanation: Cloudflare's managed robots.txt blocks Meta's Story fetcher. Facebook still shares each published reel to the Page Story automatically; Instagram Stories are unaffected.
+- Desktop UI: one type scale everywhere; a header activity pill, busy-notice spinner and pressed-button spinner whenever work runs; colour-coded actions (violet Postiz, blue drafts, green publish now, red for disruptive actions).
+
 ## [2.0.0-rc.50]
 
 - Publishing services: while services run, the start control becomes **Apply settings changes** with its own confirmation. It reloads `.env`, recreates only services whose settings changed and keeps the public tunnel link. The tray item is renamed to match.
